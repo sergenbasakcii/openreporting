@@ -1,6 +1,7 @@
 import hashlib
 import json
 import sqlite3
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -90,19 +91,30 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
 CURRENT_VERSION = 1
 
+# Each migration is a tuple of complete statements, executed in one transaction.
+# Only the initial schema is split here; later migrations may contain triggers or
+# other statements with internal semicolons and must be supplied explicitly.
+MIGRATIONS = {1: tuple(statement.strip() for statement in SCHEMA.split(";") if statement.strip())}
+
 
 def init_db(settings: Settings):
     settings.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     settings.archive_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with connect(settings) as db:
+    with connect(settings) as db, transaction(db):
+        # Acquire the write lock before reading the version: web workers may
+        # initialise the same database concurrently during application startup.
         version = db.execute("PRAGMA user_version").fetchone()[0]
         if version > CURRENT_VERSION:
             raise RuntimeError("This application cannot open a newer database schema")
-        if version == 0:
-            # executescript commits implicitly; the version is set only when the whole schema exists.
-            db.executescript("BEGIN;" + SCHEMA + "PRAGMA user_version=1; COMMIT;")
-            db.execute("INSERT OR IGNORE INTO schema_versions VALUES (1,?)", (utcnow(),))
-        db.commit()
+        for target in range(version + 1, CURRENT_VERSION + 1):
+            statements = MIGRATIONS.get(target)
+            if statements is None:
+                raise RuntimeError(f"Missing database migration: {target}")
+            for statement in statements:
+                db.execute(statement)
+            db.execute("INSERT INTO schema_versions(version,applied_at) VALUES (?,?)", (target, utcnow()))
+            # target is an application-owned integer, never user input.
+            db.execute(f"PRAGMA user_version={target}")
 
 
 @contextmanager
@@ -112,7 +124,17 @@ def connect(settings: Settings):
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA busy_timeout=20000")
-        db.execute("PRAGMA journal_mode=WAL")
+        # Switching a fresh database to WAL can return SQLITE_BUSY immediately
+        # despite busy_timeout when several workers open it at the same time.
+        deadline = time.monotonic() + 20
+        while True:
+            try:
+                db.execute("PRAGMA journal_mode=WAL")
+                break
+            except sqlite3.OperationalError as exc:
+                if getattr(exc, "sqlite_errorcode", None) != sqlite3.SQLITE_BUSY or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.05)
         yield db
     finally:
         db.close()

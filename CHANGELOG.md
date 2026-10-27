@@ -1,5 +1,13 @@
 # Değişiklik günlüğü
 
+## Yayınlanmamış
+
+### Güvenlik ve sağlamlık
+- Veritabanı şema geçişleri, sürüm kaydı ve sürüm numarası artık aynı atomik işlemde uygulanır;
+  başarısız geçiş mevcut veriyi korur ve sonraki başlangıçta yeniden denenebilir.
+- Birden fazla web worker'ın aynı anda ilk açılışında şema sürümü kilit alındıktan sonra okunur;
+  SQLite WAL başlatma kilitleri sınırlı süreyle yeniden denenir.
+
 ## 1.0.0 — 2026-10-27
 
 ### Yeni
