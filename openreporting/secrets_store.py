@@ -55,16 +55,12 @@ def _fernet(settings) -> Fernet:
 
 
 def _has_encrypted_secrets(settings):
-    import sqlite3
-    db_path = settings.data_dir / "state.sqlite3"
-    if not db_path.exists():
-        return False
+    from .db import has_encrypted_secrets
     try:
-        with sqlite3.connect(db_path) as db:
-            row = db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone()
-    except sqlite3.Error:
-        return False
-    return row is not None
+        return has_encrypted_secrets(settings)
+    except Exception as exc:
+        raise SecretError("Şifreli kimlik bilgileri kontrol edilemedi; yeni anahtar oluşturulmadı. "
+                          "Veritabanı erişimini ve yedeğini kontrol edin.") from exc
 
 
 def encrypt(settings, data: dict) -> str:

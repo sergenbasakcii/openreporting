@@ -21,3 +21,7 @@ SQLite geliştirme ve mevcut kurulumlar için korunacak. Üretim PostgreSQL dest
 ## İlk aşama doğrulaması
 
 Yeni regresyon testleri başarısız ilk kurulumu, başarısız yükseltme sonrası veri ve denetim zincirini, yeniden denemeyi, eksik geçişi ve eşzamanlı başlangıcı kapsar. Bu aşama PostgreSQL desteği sunmaz; mevcut verinin sonraki geçişlere güvenle hazırlanmasını sağlar.
+
+İkinci adımda şifreli veri varlığı kontrolü `db.has_encrypted_secrets` sınırına alındı; mevcut SQLite dosyası salt okunur açılır. Veritabanı hatası anahtar oluşturma izni sayılmaz. PostgreSQL sürücüsü bu kontrolü uygulama veritabanı bağlantısı üzerinden sağlamalıdır.
+
+Rapor kuyruğunda bütünlük hatası yakalayıp aynı işlemde yeniden SELECT yapmak yerine `ON CONFLICT(idempotency_key) DO NOTHING` kullanılır. Bu, PostgreSQL'de hatadan sonra işlemin iptal durumuna geçmesine dayalı bir tuzağı kaldırır. Dashboard yıldızlarında da `INSERT OR IGNORE` yerine belirli birincil anahtar çakışması hedeflenir. Parametre biçimi ve diğer sürücü farkları sonraki adımlarda kalır.

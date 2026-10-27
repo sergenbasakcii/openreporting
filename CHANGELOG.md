@@ -3,6 +3,10 @@
 ## Yayınlanmamış
 
 ### Güvenlik ve sağlamlık
+- Anahtar kayıpken mevcut veritabanı okunamıyorsa yeni şifreleme anahtarı oluşturulmaz;
+  kimlik bilgisi kontrolü salt okunur bağlantıyla yapılır ve veritabanını oluşturmaz.
+- Rapor kuyruğu tekrarları yalnız idempotency anahtarı çakışmasında mevcut işi kullanır;
+  dashboard yıldızları da açık çakışma hedefi kullanır. SQLite'a özel genel hata bastırma kaldırıldı.
 - Veritabanı şema geçişleri, sürüm kaydı ve sürüm numarası artık aynı atomik işlemde uygulanır;
   başarısız geçiş mevcut veriyi korur ve sonraki başlangıçta yeniden denenebilir.
 - Birden fazla web worker'ın aynı anda ilk açılışında şema sürümü kilit alındıktan sonra okunur;

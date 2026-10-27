@@ -9,7 +9,6 @@ import hashlib
 import json
 import logging
 import smtplib
-import sqlite3
 import ssl
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -281,16 +280,16 @@ def delete_schedule(settings, user, schedule_id):
 def enqueue(db, report, actor, start, end, schedule_id=None, recipients=()):
     run_id = identity()
     key = sha([report["id"], report["revision"], schedule_id or f"manual:{run_id}", start, end])
-    try:
-        db.execute("""INSERT INTO dash_report_runs(id,report_id,schedule_id,revision,config_sha256,period_start,period_end,
-                      idempotency_key,status,recipients_json,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,'queued',?,?,?)""",
-                   (run_id, report["id"], schedule_id, report["revision"], report["config_sha256"], start, end, key,
-                    canonical(list(recipients)), actor, utcnow()))
-    except sqlite3.IntegrityError:
+    inserted = db.execute("""INSERT INTO dash_report_runs(id,report_id,schedule_id,revision,config_sha256,period_start,period_end,
+                      idempotency_key,status,recipients_json,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,'queued',?,?,?)
+                      ON CONFLICT(idempotency_key) DO NOTHING""",
+                          (run_id, report["id"], schedule_id, report["revision"], report["config_sha256"], start, end, key,
+                           canonical(list(recipients)), actor, utcnow()))
+    if not inserted.rowcount:
         existing = db.execute("SELECT id FROM dash_report_runs WHERE idempotency_key=?", (key,)).fetchone()
-        if existing:
-            return existing["id"]
-        raise
+        if not existing:
+            raise ReportError("Rapor kuyruğundaki mevcut çalışma bulunamadı")
+        return existing["id"]
     audit(db, actor or "scheduler", "report_run.queued", "dash_report_run", run_id, {"report_id": report["id"]})
     return run_id
 

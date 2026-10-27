@@ -151,6 +151,23 @@ def transaction(db):
         raise
 
 
+def has_encrypted_secrets(settings: Settings):
+    """Inspect stored credentials without creating or modifying application data.
+
+    An unreadable existing database must propagate an error: callers must not
+    interpret an inspection failure as permission to replace a missing key.
+    """
+    path = settings.db_path
+    if not path.exists():
+        return False
+    uri = path.resolve().as_uri() + "?mode=ro"
+    db = sqlite3.connect(uri, uri=True, timeout=20)
+    try:
+        return db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None
+    finally:
+        db.close()
+
+
 def audit(db, actor, action, object_type, object_id, details=None):
     prev_row = db.execute("SELECT entry_hash FROM audit ORDER BY id DESC LIMIT 1").fetchone()
     prev = prev_row[0] if prev_row else "0" * 64

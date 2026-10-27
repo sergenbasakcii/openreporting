@@ -440,7 +440,8 @@ def star(settings, user, uid, value=True):
         if not row:
             raise DashboardError("Dashboard bulunamadı")
         if value:
-            db.execute("INSERT OR IGNORE INTO dashboard_stars VALUES(?,?)", (user["id"], row["id"]))
+            db.execute("""INSERT INTO dashboard_stars(user_id,dashboard_id) VALUES(?,?)
+                          ON CONFLICT(user_id,dashboard_id) DO NOTHING""", (user["id"], row["id"]))
         else:
             db.execute("DELETE FROM dashboard_stars WHERE user_id=? AND dashboard_id=?", (user["id"], row["id"]))
 
