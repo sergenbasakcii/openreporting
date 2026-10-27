@@ -54,6 +54,11 @@ Arayüz adresi: **http://127.0.0.1:8810**
 
 Worker ayrı Python alt süreci, web API ise mevcut PowerShell penceresinde çalışır. Başlatıcı worker'ı tek seferde kilitler, başlatılan alt süreci uygulama durduğunda kapatır. PowerShell penceresini açık tutun; **Ctrl+C** ile kapatın. Her yeni çalıştırmada worker logu `%LOCALAPPDATA%\OpenReporting\logs` altında ayrı dosyaya kaydedilir.
 
+Tek tıkla açmak için masaüstü kısayolu: hedefi
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "<klasör>\windows\Open-OpenReporting.ps1"`,
+simgesi `windows\OpenReporting.ico` olan bir kısayol oluşturun. Uygulama çalışmıyorsa küçültülmüş bir pencerede başlatılır,
+ardından tarayıcıda açılır; o pencere kapatılınca uygulama durur.
+
 Tarayıcıyı otomatik açmadan çalıştırma:
 
 ```powershell
