@@ -1,0 +1,24 @@
+[Unit]
+Description=OpenReporting consistent backup (SQLite + report archive)
+After=openreporting-web.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/openreporting/openreporting.env
+Environment=OPENREPORTING_BACKUP_DIR=/var/backups/openreporting
+Environment=OPENREPORTING_BACKUP_KEEP_DAYS=14
+ExecStart=/opt/openreporting/app/deploy/backup.sh
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+# Root only writes the backup directory; database files are read by the service user.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/backups/openreporting
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true

@@ -1,0 +1,142 @@
+// Administration: users, server status, audit log; self-service profile.
+import { h, button, input, select, field, toggle, toast, modal, confirmDialog, fmtDateTime, timeAgo, loading, clear } from '../dom.js';
+import { icon } from '../icons.js';
+import { get, post, put, patch } from '../api.js';
+import { setBreadcrumbs } from '../router.js';
+
+const ROLE_LABELS = { admin: 'Yönetici', editor: 'Editör', viewer: 'İzleyici' };
+const roleOptions = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
+
+function bytes(n) { if (!Number.isFinite(n)) return '—'; const u = ['B', 'KiB', 'MiB', 'GiB', 'TiB']; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i += 1; } return `${n.toFixed(1)} ${u[i]}`; }
+
+export async function usersPage(root, { app }) {
+  setBreadcrumbs([{ label: 'Yönetim' }, { label: 'Kullanıcılar' }]);
+  const page = h('div', { class: 'page' });
+  root.append(page);
+  const draw = async () => {
+    const users = await get('/api/users');
+    clear(page);
+    page.append(h('div', { class: 'page-header' }, h('div', h('h1', icon('users'), 'Kullanıcılar'), h('p', { class: 'sub', text: 'Roller: Yönetici (her şey), Editör (dashboard, rapor, Keşfet), İzleyici (kayıtlı dashboard ve raporları görüntüleme).' })),
+      button('Kullanıcı ekle', { icon: 'plus', variant: 'primary', onClick: () => addUser(draw) })));
+    const table = h('table', { class: 'list' }, h('tr', ['Kullanıcı', 'Ad', 'E-posta', 'Rol', 'Durum', 'Son giriş', ''].map((t) => h('th', { text: t }))));
+    for (const u of users) {
+      table.append(h('tr', h('td', h('b', { text: u.username })), h('td', { text: u.display_name || '—' }), h('td', { text: u.email || '—' }),
+        h('td', select(roleOptions, u.role, async (v) => { try { await patch(`/api/users/${u.id}`, { role: v }); toast('Rol güncellendi', 'ok'); } catch (err) { toast(err.message, 'error'); draw(); } })),
+        h('td', u.active ? h('span', { class: 'badge ok', text: 'etkin' }) : h('span', { class: 'badge err', text: 'devre dışı' })),
+        h('td', { text: u.last_login_at ? timeAgo(u.last_login_at) : 'hiç' }),
+        h('td', { class: 'actions' },
+          button('Düzenle', { size: 'sm', onClick: () => editUser(u, draw) }),
+          button('Parola sıfırla', { size: 'sm', onClick: () => resetPassword(u) }),
+          u.id !== app.user.id ? button(u.active ? 'Devre dışı bırak' : 'Etkinleştir', { size: 'sm', onClick: async () => {
+            if (u.active && !(await confirmDialog('Kullanıcıyı devre dışı bırak', `${u.username} oturumları sonlandırılacak.`, { danger: true, okText: 'Devre dışı bırak' }))) return;
+            try { await patch(`/api/users/${u.id}`, { active: !u.active }); draw(); } catch (err) { toast(err.message, 'error'); }
+          } }) : null)));
+    }
+    page.append(h('div', { class: 'card' }, table));
+  };
+  await draw();
+}
+
+function addUser(done) {
+  const m = { username: '', password: '', role: 'viewer', email: '', display_name: '' };
+  const dlg = modal({ title: 'Yeni kullanıcı', body: h('div', { class: 'form-grid' },
+    field('Kullanıcı adı', input({ onChange: (e) => { m.username = e.target.value; } })), field('Ad soyad', input({ onChange: (e) => { m.display_name = e.target.value; } })),
+    field('E-posta', input({ type: 'email', onChange: (e) => { m.email = e.target.value; } })), field('Rol', select(roleOptions, 'viewer', (v) => { m.role = v; })),
+    field('Parola (en az 14 karakter)', input({ type: 'password', autocomplete: 'new-password', onChange: (e) => { m.password = e.target.value; } }))),
+  footer: [button('Vazgeç', { onClick: () => dlg.close() }), button('Oluştur', { variant: 'primary', onClick: async () => {
+    try { await post('/api/users', m); toast('Kullanıcı oluşturuldu', 'ok'); dlg.close(); done(); } catch (err) { toast(err.message, 'error'); }
+  } })] });
+}
+
+function editUser(u, done) {
+  const m = { email: u.email || '', display_name: u.display_name || '' };
+  const dlg = modal({ title: `Düzenle · ${u.username}`, body: h('div', field('Ad soyad', input({ value: m.display_name, onChange: (e) => { m.display_name = e.target.value; } })),
+    field('E-posta', input({ value: m.email, onChange: (e) => { m.email = e.target.value; } }))),
+  footer: [button('Vazgeç', { onClick: () => dlg.close() }), button('Kaydet', { variant: 'primary', onClick: async () => {
+    try { await patch(`/api/users/${u.id}`, m); dlg.close(); done(); } catch (err) { toast(err.message, 'error'); }
+  } })] });
+}
+
+function resetPassword(u) {
+  let password = '';
+  const dlg = modal({ title: `Parola sıfırla · ${u.username}`, body: [field('Yeni parola (en az 14 karakter)', input({ type: 'password', autocomplete: 'new-password', onChange: (e) => { password = e.target.value; } })),
+    h('p', { class: 'hint', text: 'Kullanıcının tüm oturumları sonlandırılır.' })],
+  footer: [button('Vazgeç', { onClick: () => dlg.close() }), button('Sıfırla', { variant: 'primary', onClick: async () => {
+    try { await post(`/api/users/${u.id}/password`, { password }); toast('Parola sıfırlandı', 'ok'); dlg.close(); } catch (err) { toast(err.message, 'error'); }
+  } })] });
+}
+
+export async function serverPage(root) {
+  setBreadcrumbs([{ label: 'Yönetim' }, { label: 'Sunucu durumu' }]);
+  const page = h('div', { class: 'page' }, loading());
+  root.append(page);
+  const draw = async () => {
+    const s = await get('/api/admin/stats');
+    clear(page);
+    const worker = s.worker || {};
+    const used = s.disk.total_bytes - s.disk.free_bytes;
+    page.append(h('div', { class: 'page-header' }, h('div', h('h1', icon('activity'), 'Sunucu durumu'), h('p', { class: 'sub', text: `OpenReporting v${s.version} · Python ${s.python} · ${s.platform}` })),
+      button('Yenile', { icon: 'refresh', onClick: draw })),
+    h('div', { class: 'stat-cards' }, Object.entries({ Kullanıcı: s.counts.users, Dashboard: s.counts.dashboards, Klasör: s.counts.folders, 'Veri kaynağı': s.counts.datasources,
+      Rapor: s.counts.reports, 'Etkin zamanlama': s.activeSchedules, 'Rapor çalıştırması': s.counts.runs }).map(([k, v]) => h('div', { class: 'stat-card' }, h('span', { text: k }), h('b', { text: v })))),
+    h('div', { class: 'split-2' },
+      h('div', { class: 'card' }, h('h3', { text: 'Rapor işçisi (worker)' }),
+        h('p', {}, worker.state === 'up' ? h('span', { class: 'badge ok', text: 'çalışıyor' }) : worker.state === 'stale' ? h('span', { class: 'badge warn', text: 'yanıt vermiyor' }) : h('span', { class: 'badge err', text: 'başlatılmadı' })),
+        h('p', { class: 'muted', text: worker.last_tick ? `Son sinyal: ${fmtDateTime(worker.last_tick)} (${worker.heartbeat_age_seconds} sn önce) · döngü: ${worker.tick_count}` : 'Worker servisi henüz çalışmadı. Ubuntu’da: systemctl status openreporting-worker' }),
+        worker.last_error ? h('div', { class: 'alert error', text: worker.last_error }) : null,
+        h('h4', { text: 'Çalıştırma durumları' }), h('div', { class: 'chips' }, s.runStatus.map((r) => h('span', { class: 'chip', text: `${r.status}: ${r.count}` })))),
+      h('div', { class: 'card' }, h('h3', { text: 'Depolama ve bütünlük' }),
+        h('p', { text: `Veri diski: ${bytes(used)} / ${bytes(s.disk.total_bytes)} kullanılıyor (${bytes(s.disk.free_bytes)} boş)` }),
+        h('div', { class: 'progress' }, h('i', { style: { width: `${Math.round((used / s.disk.total_bytes) * 100)}%` } })),
+        h('p', { style: { marginTop: '10px' }, text: `Rapor arşivi: ${bytes(s.disk.archive_bytes)}` }),
+        h('p', {}, 'Denetim zinciri: ', s.auditChainValid ? h('span', { class: 'badge ok', text: 'geçerli' }) : h('span', { class: 'badge err', text: `bozuk (#${s.auditBrokenId})` })),
+        h('p', {}, 'E-posta gönderimi: ', s.mailEnabled ? h('span', { class: 'badge ok', text: 'etkin' }) : h('span', { class: 'badge', text: 'kapalı (OPENREPORTING_MAIL_ENABLED)' })))));
+  };
+  await draw();
+}
+
+export async function auditPage(root) {
+  setBreadcrumbs([{ label: 'Yönetim' }, { label: 'Denetim kaydı' }]);
+  const page = h('div', { class: 'page' });
+  root.append(page);
+  let offset = 0;
+  let action = '';
+  const tableHost = h('div', { class: 'card' });
+  const draw = async () => {
+    const rows = await get(`/api/audit?limit=200&offset=${offset}&action=${encodeURIComponent(action)}`);
+    clear(tableHost);
+    const table = h('table', { class: 'list' }, h('tr', ['#', 'Zaman', 'Kullanıcı', 'İşlem', 'Nesne', 'Ayrıntı'].map((t) => h('th', { text: t }))));
+    for (const r of rows) table.append(h('tr', h('td', { text: r.id }), h('td', { class: 'nowrap', text: fmtDateTime(r.happened_at) }), h('td', { class: 'mono', text: r.actor.slice(0, 13) }),
+      h('td', h('span', { class: 'badge', text: r.action })), h('td', { class: 'mono', text: `${r.object_type}/${r.object_id.slice(0, 13)}` }), h('td', { class: 'mono faint', text: r.details === '{}' ? '' : r.details.slice(0, 160) })));
+    tableHost.append(table, h('div', { class: 'toolbar', style: { marginTop: '10px' } },
+      button('Önceki', { disabled: offset === 0, onClick: () => { offset = Math.max(0, offset - 200); draw(); } }), button('Sonraki', { disabled: rows.length < 200, onClick: () => { offset += 200; draw(); } })));
+  };
+  page.append(h('div', { class: 'page-header' }, h('div', h('h1', icon('shield'), 'Denetim kaydı'), h('p', { class: 'sub', text: 'Tüm değişiklikler SHA-256 hash zinciriyle kayıt altındadır.' })),
+    h('div', { style: { width: '280px' } }, input({ placeholder: 'İşlem filtresi (ör. dashboard.)', onKeydown: (e) => { if (e.key === 'Enter') { action = e.target.value; offset = 0; draw(); } } }))), tableHost);
+  await draw();
+}
+
+export async function profilePage(root, { app, applyTheme }) {
+  setBreadcrumbs([{ label: 'Profil' }]);
+  const me = await get('/api/user');
+  const dashboards = await get('/api/search').catch(() => []);
+  const prefs = { ...me.preferences };
+  const pw = { old_password: '', new_password: '', confirm: '' };
+  root.append(h('div', { class: 'page' }, h('div', { class: 'page-header' }, h('div', h('h1', icon('user'), me.display_name || me.username), h('p', { class: 'sub', text: `${ROLE_LABELS[me.role] || me.role} · son giriş ${fmtDateTime(me.last_login_at)}` }))),
+    h('div', { class: 'split-2' },
+      h('div', { class: 'card' }, h('h3', { text: 'Tercihler' }),
+        field('Tema', select([{ value: 'dark', label: 'Koyu' }, { value: 'light', label: 'Açık' }, { value: 'system', label: 'Sistem' }], prefs.theme || 'dark', (v) => { prefs.theme = v; applyTheme(v); })),
+        field('Saat dilimi', select([{ value: 'browser', label: 'Tarayıcı' }, { value: 'utc', label: 'UTC' }, { value: 'Europe/Istanbul', label: 'Europe/Istanbul' }], prefs.timezone || 'browser', (v) => { prefs.timezone = v; })),
+        field('Ana sayfa dashboard’u', select([{ value: '', label: 'Varsayılan ana sayfa' }, ...dashboards.map((d) => ({ value: d.uid, label: d.title }))], prefs.home_dashboard_uid || '', (v) => { prefs.home_dashboard_uid = v || null; })),
+        button('Tercihleri kaydet', { variant: 'primary', onClick: async () => { try { await put('/api/user/preferences', prefs); app.prefs = prefs; toast('Kaydedildi', 'ok'); } catch (err) { toast(err.message, 'error'); } } })),
+      h('div', { class: 'card' }, h('h3', { text: 'Parola değiştir' }),
+        field('Mevcut parola', input({ type: 'password', autocomplete: 'current-password', onChange: (e) => { pw.old_password = e.target.value; } })),
+        field('Yeni parola (en az 14 karakter)', input({ type: 'password', autocomplete: 'new-password', onChange: (e) => { pw.new_password = e.target.value; } })),
+        field('Yeni parola (tekrar)', input({ type: 'password', autocomplete: 'new-password', onChange: (e) => { pw.confirm = e.target.value; } })),
+        button('Parolayı değiştir', { onClick: async () => {
+          if (pw.new_password !== pw.confirm) { toast('Yeni parolalar eşleşmiyor', 'error'); return; }
+          try { await put('/api/user/password', { old_password: pw.old_password, new_password: pw.new_password }); toast('Parola değiştirildi; diğer oturumlar kapatıldı', 'ok'); } catch (err) { toast(err.message, 'error'); }
+        } })))));
+}
+
+export { toggle };

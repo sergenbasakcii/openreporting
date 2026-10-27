@@ -1,0 +1,40 @@
+# docker compose up -d   →  http://127.0.0.1:8810 (bind to localhost; terminate TLS in a reverse proxy)
+# First admin:  docker compose exec web openreporting create-user sergen --role admin
+#
+# The Fernet key lives in a separate volume so it is not copied by naive volume backups of the data.
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp:size=64m"]
+  restart: unless-stopped
+
+services:
+  web:
+    <<: *hardening
+    build: .
+    image: openreporting:1.0.0
+    env_file: [deploy/openreporting.env.example]
+    environment:
+      OPENREPORTING_DATA_DIR: /var/lib/openreporting
+      OPENREPORTING_SECRET_KEY_FILE: /run/openreporting-key/secret.key
+    ports: ["127.0.0.1:8810:8810"]
+    volumes:
+      - openreporting-data:/var/lib/openreporting
+      - openreporting-key:/run/openreporting-key
+  worker:
+    <<: *hardening
+    image: openreporting:1.0.0
+    depends_on: [web]
+    env_file: [deploy/openreporting.env.example]
+    environment:
+      OPENREPORTING_DATA_DIR: /var/lib/openreporting
+      OPENREPORTING_SECRET_KEY_FILE: /run/openreporting-key/secret.key
+    command: ["openreporting", "worker"]
+    volumes:
+      - openreporting-data:/var/lib/openreporting
+      - openreporting-key:/run/openreporting-key
+
+volumes:
+  openreporting-data: {}
+  openreporting-key: {}

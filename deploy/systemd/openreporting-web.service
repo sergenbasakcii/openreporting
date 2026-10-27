@@ -1,0 +1,51 @@
+[Unit]
+Description=OpenReporting web/API (dashboards, queries, reports)
+Documentation=file:///opt/openreporting/app/docs/LINUX_DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=openreporting
+Group=openreporting
+EnvironmentFile=/etc/openreporting/openreporting.env
+WorkingDirectory=/var/lib/openreporting
+ExecStartPre=/opt/openreporting/venv/bin/openreporting init
+ExecStart=/opt/openreporting/venv/bin/openreporting serve --host 127.0.0.1 --port 8810
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0027
+LimitNOFILE=65536
+
+# Hardening: the service only writes its own state directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+ProtectProc=invisible
+ProcSubset=pid
+RemoveIPC=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/openreporting
+ReadOnlyPaths=/etc/openreporting /opt/openreporting
+
+[Install]
+WantedBy=multi-user.target

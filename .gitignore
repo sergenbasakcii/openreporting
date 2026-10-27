@@ -1,0 +1,8 @@
+.venv/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+windows/Settings.local.ps1
+/data/

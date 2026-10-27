@@ -1,0 +1,167 @@
+"""User administration (admin) and self-service profile/preferences."""
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+
+from ..db import audit, connect, transaction, utcnow
+from ..security import authenticate, check_password, create_user, password_hash
+from ..timerange import TimeRangeError, zone
+from .deps import admin, admin_read, settings_of, viewer_write
+
+router = APIRouter()
+ROLES = ("admin", "editor", "viewer")
+_EMAIL = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+
+
+class UserIn(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    password: str = Field(min_length=14, max_length=256)
+    role: str = "viewer"
+    email: str = Field(default="", max_length=254)
+    display_name: str = Field(default="", max_length=120)
+
+
+class UserPatch(BaseModel):
+    role: str | None = None
+    active: bool | None = None
+    email: str | None = Field(default=None, max_length=254)
+    display_name: str | None = Field(default=None, max_length=120)
+
+
+class PasswordReset(BaseModel):
+    password: str = Field(min_length=14, max_length=256)
+
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=14, max_length=256)
+
+
+class PreferencesIn(BaseModel):
+    theme: str = "dark"
+    timezone: str = "browser"
+    home_dashboard_uid: str | None = None
+
+
+def _email(value):
+    if value and not _EMAIL.match(value):
+        raise HTTPException(422, "Geçersiz e-posta adresi")
+    return value or ""
+
+
+@router.get("/api/users")
+def list_users(request: Request, user=Depends(admin_read)):
+    with connect(settings_of(request)) as db:
+        return [dict(r) for r in db.execute("""SELECT id,username,role,active,email,display_name,created_at,last_login_at
+                                               FROM users ORDER BY username""")]
+
+
+@router.post("/api/users", status_code=201)
+def add_user(body: UserIn, request: Request, user=Depends(admin)):
+    if body.role not in ROLES:
+        raise HTTPException(422, "Geçersiz rol")
+    settings = settings_of(request)
+    with connect(settings) as db:
+        if db.execute("SELECT 1 FROM users WHERE username=?", (body.username.strip().lower(),)).fetchone():
+            raise HTTPException(409, "Bu kullanıcı adı zaten var")
+    try:
+        uid = create_user(settings, body.username, body.password, body.role)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    with connect(settings) as db, transaction(db):
+        db.execute("UPDATE users SET email=?,display_name=? WHERE id=?",
+                   (_email(body.email), body.display_name.strip(), uid))
+        audit(db, user["id"], "user.created_by_admin", "user", uid, {"role": body.role})
+    return {"id": uid}
+
+
+@router.patch("/api/users/{user_id}")
+def update_user(user_id: str, body: UserPatch, request: Request, user=Depends(admin)):
+    with connect(settings_of(request)) as db, transaction(db):
+        target = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        if not target:
+            raise HTTPException(404, "Kullanıcı bulunamadı")
+        role = body.role if body.role is not None else target["role"]
+        active = int(body.active) if body.active is not None else target["active"]
+        if role not in ROLES:
+            raise HTTPException(422, "Geçersiz rol")
+        if target["role"] == "admin" and target["active"] and (role != "admin" or not active):
+            admins = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
+            if admins <= 1:
+                raise HTTPException(409, "Son etkin yönetici devre dışı bırakılamaz veya rolü değiştirilemez")
+        if user_id == user["id"] and not active:
+            raise HTTPException(409, "Kendi hesabınızı devre dışı bırakamazsınız")
+        email = _email(body.email) if body.email is not None else target["email"]
+        name = body.display_name.strip() if body.display_name is not None else target["display_name"]
+        db.execute("UPDATE users SET role=?,active=?,email=?,display_name=? WHERE id=?",
+                   (role, active, email, name, user_id))
+        if not active or role != target["role"]:
+            db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+        audit(db, user["id"], "user.updated", "user", user_id, {"role": role, "active": bool(active)})
+    return {"id": user_id, "role": role, "active": bool(active)}
+
+
+@router.post("/api/users/{user_id}/password")
+def reset_password(user_id: str, body: PasswordReset, request: Request, user=Depends(admin)):
+    try:
+        hashed = password_hash(body.password)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    with connect(settings_of(request)) as db, transaction(db):
+        if not db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, user_id)).rowcount:
+            raise HTTPException(404, "Kullanıcı bulunamadı")
+        db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+        audit(db, user["id"], "user.password_reset_by_admin", "user", user_id)
+    return {"ok": True}
+
+
+@router.get("/api/user")
+def current_user(request: Request, user=Depends(authenticate)):
+    with connect(settings_of(request)) as db:
+        row = db.execute("SELECT id,username,role,email,display_name,last_login_at FROM users WHERE id=?",
+                         (user["id"],)).fetchone()
+        prefs = db.execute("SELECT theme,timezone,home_dashboard_uid FROM user_prefs WHERE user_id=?",
+                           (user["id"],)).fetchone()
+    return {**dict(row), "preferences": dict(prefs) if prefs else
+            {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None}}
+
+
+@router.put("/api/user/preferences")
+def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewer_write)):
+    if body.theme not in ("dark", "light", "system"):
+        raise HTTPException(422, "Geçersiz tema")
+    if body.timezone not in ("browser", "utc"):
+        try:
+            zone(body.timezone)
+        except TimeRangeError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    with connect(settings_of(request)) as db, transaction(db):
+        if body.home_dashboard_uid and not db.execute("SELECT 1 FROM dashboards WHERE uid=?",
+                                                      (body.home_dashboard_uid,)).fetchone():
+            raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı")
+        db.execute("""INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,updated_at) VALUES(?,?,?,?,?)
+                      ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
+                      home_dashboard_uid=excluded.home_dashboard_uid,updated_at=excluded.updated_at""",
+                   (user["id"], body.theme, body.timezone, body.home_dashboard_uid, utcnow()))
+    return body.model_dump()
+
+
+@router.put("/api/user/password")
+def change_password(body: PasswordChange, request: Request, user=Depends(viewer_write)):
+    settings = settings_of(request)
+    with connect(settings) as db:
+        row = db.execute("SELECT password_hash FROM users WHERE id=?", (user["id"],)).fetchone()
+    if not row or not check_password(body.old_password, row["password_hash"]):
+        raise HTTPException(403, "Mevcut parola hatalı")
+    try:
+        hashed = password_hash(body.new_password)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    token = request.cookies.get("openreporting_session", "")
+    from ..security import digest
+    with connect(settings) as db, transaction(db):
+        db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, user["id"]))
+        db.execute("DELETE FROM sessions WHERE user_id=? AND token_hash<>?", (user["id"], digest(token)))
+        audit(db, user["id"], "user.password_changed", "user", user["id"])
+    return {"ok": True}

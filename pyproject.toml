@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openreporting"
+version = "1.0.0"
+description = "Grafana-style dashboards and group-based PDF/Excel reporting for Zabbix and SQL (read-only sources)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "psycopg[binary]>=3.2,<4",
+  "reportlab>=4.2,<5",
+  "cryptography>=42,<47",
+  "openpyxl>=3.1,<4",
+  "regex>=2024.4",
+  "tzdata>=2024.1; platform_system == 'Windows'",
+]
+
+[project.optional-dependencies]
+test = ["httpx>=0.27,<1", "pytest>=8,<10"]
+
+[project.scripts]
+openreporting = "openreporting.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["openreporting*"]
+
+[tool.setuptools.package-data]
+openreporting = ["static/*", "static/app/*", "static/app/*/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

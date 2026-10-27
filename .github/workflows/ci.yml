@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install fonts
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
+      - name: Install package
+        run: python -m pip install --upgrade pip && python -m pip install ".[test]"
+      - name: Pytest
+        run: python -m pytest -q -p no:cacheprovider
+
+  lint:
+    name: Shell and JS checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -x -s bash deploy/*.sh
+      - name: bash -n
+        run: for f in deploy/*.sh; do bash -n "$f"; done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: JS syntax
+        run: find openreporting/static/app -name '*.js' -print0 | xargs -0 -n1 node --check
+
+  ubuntu-install:
+    name: End-to-end Ubuntu install
+    runs-on: ubuntu-24.04
+    needs: [tests, lint]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install with installer script (self-signed TLS)
+        run: sudo ./deploy/install-ubuntu.sh --domain openreporting.ci.local --self-signed -y
+      - name: Services are active
+        run: |
+          systemctl is-active openreporting-web openreporting-worker
+          systemctl is-enabled openreporting-backup.timer
+      - name: HTTPS through nginx
+        run: |
+          curl -fsS -k --resolve openreporting.ci.local:443:127.0.0.1 https://openreporting.ci.local/api/health
+          curl -fsS -k --resolve openreporting.ci.local:443:127.0.0.1 https://openreporting.ci.local/ | grep -q 'OpenReporting'
+          code=$(curl -s -o /dev/null -w '%{http_code}' -k --resolve openreporting.ci.local:443:127.0.0.1 https://openreporting.ci.local/metrics)
+          test "$code" = "404"
+          curl -fsS http://127.0.0.1:8810/metrics | grep -q openreporting_up
+      - name: Permissions and hardening
+        run: |
+          # Config and state are closed to other users, so inspect them as root.
+          sudo stat -c '%U:%G %a %n' /var/lib/openreporting /etc/openreporting /etc/openreporting/openreporting.env /etc/openreporting/secret.key
+          test "$(sudo stat -c '%U:%G %a' /etc/openreporting/secret.key)" = "root:openreporting 640"
+          test "$(sudo stat -c '%U:%G %a' /etc/openreporting/openreporting.env)" = "root:openreporting 640"
+          test "$(sudo stat -c '%U' /var/lib/openreporting/state.sqlite3)" = "openreporting"
+          if cat /etc/openreporting/secret.key >/dev/null 2>&1; then echo "secret.key readable by an unprivileged user"; exit 1; fi
+          if ls /var/lib/openreporting >/dev/null 2>&1; then echo "state directory listable by an unprivileged user"; exit 1; fi
+          sudo systemd-analyze security openreporting-web.service --no-pager | tail -1
+      - name: Admin, login and report run through the API
+        run: |
+          set -euo pipefail
+          sudo systemd-run --quiet --wait --pipe --collect -p User=openreporting -p Group=openreporting \
+            -p EnvironmentFile=/etc/openreporting/openreporting.env /opt/openreporting/venv/bin/python - <<'EOF'
+          from openreporting.config import Settings
+          from openreporting.security import create_user
+          create_user(Settings.from_env(), "ciadmin", "ci-admin-password-1234", "admin")
+          EOF
+          base=https://openreporting.ci.local
+          opts=(-sS -k --resolve openreporting.ci.local:443:127.0.0.1 -c /tmp/jar -b /tmp/jar -H 'Content-Type: application/json')
+          csrf=$(curl "${opts[@]}" -X POST "$base/api/login" -d '{"username":"ciadmin","password":"ci-admin-password-1234"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf"])')
+          dash='{"dashboard":{"uid":"ci","title":"CI","templating":{"list":[{"name":"host","type":"query","datasource":{"uid":"testdata"},"query":{"type":"host","group":"WAN Routers"},"multi":true,"includeAll":true,"current":{"value":["$__all"]}}]},"panels":[{"id":1,"type":"timeseries","title":"CPU $host","gridPos":{"x":0,"y":0,"w":24,"h":8},"targets":[{"refId":"A","datasource":{"uid":"testdata"},"group":{"filter":"WAN Routers"},"host":{"filter":"$host"},"item":{"filter":"CPU utilization"}}]}]}}'
+          curl "${opts[@]}" -H "X-CSRF-Token: $csrf" -X POST "$base/api/dashboards/db" -d "$dash" | grep -q '"uid":"ci"'
+          rid=$(curl "${opts[@]}" -H "X-CSRF-Token: $csrf" -X POST "$base/api/dash-reports" \
+            -d '{"name":"CI raporu","dashboard_uid":"ci","split_by":"host","formats":["pdf","xlsx","csv"]}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          run=$(curl "${opts[@]}" -H "X-CSRF-Token: $csrf" -X POST "$base/api/dash-reports/$rid/runs" -d '{}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')
+          for i in $(seq 1 60); do
+            status=$(curl "${opts[@]}" "$base/api/dash-reports/$rid/runs" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["status"])')
+            [ "$status" = "completed" ] && break
+            sleep 2
+          done
+          test "$status" = "completed"
+          curl "${opts[@]}" -o /tmp/report.pdf "$base/api/report-runs/$run/files/pdf"
+          head -c 4 /tmp/report.pdf | grep -q '%PDF'
+          sudo ls -la /var/lib/openreporting/archive
+      - name: Doctor
+        run: sudo /opt/openreporting/app/deploy/openreporting-admin.sh doctor
+      - name: Backup
+        run: |
+          sudo systemctl start openreporting-backup.service
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1) && ls -la "$latest" && cd "$latest" && sha256sum -c SHA256SUMS && test ! -e secret.key'
+      - name: Upgrade from a fresh copy
+        run: |
+          cp -a "$GITHUB_WORKSPACE" /tmp/openreporting-next
+          sudo /tmp/openreporting-next/deploy/upgrade.sh
+          systemctl is-active openreporting-web openreporting-worker
+      - name: Uninstall keeps data
+        run: |
+          sudo /opt/openreporting/app/deploy/uninstall.sh
+          sudo test -f /var/lib/openreporting/state.sqlite3
+      - name: Logs on failure
+        if: failure()
+        run: sudo journalctl -u openreporting-web -u openreporting-worker -u nginx --no-pager -n 200
