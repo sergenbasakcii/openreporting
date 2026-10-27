@@ -326,3 +326,9 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .row-panel:focus-within .row-actions { opacity: 1; }
 @media (hover: none) { .panel-header .p-icons .btn, .row-panel .row-actions { opacity: 1; } }
 .menu button:focus-visible, .menu a:focus-visible { background: var(--bg-hover, rgba(127,127,127,.15)); }
+
+/* ---- report editor: customer logo ---- */
+.logo-picker { display: flex; flex-direction: column; gap: 8px; }
+.logo-preview { display: flex; align-items: center; justify-content: center; height: 72px; max-width: 260px; padding: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius, 4px); }
+.logo-preview img { max-height: 56px; max-width: 240px; object-fit: contain; }

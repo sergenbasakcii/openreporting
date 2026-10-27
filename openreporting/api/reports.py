@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from ..domain import DomainError
-from ..reporting import service
+from ..reporting import logos, service
 from ..security import authenticate
 from ..timerange import TimeRangeError, resolve_range
 from .deps import editor, settings_of, viewer_write
@@ -46,6 +46,9 @@ class ReportIn(BaseModel):
     cover: bool = True
     toc: bool = True
     footer_text: str = ""
+    logo_id: str | None = Field(default=None, max_length=64)
+    logo_on_cover: bool = True
+    logo_on_pages: bool = True
     table_max_rows: int = 500
     send_partial: bool = False
     email_subject: str = ""
@@ -139,6 +142,28 @@ def delete_report(report_id: str, request: Request, user=Depends(editor)):
     return {"deleted": report_id}
 
 
+class LogoIn(BaseModel):
+    data: str = Field(min_length=8, max_length=1_400_000)
+
+
+@router.post("/api/dash-reports/logos", status_code=201)
+def upload_logo(body: LogoIn, request: Request, user=Depends(editor)):
+    """Store a customer logo (validated and re-encoded as PNG); returns its id for the report config."""
+    try:
+        return logos.save(settings_of(request), body.data)
+    except DomainError as exc:
+        _fail(exc)
+
+
+@router.get("/api/dash-reports/logos/{logo_id}")
+def get_logo(logo_id: str, request: Request, user=Depends(authenticate)):
+    try:
+        target = logos.path(settings_of(request), logo_id)
+    except DomainError as exc:
+        _fail(exc)
+    return FileResponse(target, media_type="image/png")
+
+
 @router.post("/api/dash-reports/preview")
 def preview(body: PreviewIn, request: Request, user=Depends(editor)):
     """Synchronous render (first N sections) without archiving — for the report editor."""
@@ -156,7 +181,8 @@ def preview(body: PreviewIn, request: Request, user=Depends(editor)):
         with _heavy():
             collected = collect(settings, dashboard, config, start, end, user=user["username"],
                                 section_limit=body.max_sections)
-            payload = renderer(config, collected, f"{config['name']} (önizleme)")
+            extra = {"logo": service.report_logo(settings, config)} if fmt == "pdf" else {}
+            payload = renderer(config, collected, f"{config['name']} (önizleme)", **extra)
     except (DomainError, TimeRangeError) as exc:
         _fail(exc)
     return _file_response(payload, fmt, f"{config['name']}-onizleme")

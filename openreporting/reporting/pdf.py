@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from reportlab.lib.colors import Color
 from reportlab.lib.pagesizes import A3, A4, LETTER, landscape, portrait
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
@@ -63,8 +64,14 @@ def _nice_ticks(low, high, count=5):
     return ticks
 
 
+def _fit(width, height, box_w, box_h):
+    """Largest size of a width×height image inside box_w×box_h, keeping its aspect ratio."""
+    scale = min(box_w / width, box_h / height)
+    return width * scale, height * scale
+
+
 class Pdf:
-    def __init__(self, config, collected, title, *, generated_at=None):
+    def __init__(self, config, collected, title, *, generated_at=None, logo=None):
         _fonts()
         size = PAPERS.get(config.get("paper", "A4"), A4)
         self.page_w, self.page_h = landscape(size) if config.get("orientation", "landscape") == "landscape" else portrait(size)
@@ -77,6 +84,9 @@ class Pdf:
         self.c = canvas.Canvas(self.buffer, pagesize=(self.page_w, self.page_h), pageCompression=1)
         self.c.setTitle(title)
         self.c.setAuthor("OpenReporting")
+        self.c.setCreator("OpenReporting")
+        # Customer logo (validated PNG bytes); ImageReader is shared so the image is embedded once.
+        self.logo = ImageReader(io.BytesIO(logo)) if logo else None
         self.c.setSubject(f"{self._fmt_time(collected.start)} – {self._fmt_time(collected.end)}")
         self.page = 0
         self.section_title = ""
@@ -130,9 +140,15 @@ class Pdf:
         self.text(MARGIN, self.page_h - MARGIN - 12, self.title, 11, INK, bold=True, max_width=self.content_w * 0.55)
         if self.section_title:
             self.text(MARGIN, self.page_h - MARGIN - 24, self.section_title, 8.5, MUTED, max_width=self.content_w * 0.55)
-        self.text(self.page_w - MARGIN, self.page_h - MARGIN - 12,
+        right = self.page_w - MARGIN
+        if self.logo and self.config.get("logo_on_pages", True):
+            # Header logo: right-aligned in the header band, at most 22pt high / 96pt wide.
+            lw, lh = _fit(*self.logo.getSize(), 96, HEADER_H - 8)
+            c.drawImage(self.logo, right - lw, self.top + 6 + (HEADER_H - 8 - lh) / 2, lw, lh, mask="auto")
+            right -= lw + 12
+        self.text(right, self.page_h - MARGIN - 12,
                   f"{self._fmt_time(self.collected.start)} – {self._fmt_time(self.collected.end)}", 8.5, MUTED, align="right")
-        self.text(self.page_w - MARGIN, self.page_h - MARGIN - 24, self.collected.timezone, 7.5, FAINT, align="right")
+        self.text(right, self.page_h - MARGIN - 24, self.collected.timezone, 7.5, FAINT, align="right")
         c.setStrokeColor(_rgb(GRID))
         c.setLineWidth(0.6)
         c.line(MARGIN, self.top + 2, self.page_w - MARGIN, self.top + 2)
@@ -149,12 +165,24 @@ class Pdf:
         c.rect(0, self.page_h - 150, self.page_w, 150, stroke=0, fill=1)
         c.setFillColor(_rgb(BRAND))
         c.rect(0, self.page_h - 154, self.page_w, 4, stroke=0, fill=1)
+        text_w = self.content_w - 10
+        if self.logo and self.config.get("logo_on_cover", True):
+            # Cover logo: white card on the right of the dark band, so dark and transparent logos stay visible.
+            pad, box_w, box_h = 12, 170, 86
+            lw, lh = _fit(*self.logo.getSize(), box_w, box_h)
+            card_w, card_h = lw + 2 * pad, lh + 2 * pad
+            card_x = self.page_w - MARGIN - card_w
+            card_y = self.page_h - 75 - card_h / 2
+            c.setFillColor(_rgb("#ffffff"))
+            c.roundRect(card_x, card_y, card_w, card_h, 6, stroke=0, fill=1)
+            c.drawImage(self.logo, card_x + pad, card_y + pad, lw, lh, mask="auto")
+            text_w = card_x - MARGIN - 24
         self.text(MARGIN + 4, self.page_h - 50, "OPENREPORTING · RAPOR", 9, "#ff9830", bold=True)
-        lines = self.wrap(self.title, 22, self.content_w - 10, bold=True)[:2]
+        lines = self.wrap(self.title, 22, text_w, bold=True)[:2]
         for i, line in enumerate(lines):
             self.text(MARGIN + 4, self.page_h - 82 - i * 26, line, 22, "#ffffff", bold=True)
         dash_title = self.collected.dashboard.get("title", "")
-        self.text(MARGIN + 4, self.page_h - 136, f"Dashboard: {dash_title}", 9.5, "#c7cbd6", max_width=self.content_w)
+        self.text(MARGIN + 4, self.page_h - 136, f"Dashboard: {dash_title}", 9.5, "#c7cbd6", max_width=text_w)
         y = self.page_h - 190
         rows = [("Rapor dönemi", f"{self._fmt_time(self.collected.start)} – {self._fmt_time(self.collected.end)}"),
                 ("Saat dilimi", self.collected.timezone),
@@ -941,8 +969,8 @@ def paginate(pdf, config, sections):
     return pages, toc
 
 
-def render_pdf(config, collected, title):
-    pdf = Pdf(config, collected, title)
+def render_pdf(config, collected, title, logo=None):
+    pdf = Pdf(config, collected, title, logo=logo)
     pages, toc = paginate(pdf, config, collected.sections)
     if config.get("cover", True):
         pdf.cover([(t or title, page) for t, page in toc] if config.get("toc", True) else [])

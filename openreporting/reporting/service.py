@@ -20,6 +20,7 @@ from ..db import audit, connect, transaction, utcnow
 from ..domain import DomainError, canonical, identity, parse_utc, sha, validate_emails
 from ..timerange import TimeRangeError, resolve_range
 from ..worker import _atomic_write, completed_period, schedule_next
+from . import logos
 from .collect import collect
 from .excel import render_csv, render_xlsx
 from .pdf import render_pdf
@@ -73,12 +74,22 @@ def validate_config(body, settings):
         "paper": body.get("paper") if body.get("paper") in ("A4", "A3", "Letter") else "A4",
         "formats": formats, "cover": bool(body.get("cover", True)), "toc": bool(body.get("toc", True)),
         "footer_text": str(body.get("footer_text", ""))[:200],
+        "logo_id": _logo_id(settings, body.get("logo_id")),
+        "logo_on_cover": bool(body.get("logo_on_cover", True)),
+        "logo_on_pages": bool(body.get("logo_on_pages", True)),
         "table_max_rows": max(10, min(int(body.get("table_max_rows") or 500), 20000)),
         "send_partial": bool(body.get("send_partial", False)),
         "email_subject": str(body.get("email_subject", ""))[:300],
         "email_message": str(body.get("email_message", ""))[:4000],
     }
     return config
+
+
+def _logo_id(settings, value):
+    if not value:
+        return None
+    logos.path(settings, value)  # must be an uploaded, validated logo
+    return value
 
 
 def _row(row):
@@ -387,13 +398,26 @@ def mark_interrupted(settings, force=False):
             audit(db, "worker", "report_run.interrupted", "dash_report_run", row["id"])
 
 
+def report_logo(settings, config):
+    """PNG bytes of the report's customer logo, or None."""
+    if not config.get("logo_id"):
+        return None
+    try:
+        return logos.path(settings, config["logo_id"]).read_bytes()
+    except logos.LogoError:
+        # A missing logo is cosmetic: the report is still complete and may be delivered.
+        log.warning("Report %s: logo %s unavailable, rendering without it", config.get("name"), config["logo_id"])
+        return None
+
+
 def build_outputs(settings, config, title, start, end, *, user="report", formats=None, trusted=True):
     dashboard = dashboards.get(settings, config["dashboard_uid"])["dashboard"]
     collected = collect(settings, dashboard, config, start, end, user=user, trusted=trusted)
     outputs = {}
+    logo = report_logo(settings, config)
     for fmt in formats or config["formats"]:
         if fmt == "pdf":
-            outputs["pdf"] = render_pdf(config, collected, title)
+            outputs["pdf"] = render_pdf(config, collected, title, logo=logo)
         elif fmt == "xlsx":
             outputs["xlsx"] = render_xlsx(config, collected, title)
         elif fmt == "csv":

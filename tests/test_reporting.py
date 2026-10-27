@@ -3,7 +3,7 @@ import io
 import json
 import zipfile
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -168,3 +168,57 @@ def test_report_api_permissions_preview_and_export(env):
         bad = http.post("/api/dash-reports", json={**body, "dashboard_uid": "nope"}, headers=h)
         assert bad.status_code == 404
         assert http.delete(f"/api/dash-reports/{rid}", headers=h).status_code == 200
+
+
+def _png(color=(30, 90, 200, 255), size=(240, 80)):
+    import io
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGBA", size, color).save(out, format="PNG")
+    return out.getvalue()
+
+
+def test_customer_logo_upload_and_pdf_embedding(env):
+    import base64
+    from fastapi.testclient import TestClient
+    from openreporting.reporting import logos
+    settings, app, user = env
+    with TestClient(app) as http:
+        csrf = http.post("/api/login", json={"username": "viewer1", "password": "a-viewer-password-123"}).json()["csrf"]
+        data = "data:image/png;base64," + base64.b64encode(_png()).decode()
+        assert http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf}, json={"data": data}).status_code == 403
+        csrf = http.post("/api/login", json={"username": "admin1", "password": "an-admin-password-123"}).json()["csrf"]
+        bad = http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf},
+                        json={"data": base64.b64encode(b"<svg onload=alert(1)></svg>").decode()})
+        assert bad.status_code == 422
+        res = http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf}, json={"data": data})
+        assert res.status_code == 201, res.text
+        logo = res.json()
+        assert (logo["width"], logo["height"]) == (240, 80)
+        img = http.get(f"/api/dash-reports/logos/{logo['id']}")
+        assert img.status_code == 200 and img.content.startswith(b"\x89PNG")
+        assert http.get("/api/dash-reports/logos/../../state").status_code == 404
+    # Unknown logo ids are refused in a report definition.
+    with pytest.raises(logos.LogoError):
+        service.save_report(settings, user, {"name": "Logo", "dashboard_uid": "rep-test", "logo_id": "0" * 64})
+    created = service.save_report(settings, user, {"name": "Logolu rapor", "dashboard_uid": "rep-test", "logo_id": logo["id"],
+                                                   "time_range": {"from": "now-6h", "to": "now"}, "formats": ["pdf"]})
+    config = service.get_report(settings, created["id"])["config"]
+    assert config["logo_id"] == logo["id"] and config["logo_on_cover"] and config["logo_on_pages"]
+    start, end = datetime.now(timezone.utc) - timedelta(hours=6), datetime.now(timezone.utc)
+    _, with_logo, _ = service.build_outputs(settings, config, "Logolu rapor", start, end)
+    _, without, _ = service.build_outputs(settings, {**config, "logo_id": None}, "Logosuz rapor", start, end)
+    assert b"/Subtype /Image" in with_logo["pdf"] and b"/Subtype /Image" not in without["pdf"]
+    assert b"/Creator (OpenReporting)" in with_logo["pdf"]
+
+
+def test_logo_normalisation_rejects_bad_input():
+    from openreporting.reporting import logos
+    with pytest.raises(logos.LogoError):
+        logos.normalize(b"not an image")
+    with pytest.raises(logos.LogoError):
+        logos.normalize(_png(color=(0, 0, 0, 0)))  # fully transparent
+    big = logos.normalize(_png(size=(3000, 600)))
+    from io import BytesIO
+    from PIL import Image
+    assert max(Image.open(BytesIO(big)).size) <= logos.MAX_EDGE

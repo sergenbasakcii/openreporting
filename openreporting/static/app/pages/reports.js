@@ -6,6 +6,46 @@ import { navigate, setBreadcrumbs } from '../router.js';
 import { QUICK_RANGES, effectiveZone } from '../time.js';
 import { resolveVariables, ALL } from '../variables.js';
 
+const LOGO_MAX_BYTES = 1_000_000;
+
+const readAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(reader.error);
+  reader.readAsDataURL(file);
+});
+
+// Customer logo for the PDF: uploaded once, validated and re-encoded by the server, referenced by id in the config.
+function logoPicker(cfg, canEdit) {
+  const wrap = h('div', { class: 'logo-picker' });
+  const fileIn = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', hidden: true, onchange: async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > LOGO_MAX_BYTES) { toast('Logo en fazla 1 MB olabilir', 'error'); return; }
+    try {
+      const res = await post('/api/dash-reports/logos', { data: await readAsDataUrl(file) });
+      cfg.logo_id = res.id;
+      draw();
+      toast('Logo yüklendi; raporu kaydetmeyi unutmayın', 'ok');
+    } catch (err) { toast(err.message, 'error'); }
+  } });
+  const draw = () => {
+    const preview = h('div', { class: 'logo-preview' }, cfg.logo_id
+      ? h('img', { src: `/api/dash-reports/logos/${encodeURIComponent(cfg.logo_id)}`, alt: 'Müşteri logosu' })
+      : h('span', { class: 'muted', text: 'Logo yok' }));
+    wrap.replaceChildren(preview, fileIn,
+      canEdit ? h('div', { class: 'toolbar' },
+        button(cfg.logo_id ? 'Değiştir' : 'Logo yükle', { icon: 'upload', size: 'sm', onClick: () => fileIn.click() }),
+        cfg.logo_id ? button('Kaldır', { icon: 'trash', size: 'sm', onClick: () => { cfg.logo_id = null; draw(); } }) : null) : null,
+      cfg.logo_id ? h('div', { class: 'toolbar' },
+        toggle('Kapakta göster', cfg.logo_on_cover, (v) => { cfg.logo_on_cover = v; }),
+        toggle('Her sayfanın başlığında göster', cfg.logo_on_pages, (v) => { cfg.logo_on_pages = v; })) : null);
+  };
+  draw();
+  return wrap;
+}
+
 const STATUS = { queued: ['Kuyrukta', 'info'], running: ['Çalışıyor', 'info'], completed: ['Tamamlandı', 'ok'], partial: ['Kısmi veri', 'warn'],
   failed: ['Başarısız', 'err'], blocked: ['Engellendi', 'err'], needs_review: ['İnceleme gerekli', 'warn'] };
 const DELIVERY = { not_requested: 'E-posta yok', disabled: 'E-posta kapalı', pending: 'Gönderilecek', sending: 'Gönderiliyor', sent: 'Gönderildi',
@@ -100,6 +140,9 @@ export async function reportEditPage(root, { id, query, app }) {
     name: '', description: '', dashboard_uid: params.get('dashboard') || (dashboardsList[0] || {}).uid || '', time_range: { from: 'now-1d/d', to: 'now-1d/d' },
     timezone: 'Europe/Istanbul', variables: {}, split_by: null, panel_ids: [], include_collapsed: true, layout: 'grid', orientation: 'landscape', paper: 'A4',
     formats: ['pdf', 'xlsx'], cover: true, toc: true, footer_text: '', table_max_rows: 500, send_partial: false, email_subject: '', email_message: '' };
+  cfg.logo_id = cfg.logo_id || null;
+  cfg.logo_on_cover = cfg.logo_on_cover !== false;
+  cfg.logo_on_pages = cfg.logo_on_pages !== false;
   setBreadcrumbs([{ label: 'Raporlar', href: '/reports' }, { label: existing ? existing.name : 'Yeni rapor' }], root);
   const page = h('div', { class: 'page' });
   root.append(page);
@@ -211,6 +254,8 @@ export async function reportEditPage(root, { id, query, app }) {
         field('Tablo satır sınırı (PDF)', input({ type: 'number', value: cfg.table_max_rows, min: 10, max: 20000, onChange: (e) => { cfg.table_max_rows = Number(e.target.value); } }))),
       h('div', { class: 'toolbar' }, toggle('Kapak sayfası', cfg.cover, (v) => { cfg.cover = v; }), toggle('İçindekiler', cfg.toc, (v) => { cfg.toc = v; }),
         toggle('Daraltılmış satırları dahil et', cfg.include_collapsed, (v) => { cfg.include_collapsed = v; })),
+      field('Müşteri logosu', logoPicker(cfg, canEdit),
+        'PNG, JPG, WebP veya GIF; en fazla 1 MB. Saydam arka planlı PNG en iyi sonucu verir. Kapakta sağ üstte, sayfalarda başlığın sağında yer alır.'),
       field('Alt bilgi metni', input({ value: cfg.footer_text, placeholder: 'Ör. Ağ Operasyon Merkezi · Gizli', onChange: (e) => { cfg.footer_text = e.target.value; } }))),
     h('div', { class: 'card' }, h('h3', { text: 'E-posta' }),
       settings.mailEnabled ? null : h('div', { class: 'alert warn', text: 'SMTP kapalı: raporlar arşivlenir, e-posta gönderilmez. Etkinleştirmek için /etc/openreporting/openreporting.env içinde OPENREPORTING_MAIL_ENABLED=true ve SMTP ayarlarını yapın.' }),
