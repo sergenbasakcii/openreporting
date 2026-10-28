@@ -43,3 +43,11 @@ Yeni sürücü mevcut çağrı sözleşmesini korumalı veya çağrıları birli
 Liste sıralamaları SQLite'a özel `COLLATE NOCASE` yerine `LOWER(alan), kimlik` kullanır. ASCII adlarda mevcut harf duyarsız sıra korunur; eşit normalleştirilmiş adlarda kimlik ikinci anahtardır. Unicode harf dönüşümü veritabanının dil/yerel ayarına bağlıdır; iki sürücü için tam Türkçe eşdeğerlik henüz taahhüt edilmez.
 
 Dashboard yıldız filtresi WHERE içinde SELECT takma adı kullanmak yerine kullanıcıya bağlı EXISTS alt sorgusu kullanır. Metin aramasında iki taraf LOWER ile karşılaştırılır; yüzde, alt çizgi ve ters eğik çizgi değerleri bağlı parametrede kaçırılır. PostgreSQL'e geçişte kalan parametre biçimi ve veri türü farklılıkları ayrıca ele alınmalıdır.
+
+## PostgreSQL bağlantı öncülü
+
+`postgres_store.py` mevcut psycopg bağımlılığıyla bağlantı, bağlı parametre, satır ve işlem ilkellerini sağlar. Henüz `db.py` sürücü seçimine bağlanmaz; uygulama SQLite kullanmaya devam eder. Tam şema, kilit ve işletim desteği gelmeden DSN ayarı etkinleştirilmez.
+
+İç uygulama SQL'indeki `?` işaretleri, tırnaklar ve yorumlar korunarak `$n` biçimine çevrilir; değerler SQL metnine eklenmez. Yüzde karakterlerinin değişmemesi için psycopg RawCursor seçildi ([resmî cursor belgesi](https://www.psycopg.org/psycopg3/docs/advanced/cursors.html)). Bu dar uyumluluk katmanı kullanıcı SQL'i veya PostgreSQL JSON soru işareti operatörleri için kullanılmaz. Satır fabrikası isim/sıra ve `dict(row)` erişimini birlikte sunar ([resmî satır fabrikası belgesi](https://www.psycopg.org/psycopg3/docs/advanced/rows.html)). Yeni bağımlılık eklenmedi.
+
+Bağlantı/statement/lock zaman aşımı sınırlıdır; bağlantı bütün çıkışlarda kapanır. İşlemler psycopg transaction bağlamıyla geri alınır. Birim testlerinden ayrı gerçek sunucu sözleşme testi `OPENREPORTING_TEST_POSTGRES_DSN` gerektirir; CI'da izole PostgreSQL 16 servisiyle ayrı iş eklendi. Yerelde bu test sunucu bulunmadığında atlanır ve bu durum entegrasyon başarısı sayılmaz.

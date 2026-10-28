@@ -2,6 +2,10 @@
 
 ## Yayınlanmamış
 
+### Geliştirme altyapısı
+- PostgreSQL uygulama sürücüsünün bağlantı/parametre/satır/işlem ilkelleri ve izole PostgreSQL CI sözleşme testi
+  eklendi. Bu ilkeller henüz uygulama veritabanı seçimine bağlı değildir; üretim PostgreSQL desteği tamamlanmadı.
+
 ### Güvenlik ve sağlamlık
 - Dashboard, klasör, veri kaynağı ve rapor listeleri taşınabilir `LOWER` sıralaması kullanır;
   aynı ada sahip kayıtlar kimlikle kararlı sıralanır. Dashboard yıldız filtresi SELECT takma adına

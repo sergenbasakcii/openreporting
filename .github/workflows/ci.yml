@@ -10,6 +10,35 @@ permissions:
   contents: read
 
 jobs:
+  postgres-driver:
+    name: PostgreSQL driver contract
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: openreporting_test
+          POSTGRES_USER: openreporting_test
+          POSTGRES_PASSWORD: isolated-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openreporting_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install package
+        run: python -m pip install ".[test]"
+      - name: Test PostgreSQL primitives against isolated server
+        env:
+          OPENREPORTING_TEST_POSTGRES_DSN: postgresql://openreporting_test:isolated-ci-password@localhost:5432/openreporting_test
+        run: python -m pytest -q tests/test_postgres_store.py
+
   tests:
     name: Tests (Python ${{ matrix.python }})
     runs-on: ubuntu-24.04
