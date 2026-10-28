@@ -274,6 +274,9 @@ class Pdf:
             from .extended_pdf import draw as draw_extended
             if draw_extended(self, result.panel, frames, bx, by, bw, bh):
                 return
+            from .categorical_pdf import draw as draw_categorical
+            if draw_categorical(self, result.panel, frames, bx, by, bw, bh):
+                return
             if kind in ("timeseries",) and has_series:
                 self.draw_timeseries(result.panel, frames, bx, by, bw, bh)
             elif kind == "statetimeline" and has_series:
