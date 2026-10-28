@@ -3,6 +3,8 @@
 ## Yayınlanmamış
 
 ### Geliştirme altyapısı
+- PostgreSQL başlangıç şeması, atomik sürüm geçişleri, transaction kapsamlı yazıcı kilidi ve
+  denetim kayıtları için UPDATE/DELETE/TRUNCATE koruması eklendi; gerçek sunucu regresyonları genişletildi.
 - PostgreSQL uygulama sürücüsünün bağlantı/parametre/satır/işlem ilkelleri ve izole PostgreSQL CI sözleşme testi
   eklendi. Bu ilkeller henüz uygulama veritabanı seçimine bağlı değildir; üretim PostgreSQL desteği tamamlanmadı.
 

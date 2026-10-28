@@ -51,3 +51,13 @@ Dashboard yıldız filtresi WHERE içinde SELECT takma adı kullanmak yerine kul
 İç uygulama SQL'indeki `?` işaretleri, tırnaklar ve yorumlar korunarak `$n` biçimine çevrilir; değerler SQL metnine eklenmez. Yüzde karakterlerinin değişmemesi için psycopg RawCursor seçildi ([resmî cursor belgesi](https://www.psycopg.org/psycopg3/docs/advanced/cursors.html)). Bu dar uyumluluk katmanı kullanıcı SQL'i veya PostgreSQL JSON soru işareti operatörleri için kullanılmaz. Satır fabrikası isim/sıra ve `dict(row)` erişimini birlikte sunar ([resmî satır fabrikası belgesi](https://www.psycopg.org/psycopg3/docs/advanced/rows.html)). Yeni bağımlılık eklenmedi.
 
 Bağlantı/statement/lock zaman aşımı sınırlıdır; bağlantı bütün çıkışlarda kapanır. İşlemler psycopg transaction bağlamıyla geri alınır. Birim testlerinden ayrı gerçek sunucu sözleşme testi `OPENREPORTING_TEST_POSTGRES_DSN` gerektirir; CI'da izole PostgreSQL 16 servisiyle ayrı iş eklendi. Yerelde bu test sunucu bulunmadığında atlanır ve bu durum entegrasyon başarısı sayılmaz.
+
+## PostgreSQL şeması ve yazıcı güvenliği
+
+İlk PostgreSQL şeması yalnız bilinen v1 başlangıç ifadelerinden hazırlanır: SQLite'ın 64 bit INTEGER değerleri BIGINT, denetim kimliği identity olur. Sonraki PostgreSQL geçişleri açık ifade listeleriyle eklenir. Kimlik/zaman/JSON alanları ilk geçişte TEXT kalır; UUID/timestamptz/jsonb dönüşümü ayrı bir veri geçişi gerektirir. Bu tercih mevcut denetim karma girdilerinin biçimini korur.
+
+Şema DDL ve sürüm geçmişi aynı transaction içinde uygulanır. Eksik, ilerideki veya aralıklı sürüm geçmişi reddedilir. İlk aşamada yazıcılar transaction kapsamlı ortak advisory kilitle sıraya girer; bu SQLite'ın tek yazıcı davranışını ve denetim zincirini korur. Kilit transaction bittiğinde bırakılır ([PostgreSQL kilit belgesi](https://www.postgresql.org/docs/16/explicit-locking.html#ADVISORY-LOCKS)). Bu bilinçli başlangıç sınırı ileride kuyruk satır kilitleriyle daraltılabilir.
+
+Denetim tablosunda UPDATE/DELETE/TRUNCATE işlemleri statement trigger ile reddedilir ([CREATE TRIGGER](https://www.postgresql.org/docs/16/sql-createtrigger.html)). Bu koruma şemayı değiştirme yetkili veritabanı yöneticisine karşı güvenlik sınırı değildir; üretimde migration/uygulama rol ayrımı ayrıca sağlanmalıdır.
+
+Gerçek sunucu regresyonları her test için yeni ve rastgele adlı izole şema kullanır: atomik ilk kurulum/yeniden deneme, başarısız yükseltmede veri ve hash koruması, yabancı anahtarlar, büyük milisaniye değerleri, append-only davranışı ve eşzamanlı başlangıç/20 audit eklemesi. Test yalnız kendi oluşturduğu şemayı temizler.
