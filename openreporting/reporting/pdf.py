@@ -271,6 +271,9 @@ class Pdf:
             return
         has_series = any(f["type"] == "timeseries" for f in frames)
         try:
+            from .extended_pdf import draw as draw_extended
+            if draw_extended(self, result.panel, frames, bx, by, bw, bh):
+                return
             if kind in ("timeseries",) and has_series:
                 self.draw_timeseries(result.panel, frames, bx, by, bw, bh)
             elif kind == "statetimeline" and has_series:

@@ -48,7 +48,7 @@ Uygun sütun yoksa açıklama gösterilir; örnek koordinat/bağlantı uydurulma
 
 ## Raporlar
 
-Excel ve CSV bütün yeni panel türlerinin sorgu verisini aynı aktarım hattıyla içerir. PDF'de halka, basamak ve yığılmış alan vektör çizilir. Diğer 17 yeni tür PDF'de açıkça **Grafik verisi · tablo görünümü** etiketiyle veriyi sunar; ekran görüntüsüyle birebir çizim iddia edilmez. Özel grafiklerin tam vektör PDF karşılıkları sonraki geliştirmedir.
+Excel ve CSV bütün yeni panel türlerinin sorgu verisini aynı aktarım hattıyla içerir. PDF'de halka, basamak, yığılmış alan, histogram, XY dağılım, balon, kutu ve mum grafikleri vektör çizilir. Diğer 12 yeni tür PDF'de açıkça **Grafik verisi · tablo görünümü** etiketiyle veriyi sunar; ekran görüntüsüyle birebir çizim iddia edilmez. Özel grafiklerin tam vektör PDF karşılıkları sonraki geliştirmedir.
 
 ## Veri geçişi
 

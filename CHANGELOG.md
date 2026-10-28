@@ -3,10 +3,11 @@
 ## Yayınlanmamış
 
 ### Veri kaynakları ve görselleştirmeler
+- Histogram, XY, balon, kutu ve mum grafiklerine yerel vektör PDF çizimi eklendi; tabloya aktarılan yeni tür sayısı 17’den 12’ye indi.
 - Prometheus, Loki, HTTP JSON ve HTTP CSV veri kaynakları eklendi (toplam 7 tür).
 - Mevcut panel seçicisine 20 görselleştirme eklendi (toplam 30); mevcut arama grafik adlarını da süzer.
 - Tasarım ve oluşturma akışı korundu. Yeni HTTP kaynakları salt okunur, TLS doğrulamalı, sabit origin ve yanıt bütçeli; metadata adresleri/yönlendirmeler engellenir.
-- Şema v2 mevcut kaynakları koruyarak tür kısıtını genişletir. PDF yeni türlerin üçünde vektör, diğerlerinde açık etiketli veri tablosu sunar; Excel/CSV aktarımı korunur.
+- Şema v2 mevcut kaynakları koruyarak tür kısıtını genişletir. PDF yeni türlerin sekizinde vektör, diğerlerinde açık etiketli veri tablosu sunar; Excel/CSV aktarımı korunur.
 - Veri biçimleri ve sınırlar: docs/EXTRA_SOURCES_AND_PANELS.md.
 
 
