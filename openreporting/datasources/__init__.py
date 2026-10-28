@@ -130,7 +130,7 @@ def get(settings, uid_or_name=None, *, transport=None):
 
 def list_all(settings):
     with connect(settings) as db:
-        rows = db.execute("SELECT * FROM datasources ORDER BY name COLLATE NOCASE").fetchall()
+        rows = db.execute("SELECT * FROM datasources ORDER BY LOWER(name),uid").fetchall()
     return [public(_row(r), settings) for r in rows]
 
 

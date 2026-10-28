@@ -452,7 +452,7 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
              FROM dashboards d LEFT JOIN folders f ON f.id=d.folder_id WHERE 1=1"""
     params = [user["id"]]
     if query:
-        sql += " AND d.title LIKE ? ESCAPE '\\'"
+        sql += " AND LOWER(d.title) LIKE LOWER(?) ESCAPE '\\'"
         params.append("%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
     if folder_uid is not None:
         if folder_uid == "":
@@ -461,8 +461,9 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
             sql += " AND f.uid=?"
             params.append(folder_uid)
     if starred:
-        sql += " AND starred=1"
-    sql += " ORDER BY d.title COLLATE NOCASE LIMIT ?"
+        sql += " AND EXISTS(SELECT 1 FROM dashboard_stars s WHERE s.dashboard_id=d.id AND s.user_id=?)"
+        params.append(user["id"])
+    sql += " ORDER BY LOWER(d.title),d.uid LIMIT ?"
     params.append(max(1, min(int(limit), 5000)))
     with connect(settings) as db:
         rows = db.execute(sql, params).fetchall()
@@ -481,7 +482,7 @@ def folders(settings):
     with connect(settings) as db:
         return [dict(r) for r in db.execute("""SELECT f.uid,f.title,f.updated_at,
                 (SELECT COUNT(*) FROM dashboards d WHERE d.folder_id=f.id) AS dashboard_count
-                FROM folders f ORDER BY f.title COLLATE NOCASE""")]
+                FROM folders f ORDER BY LOWER(f.title),f.uid""")]
 
 
 def save_folder(settings, user, title, uid=None):

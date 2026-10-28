@@ -3,6 +3,9 @@
 ## Yayınlanmamış
 
 ### Güvenlik ve sağlamlık
+- Dashboard, klasör, veri kaynağı ve rapor listeleri taşınabilir `LOWER` sıralaması kullanır;
+  aynı ada sahip kayıtlar kimlikle kararlı sıralanır. Dashboard yıldız filtresi SELECT takma adına
+  bağlı kalmaz; metin araması açıkça büyük/küçük harf duyarsızdır ve joker karakterleri kaçırır.
 - SQLite bağlantı, işlem, sürüm/bütünlük kontrolü ve yedekleme işlemleri ayrı sürücü modülüne taşındı;
   CLI artık bu ayrıntıları çoğaltmıyor. Yedekleme eksik kaynak dosyası oluşturmaz, hedefi özel izinlerle
   ve üzerine yazmadan açar; başarısız yeni yedeği temizler. Canlı WAL verileri geri yükleme testiyle doğrulandı.

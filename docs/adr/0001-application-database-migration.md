@@ -37,3 +37,9 @@ Yeni sürücü mevcut çağrı sözleşmesini korumalı veya çağrıları birli
 - Satırlar hem alan adı hem sıra ile okunur; `dict(row)` kullanılabilir. Mevcut JSON ve zaman metinlerinin dönüşümü denetim zincirindeki baytları değiştiremez.
 - `schema_version`, `set_schema_version`, `check_integrity`, `has_encrypted_secrets` ve `backup_database` sürücüye özgü davranışı kapatır. PostgreSQL fiziksel bütünlük kontrolü SQLite PRAGMA eşdeğeri gibi sunulmamalıdır.
 - Yedek mevcut hedefi değiştirmez, eksik kaynak oluşturmaz, canlı commit edilmiş veriyi içerir. Arşiv ve anahtar ayrı kalır.
+
+## Sorgu taşınabilirliği
+
+Liste sıralamaları SQLite'a özel `COLLATE NOCASE` yerine `LOWER(alan), kimlik` kullanır. ASCII adlarda mevcut harf duyarsız sıra korunur; eşit normalleştirilmiş adlarda kimlik ikinci anahtardır. Unicode harf dönüşümü veritabanının dil/yerel ayarına bağlıdır; iki sürücü için tam Türkçe eşdeğerlik henüz taahhüt edilmez.
+
+Dashboard yıldız filtresi WHERE içinde SELECT takma adı kullanmak yerine kullanıcıya bağlı EXISTS alt sorgusu kullanır. Metin aramasında iki taraf LOWER ile karşılaştırılır; yüzde, alt çizgi ve ters eğik çizgi değerleri bağlı parametrede kaçırılır. PostgreSQL'e geçişte kalan parametre biçimi ve veri türü farklılıkları ayrıca ele alınmalıdır.

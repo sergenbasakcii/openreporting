@@ -103,7 +103,7 @@ def list_reports(settings):
                (SELECT COUNT(*) FROM dash_report_schedules s WHERE s.report_id=r.id AND s.enabled=1) AS active_schedules,
                (SELECT status FROM dash_report_runs x WHERE x.report_id=r.id ORDER BY x.created_at DESC LIMIT 1) AS last_status,
                (SELECT created_at FROM dash_report_runs x WHERE x.report_id=r.id ORDER BY x.created_at DESC LIMIT 1) AS last_run_at
-               FROM dash_reports r LEFT JOIN dashboards d ON d.uid=r.dashboard_uid ORDER BY r.name COLLATE NOCASE""").fetchall()
+               FROM dash_reports r LEFT JOIN dashboards d ON d.uid=r.dashboard_uid ORDER BY LOWER(r.name),r.id""").fetchall()
     return [_row(r) for r in rows]
 
 
