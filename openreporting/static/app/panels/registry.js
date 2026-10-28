@@ -1,3 +1,4 @@
+import { EXTRA_NAMES, renderExtended } from './extended.js';
 // Visualization plugins: renderers, defaults and option schemas used by the panel editor.
 import { render as renderTimeseries } from './timeseries.js';
 import { renderBarchart, renderPiechart, renderGauge, renderStateTimeline } from './charts.js';
@@ -123,7 +124,9 @@ export const PLUGINS = {
   },
 };
 
-export const ORDER = ['timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'statusgrid', 'statetimeline', 'text'];
+for (const [type, name] of Object.entries(EXTRA_NAMES)) PLUGINS[type] = { name, icon: 'chart-bar', render: renderExtended, defaults: { options: { reduceOptions: { calcs: ['lastNotNull'] }, bins: 10 }, fieldConfig: { defaults: { unit: 'auto' }, overrides: [] } }, sections: type === 'histogram' ? [{ title: 'Histogram', items: [{ path: 'options.bins', label: 'Aralık sayısı', type: 'number', min: 1, max: 50, default: 10 }] }] : [] };
+
+export const ORDER = ['timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'statusgrid', 'statetimeline', 'text', ...Object.keys(EXTRA_NAMES)];
 export const CALC_OPTIONS = calcOptions;
 
 export function plugin(type) { return PLUGINS[type] || PLUGINS.timeseries; }

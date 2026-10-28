@@ -35,6 +35,11 @@ def _sql_quote(value):
 
 
 def format_values(values, fmt, *, multi=False, name=""):
+    if fmt == "promql":
+        # A regex value inside a double-quoted PromQL/LogQL label matcher.
+        escaped = [re.sub(r'([\\.^$|?*+(){}\[\]])', r'\\\1', v) for v in values]
+        pattern = escaped[0] if len(escaped) == 1 else "(" + "|".join(escaped) + ")"
+        return json.dumps(pattern, ensure_ascii=False)[1:-1]
     if fmt in (None, "", "raw"):
         if len(values) == 1 and not multi:
             return values[0]
@@ -73,6 +78,25 @@ def format_values(values, fmt, *, multi=False, name=""):
 
 # Formats that keep a value inert inside the datasource's own syntax.
 SAFE_FORMATS = {"sqlstring": {"sqlstring"}, "zabbix": {"zabbix", "regex", "csv", "pipe", "text", "json", "glob"}}
+
+
+def validate_promql_variables(text, variables, builtins):
+    # User variables are only allowed inside double-quoted label strings.
+    # Escaping a value is not sufficient if the author places it as syntax.
+    quoted, escaped, inside = False, False, set()
+    for i, char in enumerate(text):
+        if quoted:
+            inside.add(i)
+        if escaped:
+            escaped = False
+        elif char == "\\" and quoted:
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+    for match in _PATTERN.finditer(text):
+        name = match.group(1) or match.group(2) or match.group(4)
+        if name in variables and name not in builtins and match.start() not in inside:
+            raise ValueError("PromQL/LogQL değişkenlerini çift tırnaklı etiket değerleri içinde kullanın")
 
 
 def interpolate(text, variables, *, default_format=None, builtins=None, strict=False):

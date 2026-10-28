@@ -13,7 +13,7 @@ export async function datasourcesPage(root) {
   page.append(loading());
   const list = await get('/api/datasources');
   page.replaceChildren(h('div', { class: 'page-header' }, h('div', h('h1', icon('database'), 'Veri kaynakları'),
-    h('p', { class: 'sub', text: 'Zabbix API, PostgreSQL/TimescaleDB ve sentetik test verisi. Kimlik bilgileri sunucuda şifreli saklanır ve tarayıcıya hiçbir zaman gönderilmez.' })),
+    h('p', { class: 'sub', text: 'Zabbix, PostgreSQL, Prometheus, Loki, HTTP JSON/CSV ve test verisi. Kimlik bilgileri sunucuda şifreli saklanır ve tarayıcıya hiçbir zaman gönderilmez.' })),
   button('Veri kaynağı ekle', { icon: 'plus', variant: 'primary', onClick: () => navigate('/datasources/new') })));
   if (!list.length) page.append(h('div', { class: 'empty-state' }, h('h3', { text: 'Veri kaynağı yok' })));
   for (const ds of list) {
@@ -77,6 +77,13 @@ export async function datasourceEditPage(root, { uid }) {
         jd('history_table_float', 'History tablosu (float)', { placeholder: 'history' }), jd('history_table_uint', 'History tablosu (uint)', { placeholder: 'history_uint' }),
         jd('trends_table_float', 'Trend tablosu (float)', { placeholder: 'trends' }), jd('trends_table_uint', 'Trend tablosu (uint)', { placeholder: 'trends_uint' })) : null,
       h('p', { class: 'hint', text: 'Grup/host/item keşfi her zaman Zabbix API ile yapılır; SQL modu yalnızca büyük gruplarda zaman serisini hızlandırır.' })));
+    } else if (['prometheus', 'loki', 'httpjson', 'csv'].includes(model.type)) {
+      form.append(h('div', { class: 'card' }, h('h3', { text: 'Bağlantı' }),
+        field('Sunucu / uç nokta URL', input({ value: model.url || '', placeholder: 'https://metrics.example.com', onChange: e => { model.url = e.target.value; } })),
+        secret('token', 'Bearer token (isteğe bağlı)'), jd('timeout', 'Zaman aşımı (sn)', { type: 'number' }),
+        model.type === 'httpjson' ? jd('root', 'JSON kök alanı (isteğe bağlı)', { placeholder: 'data.items' }) : null,
+        field('CA sertifikası (PEM)', textarea({ value: model.jsonData.ca_pem || '', rows: 3, onChange: e => { model.jsonData.ca_pem = e.target.value; } })),
+        h('p', { class: 'hint', text: 'Yalnızca okuma. HTTPS doğrulanır, yönlendirmeler izlenmez. JSON/CSV için tablo uç noktasının tam adresini yazın.' })));
     } else if (model.type === 'postgres') {
       form.append(h('div', { class: 'card' }, h('h3', { text: 'Bağlantı' }), h('div', { class: 'form-grid' },
         jd('host', 'Sunucu', { placeholder: 'db.example.com' }), jd('port', 'Port', { type: 'number' }), jd('database', 'Veritabanı'), jd('user', 'Kullanıcı (yalnızca SELECT yetkili)'),

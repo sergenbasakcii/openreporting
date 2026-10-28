@@ -11,7 +11,8 @@ import re
 from .db import audit, connect, transaction, utcnow
 from .domain import DomainError, canonical, identity
 
-PANEL_TYPES = {"timeseries", "barchart", "stat", "gauge", "bargauge", "table", "piechart", "text",
+EXTRA_PANEL_TYPES = {'donut', 'radar', 'calendarheatmap', 'heatmap', 'polarbar', 'candlestick', 'histogram', 'scatter', 'funnel', 'treemap', 'boxplot', 'nodegraph', 'stackedarea', 'waterfall', 'stepchart', 'sunburst', 'rosepie', 'parallel', 'bubble', 'sankey'}
+PANEL_TYPES = EXTRA_PANEL_TYPES | {"timeseries", "barchart", "stat", "gauge", "bargauge", "table", "piechart", "text",
                "statusgrid", "row", "heatmap", "statetimeline"}
 TYPE_ALIASES = {"graph": "timeseries", "singlestat": "stat", "grafana-singlestat-panel": "stat",
                 "table-old": "table", "grafana-piechart-panel": "piechart", "grafana-polystat-panel": "statusgrid",

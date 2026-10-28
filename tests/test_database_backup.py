@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from openreporting.config import Settings
-from openreporting.db import audit, backup_database, connect, init_db, schema_version, transaction, verify_audit
+from openreporting.db import CURRENT_VERSION, audit, backup_database, connect, init_db, schema_version, transaction, verify_audit
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def test_live_backup_includes_wal_and_preserves_audit(settings, tmp_path):
         assert backup_database(settings, target) == target.resolve()
     with sqlite3.connect(target) as restored:
         restored.row_factory = sqlite3.Row
-        assert schema_version(restored) == 1
+        assert schema_version(restored) == CURRENT_VERSION
         assert restored.execute("SELECT COUNT(*) FROM audit").fetchone()[0] == 1
         assert verify_audit(restored) == (True, None)
 

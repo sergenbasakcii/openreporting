@@ -11,7 +11,9 @@ from .postgres import SSL_MODES, PostgresDataSource
 from .testdata import SCENARIOS, TestDataSource
 from .zabbix import ZabbixDataSource, validate_url
 
-TYPES = {"zabbix": ZabbixDataSource, "postgres": PostgresDataSource, "testdata": TestDataSource}
+from .http_sources import PrometheusDataSource, LokiDataSource, JSONDataSource, CSVDataSource, validate_http_url
+
+TYPES = {"prometheus": PrometheusDataSource, "loki": LokiDataSource, "httpjson": JSONDataSource, "csv": CSVDataSource, "zabbix": ZabbixDataSource, "postgres": PostgresDataSource, "testdata": TestDataSource}
 TYPE_INFO = [
     {"type": "zabbix", "name": "Zabbix", "description": "Zabbix API: host grupları, hostlar, item'lar, history/trend, problemler",
      "secure_fields": ["token"]},
@@ -20,6 +22,12 @@ TYPE_INFO = [
     {"type": "testdata", "name": "TestData (sentetik)",
      "description": "Gerçek olmayan, deterministik örnek veri ve Zabbix simülasyonu", "secure_fields": []},
 ]
+TYPE_INFO += [{"type": kind, "name": name, "description": description, "secure_fields": ["token"]} for kind, name, description in [
+ ("prometheus", "Prometheus / Mimir / VictoriaMetrics", "PromQL zaman serileri"),
+ ("loki", "Loki", "LogQL log ve metrik sorguları"),
+ ("httpjson", "HTTP JSON", "REST uç noktasından tablo"),
+ ("csv", "HTTP CSV", "CSV uç noktasından tablo"),
+]]
 SECURE_FIELDS = {t["type"]: t["secure_fields"] for t in TYPE_INFO}
 _UID = re.compile(r"^[A-Za-z0-9_-]{2,40}$")
 _TABLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
@@ -84,6 +92,11 @@ def validate(kind, url, json_data, settings):
                 if not _TABLE.match(value):
                     raise DataSourceError(f"Geçersiz tablo adı: {value}")
                 clean[key] = value
+    elif kind in ("prometheus", "loki", "httpjson", "csv"):
+        url = validate_http_url(url, settings.allow_http_datasources)
+        clean["timeout"] = max(3, min(int(data.get("timeout", 30)), 60))
+        clean["ca_pem"] = _pem(data.get("ca_pem", ""))
+        clean["root"] = str(data.get("root") or "")[:200]
     elif kind == "postgres":
         for key in ("host", "database", "user"):
             value = str(data.get(key, "")).strip()

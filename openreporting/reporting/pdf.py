@@ -283,9 +283,24 @@ class Pdf:
                 self.draw_bars(result.panel, frames, bx, by, bw, bh, kind)
             elif kind == "piechart":
                 self.draw_pie(result.panel, frames, bx, by, bw, bh)
+            elif kind == "donut":
+                self.draw_pie({**result.panel, "options": {**result.panel.get("options", {}), "pieType": "donut"}}, frames, bx, by, bw, bh)
+            elif kind in ("stepchart", "stackedarea") and has_series:
+                cfg = result.panel.get("fieldConfig", {})
+                defaults = cfg.get("defaults", {})
+                custom = {**defaults.get("custom", {})}
+                if kind == "stepchart":
+                    custom["lineInterpolation"] = "stepAfter"
+                else:
+                    custom.update(stacking={"mode": "normal"}, fillOpacity=40)
+                self.draw_timeseries({**result.panel, "fieldConfig": {**cfg, "defaults": {**defaults, "custom": custom}}}, frames, bx, by, bw, bh)
             elif kind == "statusgrid":
                 self.draw_statusgrid(result.panel, frames, bx, by, bw, bh)
             else:
+                from ..dashboards import EXTRA_PANEL_TYPES
+                if kind in EXTRA_PANEL_TYPES:
+                    self.text(bx, by + bh - 8, "Grafik verisi · tablo görünümü", 7, MUTED)
+                    bh -= 16
                 self.draw_table(result.panel, frames, bx, by, bw, bh)
         except Exception as exc:  # noqa: BLE001 - one bad panel must not break the document
             self.text(bx + bw / 2, by + bh / 2, f"Çizim hatası: {type(exc).__name__}", 8, "#c4162a", align="center")
@@ -322,7 +337,8 @@ class Pdf:
             entries.append({"name": cfg.get("displayName") or name, "color": series_color(cfg, index, last), "unit": unit,
                             "cfg": cfg, "points": points, "values": values, "negative": negative,
                             "draw": custom.get("drawStyle", "line"), "fill": custom.get("fillOpacity", 10),
-                            "width": custom.get("lineWidth", 1), "span": custom.get("spanNulls", False)})
+                            "width": custom.get("lineWidth", 1), "span": custom.get("spanNulls", False),
+                            "step": custom.get("lineInterpolation") == "stepAfter"})
         if not entries:
             self.text(x + w / 2, y + h / 2, "Veri yok", 10, FAINT, align="center")
             return
@@ -420,6 +436,11 @@ class Pdf:
             if current:
                 segments.append(current)
             for seg in segments:
+                if e["step"] and len(seg) > 1:
+                    stepped = [seg[0]]
+                    for previous, point in zip(seg, seg[1:]):
+                        stepped.extend([(point[0], previous[1]), point])
+                    seg = stepped
                 if e["fill"] and len(seg) > 1:
                     path = c.beginPath()
                     path.moveTo(seg[0][0], zero)

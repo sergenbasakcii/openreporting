@@ -10,7 +10,8 @@ from openreporting.config import Settings
 
 
 @pytest.fixture
-def settings(tmp_path):
+def settings(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "CURRENT_VERSION", 1)
     return replace(Settings.from_env(), data_dir=tmp_path)
 
 
@@ -54,6 +55,7 @@ def test_upgrade_failure_preserves_existing_data_and_can_retry(settings, monkeyp
 def test_missing_migration_fails_without_version_change(settings, monkeypatch):
     db.init_db(settings)
     monkeypatch.setattr(db, "CURRENT_VERSION", 2)
+    monkeypatch.delitem(db.MIGRATIONS, 2)
     with pytest.raises(RuntimeError, match="Missing database migration: 2"):
         db.init_db(settings)
     with db.connect(settings) as connection:

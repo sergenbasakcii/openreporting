@@ -197,7 +197,7 @@ export function openPanelEditor({ panel, dashboard, ctx, variablesList, onApply,
     clear(right);
     const search = input({ placeholder: 'Seçeneklerde ara…', value: filter, onInput: debounce((e) => drawOptions(e.target.value), 250) });
     right.append(h('div', { class: 'opt-search' }, search));
-    const picker = h('div', { class: 'viz-picker' }, ORDER.map((type) => h('button', { type: 'button', class: work.type === type ? 'on' : '', onclick: () => {
+    const picker = h('div', { class: 'viz-picker' }, ORDER.filter(type => !filter || PLUGINS[type].name.toLocaleLowerCase('tr').includes(filter.toLocaleLowerCase('tr'))).map((type) => h('button', { type: 'button', class: work.type === type ? 'on' : '', onclick: () => {
       const prevTargets = work.targets;
       const next = withDefaults({ ...work, type, options: {}, fieldConfig: { defaults: { ...(work.fieldConfig?.defaults || {}), custom: undefined }, overrides: work.fieldConfig?.overrides || [] } });
       Object.keys(work).forEach((k) => delete work[k]);

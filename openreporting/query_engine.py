@@ -19,7 +19,7 @@ from .domain import DomainError
 from .expressions import evaluate
 from .frames import total_points
 from .series_functions import apply_functions, query_option
-from .templating import builtin_variables, interpolate_deep
+from .templating import builtin_variables, interpolate_deep, validate_promql_variables
 from .timerange import calculate_interval, parse_duration, resolve_range, zone
 from .transformations import apply_transformations
 
@@ -87,6 +87,8 @@ def build_context(settings, request, *, user=""):
 def _run_target(settings, target, ctx, panel_ds, transport, trusted):
     uid = _ds_ref(target, panel_ds)
     ds = datasources.get(settings, uid, transport=transport)
+    if ds.default_format == "promql":
+        validate_promql_variables(str(target.get("expr") or ""), ctx.variables, ctx.builtins)
     prepared = interpolate_deep(copy.deepcopy(target), ctx.variables, default_format=ds.default_format,
                                 builtins=ctx.builtins, strict=not trusted)
     local_ctx = ctx

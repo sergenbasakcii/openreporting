@@ -135,6 +135,9 @@ function expressionEditor(target, ctx, onChange) {
 }
 
 export function queryEditor(target, ds, ctx, onChange) {
+  if (['prometheus', 'loki'].includes(ds?.type)) return h('div', field(ds.type === 'prometheus' ? 'PromQL' : 'LogQL', textarea({ value: target.expr || '', rows: 4, placeholder: ds.type === 'prometheus' ? 'rate(http_requests_total[5m])' : '{job="app"}', onChange: e => onChange({ ...target, expr: e.target.value }) })));
+  if (['httpjson', 'csv'].includes(ds?.type)) return h('p', { class: 'hint', text: 'Kayıtlı uç noktadan tablo okunur. Alan seçimi ve düzenleme için Dönüşümler sekmesini kullanın.' });
+
   if (!ds) return h('div', { class: 'alert warn', text: 'Veri kaynağı bulunamadı; bir veri kaynağı seçin.' });
   if (ds.type === '__expr__') return expressionEditor(target, ctx, onChange);
   if (ds.type === 'postgres') return postgresEditor(target, ds, ctx, onChange);

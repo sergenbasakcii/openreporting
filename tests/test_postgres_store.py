@@ -181,6 +181,12 @@ def test_application_uses_postgres_for_login_dashboard_and_report_queue(postgres
         response = http.post("/api/login", json={"username": "admin1", "password": "an-admin-password-123"})
         assert response.status_code == 200, response.text
         headers = {"X-CSRF-Token": response.json()["csrf"]}
+        source = http.post("/api/datasources", json={"name":"HTTP fixture","type":"httpjson",
+            "url":"https://data.example.com/items","secureJsonData":{"token":"synthetic-token"}}, headers=headers)
+        assert source.status_code == 201, source.text
+        sources = http.get("/api/datasources").json()
+        assert any(item["type"] == "httpjson" for item in sources)
+        assert "synthetic-token" not in str(sources)
         dashboard = {"uid": "pg-test", "title": "Postgres test", "panels": []}
         saved = http.post("/api/dashboards/db", json={"dashboard": dashboard}, headers=headers)
         assert saved.status_code == 200, saved.text
@@ -191,7 +197,7 @@ def test_application_uses_postgres_for_login_dashboard_and_report_queue(postgres
         assert http.get("/api/audit").status_code == 200
     assert not (tmp_path / "state.sqlite3").exists()
     with application_db.connect(settings) as db:
-        assert application_db.schema_version(db) == 1
+        assert application_db.schema_version(db) == application_db.CURRENT_VERSION
         assert application_db.verify_audit(db) == (True, None)
         assert db.execute("SELECT COUNT(*) FROM dash_report_runs").fetchone()[0] == 1
     with pytest.raises(RuntimeError, match="pg_dump"):

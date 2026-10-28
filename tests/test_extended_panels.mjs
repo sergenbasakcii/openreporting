@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { EXTRA_NAMES, extendedOption } from '../openreporting/static/app/panels/extended.js';
+import { ORDER, newPanel } from '../openreporting/static/app/panels/registry.js';
+
+const series = [{ type: 'timeseries', name: 'Test', labels: {}, points: [[1000, 1], [2000, null], [3000, 3]], unit: '' }];
+const panel = (type) => ({ type, options: {}, fieldConfig: { defaults: {} } });
+test('20 new plugins remain in the existing picker, 30 total', () => {
+  assert.equal(Object.keys(EXTRA_NAMES).length, 20);
+  assert.equal(ORDER.length, 30);
+  assert.equal(new Set(ORDER).size, 30);
+  for (const type of Object.keys(EXTRA_NAMES)) assert.equal(newPanel(type, 1, {}).type, type);
+});
+test('histogram includes real samples, excludes missing values', () => {
+  const option = extendedOption(series, panel('histogram'));
+  assert.equal(option.series[0].data.reduce((a, b) => a + b, 0), 2);
+});
+test('step chart preserves missing points and timestamps', () => {
+  assert.deepEqual(extendedOption(series, panel('stepchart')).series[0].data, series[0].points);
+});
+test('scatter requires actual numeric pairs, never invents coordinates', () => {
+  assert.ok(extendedOption(series, panel('scatter')).message);
+});
+test('Sankey cycles have a clear explanation', () => {
+  const frame = {type:'table',columns:[{name:'source',type:'string'},{name:'target',type:'string'},{name:'value',type:'number'}],rows:[['a','b',1],['b','a',1]]};
+  assert.ok(extendedOption([frame], panel('sankey')).message);
+});
+test('waterfall keeps the actual signed cumulative endpoints', () => {
+  const values = [10, -20, 4].map((v,i)=>({...series[0],name:String(i),points:[[1000,v]]}));
+  assert.deepEqual(extendedOption(values,panel('waterfall')).series[0].data, [[0,0,10],[1,10,-10],[2,-10,-6]]);
+});

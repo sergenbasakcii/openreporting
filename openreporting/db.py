@@ -126,12 +126,21 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 1
+CURRENT_VERSION = 2
 
 # Each migration is a tuple of complete statements, executed in one transaction.
 # Only the initial schema is split here; later migrations may contain triggers or
 # other statements with internal semicolons and must be supplied explicitly.
 MIGRATIONS = {1: tuple(statement.strip() for statement in SCHEMA.split(";") if statement.strip())}
+_SOURCE_TYPES = "'zabbix','postgres','testdata','prometheus','loki','httpjson','csv'"
+_source_schema = next(s for s in MIGRATIONS[1] if s.startswith("CREATE TABLE IF NOT EXISTS datasources("))
+_source_schema = _source_schema.replace("datasources(", "datasources_v2(", 1).replace("'zabbix','postgres','testdata'", _SOURCE_TYPES)
+MIGRATIONS[2] = (_source_schema, "INSERT INTO datasources_v2 SELECT * FROM datasources", "DROP TABLE datasources", "ALTER TABLE datasources_v2 RENAME TO datasources")
+POSTGRES_MIGRATIONS = {1: postgres_store.bootstrap_statements(MIGRATIONS[1]), 2: (
+    "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
+    f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK(type IN ({_SOURCE_TYPES}))",
+)}
+
 
 
 def init_db(settings: Settings):
@@ -139,7 +148,7 @@ def init_db(settings: Settings):
     settings.archive_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     if settings.database_url:
         with connect(settings) as db:
-            postgres_store.init_schema(db, {1: postgres_store.bootstrap_statements(MIGRATIONS[1])}, CURRENT_VERSION)
+            postgres_store.init_schema(db, POSTGRES_MIGRATIONS, CURRENT_VERSION)
         return
     with connect(settings) as db, transaction(db):
         # Acquire the write lock before reading the version: web workers may
