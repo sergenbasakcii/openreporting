@@ -22,6 +22,7 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
     page.on('request', req => { if (new URL(req.url()).pathname === '/api/ds/query') queries += 1; });
     const dashboardUrl = `${base}/d/${encodeURIComponent(uid)}`;
     async function theme(value) {
+      await page.locator('.app-shell').waitFor();
       await page.evaluate(value => {
         document.documentElement.dataset.theme = value;
         window.dispatchEvent(new CustomEvent('openreporting:themechange', { detail: value }));
@@ -94,8 +95,10 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
       }
       // Exercise a native popup without changing its selection.
       await page.goto(`${base}/datasources/new`);
+      await page.locator('select').first().waitFor();
       await theme(mode);
       await page.locator('select').first().click();
+      assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), mode);
       await page.screenshot({ path: `${output}/select-${mode}.png` });
       await page.keyboard.press('Escape');
 
