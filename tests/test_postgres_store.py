@@ -185,7 +185,7 @@ def test_application_uses_postgres_for_login_dashboard_and_report_queue(postgres
         saved = http.post("/api/dashboards/db", json={"dashboard": dashboard}, headers=headers)
         assert saved.status_code == 200, saved.text
         report = http.post("/api/dash-reports", json={"name": "PG report", "dashboard_uid": "pg-test", "formats": ["csv"]}, headers=headers)
-        assert report.status_code == 200, report.text
+        assert report.status_code == 201, report.text
         run = http.post(f"/api/dash-reports/{report.json()['id']}/runs", json={}, headers=headers)
         assert run.status_code == 200, run.text
         assert http.get("/api/audit").status_code == 200
