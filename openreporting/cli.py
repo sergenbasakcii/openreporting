@@ -3,30 +3,17 @@ import argparse
 import getpass
 import logging
 import os
-import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Settings
-from .db import audit, connect, init_db, transaction, verify_audit
+from .db import audit, backup_database, check_integrity, connect, init_db, schema_version, transaction, verify_audit
 from .security import create_user, password_hash
 
 
 def backup(settings, target):
-    source_path = settings.db_path
-    target = Path(target).resolve()
-    if target.exists():
-        raise RuntimeError("Refusing to overwrite an existing backup")
-    if target.is_relative_to(settings.data_dir):
-        raise RuntimeError("Backup should be outside active application data dir")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(source_path) as src, sqlite3.connect(target) as dest:
-        src.backup(dest)
-        result = dest.execute("PRAGMA integrity_check").fetchone()[0]
-        if result != "ok":
-            raise RuntimeError(f"Backup failed integrity check: {result}")
-    os.chmod(target, 0o600)
+    target = backup_database(settings, target)
     print(f"SQLite consistent backup created: {target}")
     print("Important: copy the archive/ directory independently and verify manifest hashes.")
 
@@ -71,9 +58,9 @@ def doctor(settings):
         report(False, "PDF yazı tipi", f"{exc} (Ubuntu: apt install fonts-dejavu-core)")
     from .db import CURRENT_VERSION
     with connect(settings) as db:
-        version = db.execute("PRAGMA user_version").fetchone()[0]
+        version = schema_version(db)
         report(version == CURRENT_VERSION, "Veritabanı şeması", f"v{version}")
-        integrity = db.execute("PRAGMA quick_check").fetchone()[0]
+        integrity = check_integrity(db)
         report(integrity == "ok", "SQLite bütünlük kontrolü", integrity)
         valid, broken = verify_audit(db)
         report(valid, "Denetim zinciri", "geçerli" if valid else f"bozuk kayıt #{broken}")

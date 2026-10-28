@@ -3,6 +3,9 @@
 ## Yayınlanmamış
 
 ### Güvenlik ve sağlamlık
+- SQLite bağlantı, işlem, sürüm/bütünlük kontrolü ve yedekleme işlemleri ayrı sürücü modülüne taşındı;
+  CLI artık bu ayrıntıları çoğaltmıyor. Yedekleme eksik kaynak dosyası oluşturmaz, hedefi özel izinlerle
+  ve üzerine yazmadan açar; başarısız yeni yedeği temizler. Canlı WAL verileri geri yükleme testiyle doğrulandı.
 - Anahtar kayıpken mevcut veritabanı okunamıyorsa yeni şifreleme anahtarı oluşturulmaz;
   kimlik bilgisi kontrolü salt okunur bağlantıyla yapılır ve veritabanını oluşturmaz.
 - Rapor kuyruğu tekrarları yalnız idempotency anahtarı çakışmasında mevcut işi kullanır;

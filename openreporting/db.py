@@ -1,11 +1,12 @@
 import hashlib
 import json
-import sqlite3
-import time
-from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from .config import Settings
+from .sqlite_store import (
+    backup_database, check_integrity, connect, has_encrypted_secrets,
+    schema_version, set_schema_version, transaction,
+)
 
 
 def utcnow():
@@ -103,7 +104,7 @@ def init_db(settings: Settings):
     with connect(settings) as db, transaction(db):
         # Acquire the write lock before reading the version: web workers may
         # initialise the same database concurrently during application startup.
-        version = db.execute("PRAGMA user_version").fetchone()[0]
+        version = schema_version(db)
         if version > CURRENT_VERSION:
             raise RuntimeError("This application cannot open a newer database schema")
         for target in range(version + 1, CURRENT_VERSION + 1):
@@ -113,59 +114,7 @@ def init_db(settings: Settings):
             for statement in statements:
                 db.execute(statement)
             db.execute("INSERT INTO schema_versions(version,applied_at) VALUES (?,?)", (target, utcnow()))
-            # target is an application-owned integer, never user input.
-            db.execute(f"PRAGMA user_version={target}")
-
-
-@contextmanager
-def connect(settings: Settings):
-    db = sqlite3.connect(settings.db_path, timeout=20, isolation_level=None)
-    try:
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys=ON")
-        db.execute("PRAGMA busy_timeout=20000")
-        # Switching a fresh database to WAL can return SQLITE_BUSY immediately
-        # despite busy_timeout when several workers open it at the same time.
-        deadline = time.monotonic() + 20
-        while True:
-            try:
-                db.execute("PRAGMA journal_mode=WAL")
-                break
-            except sqlite3.OperationalError as exc:
-                if getattr(exc, "sqlite_errorcode", None) != sqlite3.SQLITE_BUSY or time.monotonic() >= deadline:
-                    raise
-                time.sleep(0.05)
-        yield db
-    finally:
-        db.close()
-
-
-@contextmanager
-def transaction(db):
-    db.execute("BEGIN IMMEDIATE")
-    try:
-        yield
-        db.commit()
-    except BaseException:
-        db.rollback()
-        raise
-
-
-def has_encrypted_secrets(settings: Settings):
-    """Inspect stored credentials without creating or modifying application data.
-
-    An unreadable existing database must propagate an error: callers must not
-    interpret an inspection failure as permission to replace a missing key.
-    """
-    path = settings.db_path
-    if not path.exists():
-        return False
-    uri = path.resolve().as_uri() + "?mode=ro"
-    db = sqlite3.connect(uri, uri=True, timeout=20)
-    try:
-        return db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None
-    finally:
-        db.close()
+            set_schema_version(db, target)
 
 
 def audit(db, actor, action, object_type, object_id, details=None):

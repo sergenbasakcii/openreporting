@@ -25,3 +25,15 @@ Yeni regresyon testleri başarısız ilk kurulumu, başarısız yükseltme sonra
 İkinci adımda şifreli veri varlığı kontrolü `db.has_encrypted_secrets` sınırına alındı; mevcut SQLite dosyası salt okunur açılır. Veritabanı hatası anahtar oluşturma izni sayılmaz. PostgreSQL sürücüsü bu kontrolü uygulama veritabanı bağlantısı üzerinden sağlamalıdır.
 
 Rapor kuyruğunda bütünlük hatası yakalayıp aynı işlemde yeniden SELECT yapmak yerine `ON CONFLICT(idempotency_key) DO NOTHING` kullanılır. Bu, PostgreSQL'de hatadan sonra işlemin iptal durumuna geçmesine dayalı bir tuzağı kaldırır. Dashboard yıldızlarında da `INSERT OR IGNORE` yerine belirli birincil anahtar çakışması hedeflenir. Parametre biçimi ve diğer sürücü farkları sonraki adımlarda kalır.
+
+## Sürücü sınırı
+
+SQLite bağlantı/işlem, sürüm okuma/yazma, bütünlük kontrolü, şifreli veri varlığı ve yedekleme işlemleri `sqlite_store.py` içindedir. Uygulama ve CLI bunlara `db.py` üzerinden erişir. Şema geçişleri ve denetim zinciri uygulama DB katmanında kalır. Henüz sürücü seçimi ve PostgreSQL bağlantısı eklenmedi.
+
+Yeni sürücü mevcut çağrı sözleşmesini korumalı veya çağrıları birlikte taşımalıdır:
+
+- `connect(settings)` bağlantıyı her durumda kapatır; işlemler açıkça `transaction(connection)` ile commit/rollback olur.
+- `execute(sql, parameters)` bağlı parametreleri değer olarak işler; cursor `rowcount`, `fetchone`, `fetchall` ve satır gezintisi sağlar.
+- Satırlar hem alan adı hem sıra ile okunur; `dict(row)` kullanılabilir. Mevcut JSON ve zaman metinlerinin dönüşümü denetim zincirindeki baytları değiştiremez.
+- `schema_version`, `set_schema_version`, `check_integrity`, `has_encrypted_secrets` ve `backup_database` sürücüye özgü davranışı kapatır. PostgreSQL fiziksel bütünlük kontrolü SQLite PRAGMA eşdeğeri gibi sunulmamalıdır.
+- Yedek mevcut hedefi değiştirmez, eksik kaynak oluşturmaz, canlı commit edilmiş veriyi içerir. Arşiv ve anahtar ayrı kalır.
