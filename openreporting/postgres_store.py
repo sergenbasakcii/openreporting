@@ -5,12 +5,50 @@ own read-only driver and must never pass through the qmark conversion below.
 """
 import re
 from contextlib import contextmanager
+from contextvars import ContextVar
 
 import psycopg
 
 # Serialize write transactions until finer row locking is introduced. This
 # preserves SQLite's single-writer guarantee, including audit-chain appends.
 WRITE_LOCK = 0x4F50454E525054
+WORKER_LOCK = WRITE_LOCK + 1
+_worker_guard = ContextVar("openreporting_worker_guard", default=None)
+
+
+class WorkerOwnershipLost(RuntimeError):
+    pass
+
+
+class WorkerGuard:
+    def __init__(self, db):
+        self.db = db
+
+    def ensure(self):
+        try:
+            self.db.raw.execute("SELECT 1").fetchone()
+        except psycopg.Error:
+            raise WorkerOwnershipLost("PostgreSQL worker ownership connection was lost; stopping") from None
+
+
+def assert_worker_ownership():
+    guard = _worker_guard.get()
+    if guard is not None:
+        guard.ensure()
+
+
+@contextmanager
+def exclusive_worker(dsn, *, timeout_ms=30000):
+    with connect(dsn, timeout_ms=timeout_ms) as db:
+        if not db.execute("SELECT pg_try_advisory_lock(?)", (WORKER_LOCK,)).fetchone()[0]:
+            raise RuntimeError("A report worker is already active for this PostgreSQL database")
+        guard = WorkerGuard(db)
+        token = _worker_guard.set(guard)
+        try:
+            yield guard
+        finally:
+            _worker_guard.reset(token)
+            # Closing the dedicated session releases the lock, even on errors.
 
 
 class Row:

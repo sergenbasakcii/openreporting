@@ -3,6 +3,8 @@
 ## Yayınlanmamış
 
 ### Geliştirme altyapısı
+- PostgreSQL worker için veritabanı oturumuna bağlı tekil sahiplik eklendi. Sahiplik bağlantısı kaybolursa
+  iş aşamaları ve e-posta gönderimi durur; otomatik yeniden bağlantıyla sahiplik varsayılmaz.
 - `OPENREPORTING_DATABASE_URL` ile deneysel PostgreSQL uygulama bağlantısı seçilebilir; yapılandırma
   çıktısı DSN parolasını gizler ve bağlantı hatasında SQLite'a dönülmez. PostgreSQL worker ve dosya yedeği
   henüz desteklenmediği için açık hatayla engellenir. API giriş/dashboard/rapor kuyruğu entegrasyon testi eklendi.
@@ -12,6 +14,8 @@
   eklendi. Bu ilkeller henüz uygulama veritabanı seçimine bağlı değildir; üretim PostgreSQL desteği tamamlanmadı.
 
 ### Güvenlik ve sağlamlık
+- Rapor üretimi bitmiş olsa da e-posta `sending` durumunda yarıda kaldıysa yeniden başlangıçta
+  `needs_review/unknown` yapılır; belirsiz teslimat tekrar kuyruğa alınmaz.
 - Dashboard, klasör, veri kaynağı ve rapor listeleri taşınabilir `LOWER` sıralaması kullanır;
   aynı ada sahip kayıtlar kimlikle kararlı sıralanır. Dashboard yıldız filtresi SELECT takma adına
   bağlı kalmaz; metin araması açıkça büyük/küçük harf duyarsızdır ve joker karakterleri kaçırır.

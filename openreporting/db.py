@@ -8,6 +8,7 @@ from . import postgres_store, sqlite_store
 
 def connect(settings):
     if settings.database_url:
+        postgres_store.assert_worker_ownership()
         return postgres_store.connect(settings.database_url, timeout_ms=settings.query_timeout_ms)
     return sqlite_store.connect(settings)
 

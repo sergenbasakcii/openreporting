@@ -196,3 +196,53 @@ def test_application_uses_postgres_for_login_dashboard_and_report_queue(postgres
         assert db.execute("SELECT COUNT(*) FROM dash_report_runs").fetchone()[0] == 1
     with pytest.raises(RuntimeError, match="pg_dump"):
         application_db.backup_database(settings, tmp_path / "wrong.sqlite3")
+
+
+def test_postgres_worker_lock_release_and_connection_loss(postgres_schema):
+    from openreporting import postgres_store
+    with postgres_store.exclusive_worker(postgres_schema.dsn) as guard:
+        guard.ensure()
+        with pytest.raises(RuntimeError, match="already active"):
+            with postgres_store.exclusive_worker(postgres_schema.dsn):
+                pass
+        guard.db.raw.close()  # Simulate the dedicated ownership session dying.
+        with pytest.raises(postgres_store.WorkerOwnershipLost):
+            postgres_store.assert_worker_ownership()
+    # A dead session releases its database lock. No reconnect happens for the old guard.
+    with postgres_store.exclusive_worker(postgres_schema.dsn):
+        postgres_store.assert_worker_ownership()
+    with pytest.raises(RuntimeError, match="test interruption"):
+        with postgres_store.exclusive_worker(postgres_schema.dsn):
+            raise RuntimeError("test interruption")
+    with postgres_store.exclusive_worker(postgres_schema.dsn):
+        pass
+
+
+def test_postgres_worker_generates_verified_report_without_replaying_uncertain_mail(postgres_schema, tmp_path):
+    from dataclasses import replace
+    from openreporting import dashboards, datasources
+    from openreporting.config import Settings
+    from openreporting.reporting import service
+    from openreporting.security import create_user
+    from openreporting.worker import run_forever
+    settings = replace(Settings.from_env(), data_dir=tmp_path, database_url=postgres_schema.dsn,
+                       secret_key_file="", mail_enabled=False, zabbix_url="", zabbix_token_file="")
+    application_db.init_db(settings)
+    datasources.provision(settings)
+    user = {"id": create_user(settings, "admin1", "an-admin-password-123", "admin"), "role": "admin"}
+    dashboards.save(settings, user, {"uid": "pg-worker", "title": "Worker test", "panels": [
+        {"id": 1, "type": "timeseries", "title": "Test", "targets": [
+            {"refId": "A", "datasource": {"uid": "testdata"}, "scenario": "sine"}]}]})
+    report = service.save_report(settings, user, {"name": "Worker test", "dashboard_uid": "pg-worker", "formats": ["csv"]})
+    run_id = service.request_run(settings, user, report["id"], {})["run_id"]
+    run_forever(settings, once=True)
+    assert service.list_runs(settings, report["id"])[0]["status"] == "completed"
+    path, _ = service.verified_file(settings, run_id, "csv")
+    assert path.is_file() and path.stat().st_size > 0
+    with application_db.connect(settings) as db, application_db.transaction(db):
+        db.execute("UPDATE dash_report_runs SET delivery_status='sending' WHERE id=?", (run_id,))
+    run_forever(settings, once=True)
+    run = service.list_runs(settings, report["id"])[0]
+    assert (run["status"], run["delivery_status"]) == ("needs_review", "unknown")
+    assert service.claim(settings) is None
+    assert not (tmp_path / "worker.lock").exists()

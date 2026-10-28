@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from .db import connect, transaction, utcnow
 from .domain import identity, parse_utc
 from .portable import exclusive_local_lock
+from .postgres_store import WorkerOwnershipLost, assert_worker_ownership
 
 log = logging.getLogger(__name__)
 
@@ -80,7 +81,10 @@ def _atomic_write(target: Path, data: bytes):
 def exclusive_worker(settings):
     """One scheduler/SMTP owner per local NTFS/ext4 application data volume."""
     if settings.database_url:
-        raise RuntimeError("PostgreSQL worker ownership is not enabled yet; refusing unsafe local-only ownership")
+        from . import postgres_store
+        with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms):
+            yield
+        return
     with exclusive_local_lock(settings.data_dir / "worker.lock"):
         yield
 
@@ -143,10 +147,13 @@ def _run_locked(settings, once, interval):
             errors = []
 
             def phase(name, func, *args):
+                assert_worker_ownership()
                 # Each phase is isolated: a failing schedule never blocks report runs.
                 try:
                     return func(*args)
                 except Exception as exc:  # noqa: BLE001 - recorded in the heartbeat row
+                    if isinstance(exc, WorkerOwnershipLost):
+                        raise
                     log.exception("Worker phase %s failed", name)
                     errors.append(f"{name}: {exc}"[:200])
                     if once:

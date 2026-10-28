@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .. import dashboards
 from ..db import audit, connect, transaction, utcnow
 from ..domain import DomainError, canonical, identity, parse_utc, sha, validate_emails
+from ..postgres_store import assert_worker_ownership
 from ..timerange import TimeRangeError, resolve_range
 from ..worker import _atomic_write, completed_period, schedule_next
 from . import logos
@@ -388,7 +389,7 @@ def claim(settings):
 
 def mark_interrupted(settings, force=False):
     with connect(settings) as db, transaction(db):
-        rows = db.execute("SELECT id FROM dash_report_runs WHERE status='running'" + ("" if force else " AND lease_until<?"),
+        rows = db.execute("SELECT id FROM dash_report_runs WHERE (status='running' OR delivery_status='sending')" + ("" if force else " AND lease_until<?"),
                           () if force else (utcnow(),)).fetchall()
         for row in rows:
             db.execute("""UPDATE dash_report_runs SET status='needs_review',
@@ -445,6 +446,7 @@ def execute(settings, run_id):
         files = {}
         digests = {}
         for fmt, payload in outputs.items():
+            assert_worker_ownership()
             filename = f"rapor-{run_id[:8]}-{safe_name}-{stamp}.{fmt}"
             _atomic_write(settings.archive_dir / filename, payload)
             files[fmt] = filename
@@ -543,6 +545,7 @@ def send_mail(settings, config, run, files, recipients, partial):
         smtp.ehlo()
         if settings.smtp_user:
             smtp.login(settings.smtp_user, settings.smtp_password)
+        assert_worker_ownership()
         smtp.send_message(message)
     return "sent"
 

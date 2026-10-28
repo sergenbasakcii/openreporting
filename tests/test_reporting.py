@@ -252,3 +252,15 @@ def test_logo_normalisation_rejects_bad_input():
     from io import BytesIO
     from PIL import Image
     assert max(Image.open(BytesIO(big)).size) <= logos.MAX_EDGE
+
+
+def test_restart_marks_completed_but_sending_delivery_unknown_and_never_requeues(env):
+    settings, _, user = env
+    created = service.save_report(settings, user, {"name": "Interrupted mail", "dashboard_uid": "rep-test", "formats": ["csv"]})
+    run_id = service.request_run(settings, user, created["id"], {})["run_id"]
+    with connect(settings) as db:
+        db.execute("UPDATE dash_report_runs SET status='completed',delivery_status='sending' WHERE id=?", (run_id,))
+    service.mark_interrupted(settings, force=True)
+    run = service.list_runs(settings, created["id"])[0]
+    assert (run["status"], run["delivery_status"]) == ("needs_review", "unknown")
+    assert service.claim(settings) is None
