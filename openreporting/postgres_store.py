@@ -145,7 +145,7 @@ def schema_version(db):
     if db.execute("SELECT to_regclass('schema_versions')").fetchone()[0] is None:
         return 0
     versions = [row[0] for row in db.execute("SELECT version FROM schema_versions ORDER BY version")]
-    if versions and versions != list(range(1, versions[-1] + 1)):
+    if any(version != expected for expected, version in enumerate(versions, 1)):
         raise RuntimeError("Database migration history is not contiguous")
     return versions[-1] if versions else 0
 

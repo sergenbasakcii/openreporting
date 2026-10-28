@@ -125,6 +125,9 @@ def test_postgres_upgrade_preserves_data_on_failure_and_rejects_newer_schema(pos
         init_schema(db, steps, 2)
         with pytest.raises(RuntimeError, match="newer database schema"):
             init_schema(db, steps, 1)
+        db.execute("INSERT INTO schema_versions VALUES (?,?)", (4, "test"))
+        with pytest.raises(RuntimeError, match="not contiguous"):
+            init_schema(db, steps, 4)
 
 
 def test_postgres_audit_is_append_only_and_foreign_keys_are_enforced(postgres_schema):
