@@ -2,6 +2,12 @@
 
 ## Yayınlanmamış
 
+### Arayüz
+- Dashboard'a yeni çalışma alanı başlığı ve panel/kaynak/değişken özeti eklendi.
+- PDF, Excel, rapor hazırlama ve panel ekleme işlemleri doğrudan görünür hale getirildi.
+  Kaydedilmemiş değişikliklerde rapor/dışa aktarım düğmeleri kayda yönlendiren durum bilgisiyle devre dışı kalır.
+- Yeni özet alanı mobil, açık/koyu tema, panel görünümü ve kiosk/yazdırma düzenlerine uyar.
+
 ### Geliştirme altyapısı
 - PostgreSQL worker için veritabanı oturumuna bağlı tekil sahiplik eklendi. Sahiplik bağlantısı kaybolursa
   iş aşamaları ve e-posta gönderimi durur; otomatik yeniden bağlantıyla sahiplik varsayılmaz.

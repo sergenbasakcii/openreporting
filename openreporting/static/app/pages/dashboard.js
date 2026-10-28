@@ -8,6 +8,7 @@ import { expandLayout, pixelRect, gridHeight, place, compact, toGrid, syncPositi
 import { PanelView } from '../dashboard/panelview.js';
 import { openPanelEditor } from '../dashboard/editor.js';
 import { openSettings } from '../dashboard/settings.js';
+import { dashboardOverview } from '../dashboard/overview.js';
 import { newPanel, PLUGINS, ORDER } from '../panels/registry.js';
 import { navigate, setLeaveGuard, clearLeaveGuard, setBreadcrumbs } from '../router.js';
 
@@ -40,15 +41,16 @@ export async function dashboardPage(root, { uid, query, app }) {
   };
   if (state.kiosk) document.body.classList.add('kiosk');
   const editable = () => canEdit && dash.editable !== false && !state.viewPanel;
-  const markDirty = () => { state.dirty = true; saveBtn && saveBtn.classList.add('primary'); };
+  const markDirty = () => { state.dirty = true; saveBtn && saveBtn.classList.add('primary'); drawOverview(); };
   const leaveGuard = () => (state.dirty && canEdit ? 'Dashboard’da kaydedilmemiş değişiklikler var. Sayfadan ayrılmak istiyor musunuz?' : null);
   setLeaveGuard(leaveGuard, root);
 
   const page = h('div', { class: ['dash-page', state.viewPanel ? 'view-panel-mode' : ''].join(' ') });
   const toolbar = h('div', { class: 'dash-toolbar' });
+  const overview = h('div', { class: 'overview-host' });
   const varHost = h('div');
   const grid = h('div', { class: ['dash-grid', editable() ? 'editable' : ''].join(' ') });
-  page.append(toolbar, varHost, grid);
+  page.append(overview, toolbar, varHost, grid);
   root.replaceChildren(page);
 
   const updateUrl = () => {
@@ -474,7 +476,14 @@ export async function dashboardPage(root, { uid, query, app }) {
   }
 
   let saveBtn; let tp; let rp;
+  function drawOverview() {
+    overview.replaceChildren(dashboardOverview({ dashboard: dash, folder: meta.folderTitle, dirty: state.dirty,
+      canEdit: editable(), saved: !!savedUid(), onExport: exportAs,
+      onReport: () => navigate(`/reports/new?dashboard=${encodeURIComponent(dash.uid)}`), onAdd: () => addPanel('timeseries') }));
+    overview.hidden = !!state.viewPanel;
+  }
   function drawToolbar() {
+    drawOverview();
     clear(toolbar);
     const starBtn = meta.isNew ? null : button('', { icon: 'star', variant: 'ghost', class: meta.isStarred ? 'star-on' : '', title: meta.isStarred ? 'Yıldızı kaldır' : 'Yıldızla', onClick: async () => {
       try {
