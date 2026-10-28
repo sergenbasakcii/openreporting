@@ -164,23 +164,6 @@ table.list td.actions { text-align: right; white-space: nowrap; }
 
 /* ---- dashboard ---- */
 .dash-page { display: flex; flex-direction: column; min-height: calc(100vh - var(--topbar-height)); }
-.dashboard-overview { margin: 20px 16px 12px; padding: 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px;
-  border: 1px solid var(--border-strong); border-radius: 16px; background: linear-gradient(120deg, var(--bg-panel) 35%, rgba(61,113,217,.18)); }
-.overview-eyebrow { color: var(--primary-text); font-size: 11px; letter-spacing: .12em; font-weight: 650; margin-bottom: 10px; }
-.overview-heading h1 { font-size: clamp(24px, 2.5vw, 34px); font-weight: 650; letter-spacing: -.035em; margin-bottom: 10px; overflow-wrap: anywhere; }
-.overview-heading p { color: var(--text-muted); max-width: 620px; margin-bottom: 16px; }
-.overview-state { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--text-muted); font-size: 12px; }
-.overview-side { display: flex; flex-direction: column; justify-content: space-between; gap: 22px; }
-.overview-metrics { display: flex; gap: 28px; justify-content: flex-end; }
-.overview-metric { display: flex; flex-direction: column; gap: 3px; min-width: 64px; }
-.overview-metric strong { color: var(--text-strong); font-size: 28px; font-weight: 600; line-height: 1.2; }
-.overview-metric span { color: var(--text-muted); font-size: 12px; }
-.overview-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.overview-actions .btn { border-radius: 7px; min-height: 36px; }
-body.kiosk .overview-host { display: none; }
-@media (max-width: 1100px) { .dashboard-overview { grid-template-columns: 1fr; } .overview-side { flex-direction: row; flex-wrap: wrap; } .overview-metrics, .overview-actions { justify-content: flex-start; } }
-@media (max-width: 600px) { .dashboard-overview { margin: 10px 8px; padding: 18px; } .overview-metrics { gap: 20px; } }
-@media print { .overview-host { display: none; } }
 .dash-toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 16px; flex-wrap: wrap; position: sticky; top: var(--topbar-height); z-index: 15; background: var(--bg-canvas); }
 body.kiosk .dash-toolbar { top: 0; }
 .dash-title { display: flex; align-items: center; gap: 8px; font-size: 17px; color: var(--text-strong); font-weight: 500; margin-right: auto; min-width: 0; }
