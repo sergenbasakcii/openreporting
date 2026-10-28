@@ -78,6 +78,7 @@ def postgres_schema():
             with connect(dsn) as db:
                 db.execute("SELECT set_config('search_path', ?, false)", (name,))
                 yield db
+        scoped_connection.dsn = psycopg.conninfo.make_conninfo(dsn, options=f"-csearch_path={name}")
         try:
             yield scoped_connection
         finally:
@@ -161,3 +162,37 @@ def test_postgres_concurrent_bootstrap_and_audit_preserve_chain(postgres_schema)
         assert schema_version(db) == 1
         assert db.execute("SELECT COUNT(*) FROM audit").fetchone()[0] == 20
         assert application_db.verify_audit(db) == (True, None)
+
+
+def test_application_uses_postgres_for_login_dashboard_and_report_queue(postgres_schema, tmp_path):
+    from dataclasses import replace
+    from fastapi.testclient import TestClient
+    from openreporting.config import Settings
+    from openreporting.security import create_user
+    from openreporting.web import create_app
+    settings = replace(Settings.from_env(), data_dir=tmp_path, database_url=postgres_schema.dsn,
+                       secure_cookie=False, mail_enabled=False, provision_testdata=True,
+                       secret_key_file="", zabbix_url="", zabbix_token_file="")
+    app = create_app(settings)
+    create_user(settings, "admin1", "an-admin-password-123", "admin")
+    with TestClient(app) as http:
+        for _ in range(2):
+            assert http.post("/api/login", json={"username": "admin1", "password": "wrong"}).status_code == 401
+        response = http.post("/api/login", json={"username": "admin1", "password": "an-admin-password-123"})
+        assert response.status_code == 200, response.text
+        headers = {"X-CSRF-Token": response.json()["csrf"]}
+        dashboard = {"uid": "pg-test", "title": "Postgres test", "panels": []}
+        saved = http.post("/api/dashboards/db", json={"dashboard": dashboard}, headers=headers)
+        assert saved.status_code == 200, saved.text
+        report = http.post("/api/dash-reports", json={"name": "PG report", "dashboard_uid": "pg-test", "formats": ["csv"]}, headers=headers)
+        assert report.status_code == 200, report.text
+        run = http.post(f"/api/dash-reports/{report.json()['id']}/runs", json={}, headers=headers)
+        assert run.status_code == 200, run.text
+        assert http.get("/api/audit").status_code == 200
+    assert not (tmp_path / "state.sqlite3").exists()
+    with application_db.connect(settings) as db:
+        assert application_db.schema_version(db) == 1
+        assert application_db.verify_audit(db) == (True, None)
+        assert db.execute("SELECT COUNT(*) FROM dash_report_runs").fetchone()[0] == 1
+    with pytest.raises(RuntimeError, match="pg_dump"):
+        application_db.backup_database(settings, tmp_path / "wrong.sqlite3")

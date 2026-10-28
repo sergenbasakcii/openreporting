@@ -61,7 +61,7 @@ def login(settings, username: str, password: str):
         # Consume similar work for unknown accounts to reduce enumeration side channels.
         valid = check_password(password, user["password_hash"] if user else DUMMY_HASH)
         if not user or not valid:
-            db.execute("INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=count+1,last_at=excluded.last_at", (username, utcnow()))
+            db.execute("INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at", (username, utcnow()))
             audit(db, "anonymous", "auth.failed", "login", "redacted")
             failure = True
         else:

@@ -3,6 +3,9 @@
 ## Yayınlanmamış
 
 ### Geliştirme altyapısı
+- `OPENREPORTING_DATABASE_URL` ile deneysel PostgreSQL uygulama bağlantısı seçilebilir; yapılandırma
+  çıktısı DSN parolasını gizler ve bağlantı hatasında SQLite'a dönülmez. PostgreSQL worker ve dosya yedeği
+  henüz desteklenmediği için açık hatayla engellenir. API giriş/dashboard/rapor kuyruğu entegrasyon testi eklendi.
 - PostgreSQL başlangıç şeması, atomik sürüm geçişleri, transaction kapsamlı yazıcı kilidi ve
   denetim kayıtları için UPDATE/DELETE/TRUNCATE koruması eklendi; gerçek sunucu regresyonları genişletildi.
 - PostgreSQL uygulama sürücüsünün bağlantı/parametre/satır/işlem ilkelleri ve izole PostgreSQL CI sözleşme testi

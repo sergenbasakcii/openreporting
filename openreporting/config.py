@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -35,6 +35,7 @@ class Settings:
     max_series_points: int = 2_000_000
     report_retention_days: int = 365
     allow_http_datasources: bool = False
+    database_url: str = field(default="", repr=False)
 
     @classmethod
     def from_env(cls):
@@ -67,6 +68,7 @@ class Settings:
             max_series_points=int(os.getenv("OPENREPORTING_MAX_SERIES_POINTS", "2000000")),
             report_retention_days=int(os.getenv("OPENREPORTING_REPORT_RETENTION_DAYS", "365")),
             allow_http_datasources=_flag("OPENREPORTING_ALLOW_HTTP_DATASOURCES", False),
+            database_url=os.getenv("OPENREPORTING_DATABASE_URL", "").strip(),
         )
         if not 1 <= data.query_concurrency <= 64 or not 10_000 <= data.max_series_points <= 50_000_000:
             raise ValueError("Invalid query concurrency or point budget")
@@ -82,10 +84,20 @@ class Settings:
             raise ValueError("Mail requires SMTP host, sender and domain allowlist")
         if data.zabbix_url and (not data.zabbix_url.startswith("https://") or not data.zabbix_url.endswith("/api_jsonrpc.php")):
             raise ValueError("Zabbix URL must be HTTPS ending in /api_jsonrpc.php")
+        if data.database_url:
+            if not data.database_url.startswith(("postgresql://", "postgres://")):
+                raise ValueError("OPENREPORTING_DATABASE_URL must be a PostgreSQL URL")
+            from psycopg.conninfo import conninfo_to_dict
+            try:
+                conninfo_to_dict(data.database_url)
+            except Exception:
+                raise ValueError("Invalid OPENREPORTING_DATABASE_URL") from None
         return data
 
     @property
     def db_path(self):
+        if self.database_url:
+            raise RuntimeError("SQLite path is unavailable when PostgreSQL is configured")
         return self.data_dir / "state.sqlite3"
 
     @property

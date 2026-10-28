@@ -61,3 +61,9 @@ Bağlantı/statement/lock zaman aşımı sınırlıdır; bağlantı bütün çı
 Denetim tablosunda UPDATE/DELETE/TRUNCATE işlemleri statement trigger ile reddedilir ([CREATE TRIGGER](https://www.postgresql.org/docs/16/sql-createtrigger.html)). Bu koruma şemayı değiştirme yetkili veritabanı yöneticisine karşı güvenlik sınırı değildir; üretimde migration/uygulama rol ayrımı ayrıca sağlanmalıdır.
 
 Gerçek sunucu regresyonları her test için yeni ve rastgele adlı izole şema kullanır: atomik ilk kurulum/yeniden deneme, başarısız yükseltmede veri ve hash koruması, yabancı anahtarlar, büyük milisaniye değerleri, append-only davranışı ve eşzamanlı başlangıç/20 audit eklemesi. Test yalnız kendi oluşturduğu şemayı temizler.
+
+## Deneysel uygulama yönlendirmesi
+
+`OPENREPORTING_DATABASE_URL` boşken SQLite kullanılır; PostgreSQL URL'si verildiğinde DB facade bağlantı/işlem/şema/şifreli veri kontrollerini PostgreSQL'e yönlendirir. Hatalarda SQLite'a dönüş yapılmaz, `db_path` erişimi de reddedilir. URL repr çıktısından gizlenir. Gerçek sunucu API testi yanlış/doğru giriş, dashboard kaydı, rapor kuyruğu ve audit zincirini doğrular; SQLite dosyası oluşmadığını kontrol eder.
+
+Bu ayar geliştirme/entegrasyon içindir, üretim desteği değildir. PostgreSQL worker sahipliği henüz uygulanmadığından worker başlaması açık hatayla engellenir. Dosya yedeği de PostgreSQL için reddedilir; yanlış bir SQLite dosyası yedeklenmez. Doctor PostgreSQL için fiziksel bütünlük taraması yerine bağlantı/şema metadata kontrolünü doğru adla sunar. Worker sahipliği, pg_dump/restore, taşıma ve kurulum tamamlanana kadar mevcut üretim kurulum yolu SQLite kalır.

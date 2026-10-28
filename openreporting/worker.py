@@ -79,6 +79,8 @@ def _atomic_write(target: Path, data: bytes):
 @contextmanager
 def exclusive_worker(settings):
     """One scheduler/SMTP owner per local NTFS/ext4 application data volume."""
+    if settings.database_url:
+        raise RuntimeError("PostgreSQL worker ownership is not enabled yet; refusing unsafe local-only ownership")
     with exclusive_local_lock(settings.data_dir / "worker.lock"):
         yield
 
@@ -88,7 +90,7 @@ def update_worker_heartbeat(settings, worker_id, started_at, error=""):
         db.execute("""INSERT INTO worker_runtime(singleton_id,worker_id,started_at,last_tick,tick_count,last_error)
               VALUES(1,?,?,?,1,?) ON CONFLICT(singleton_id) DO UPDATE SET
               worker_id=excluded.worker_id,started_at=excluded.started_at,last_tick=excluded.last_tick,
-              tick_count=CASE WHEN worker_id=excluded.worker_id THEN tick_count+1 ELSE 1 END,
+              tick_count=CASE WHEN worker_runtime.worker_id=excluded.worker_id THEN worker_runtime.tick_count+1 ELSE 1 END,
               last_error=excluded.last_error""",
               (worker_id,started_at,utcnow(),error[:400]))
 

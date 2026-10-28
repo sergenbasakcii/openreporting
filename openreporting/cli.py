@@ -61,7 +61,8 @@ def doctor(settings):
         version = schema_version(db)
         report(version == CURRENT_VERSION, "Veritabanı şeması", f"v{version}")
         integrity = check_integrity(db)
-        report(integrity == "ok", "SQLite bütünlük kontrolü", integrity)
+        label = "PostgreSQL bağlantı ve şema kontrolü" if settings.database_url else "SQLite bütünlük kontrolü"
+        report(integrity == "ok", label, integrity)
         valid, broken = verify_audit(db)
         report(valid, "Denetim zinciri", "geçerli" if valid else f"bozuk kayıt #{broken}")
         admins = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]

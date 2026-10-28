@@ -3,10 +3,45 @@ import json
 from datetime import datetime, timezone
 
 from .config import Settings
-from .sqlite_store import (
-    backup_database, check_integrity, connect, has_encrypted_secrets,
-    schema_version, set_schema_version, transaction,
-)
+from . import postgres_store, sqlite_store
+
+
+def connect(settings):
+    if settings.database_url:
+        return postgres_store.connect(settings.database_url, timeout_ms=settings.query_timeout_ms)
+    return sqlite_store.connect(settings)
+
+
+def transaction(db):
+    backend = postgres_store if isinstance(db, postgres_store.Connection) else sqlite_store
+    return backend.transaction(db)
+
+
+def schema_version(db):
+    backend = postgres_store if isinstance(db, postgres_store.Connection) else sqlite_store
+    return backend.schema_version(db)
+
+
+def check_integrity(db, *, full=False):
+    if isinstance(db, postgres_store.Connection):
+        # Connectivity/schema metadata only; never claim a physical PostgreSQL scan.
+        db.execute("SELECT 1").fetchone()
+        schema_version(db)
+        return "ok"
+    return sqlite_store.check_integrity(db, full=full)
+
+
+def backup_database(settings, target):
+    if settings.database_url:
+        raise RuntimeError("PostgreSQL backup requires pg_dump; file backup is disabled for this backend")
+    return sqlite_store.backup_database(settings, target)
+
+
+def has_encrypted_secrets(settings):
+    if settings.database_url:
+        with connect(settings) as db:
+            return db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None
+    return sqlite_store.has_encrypted_secrets(settings)
 
 
 def utcnow():
@@ -101,6 +136,10 @@ MIGRATIONS = {1: tuple(statement.strip() for statement in SCHEMA.split(";") if s
 def init_db(settings: Settings):
     settings.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     settings.archive_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if settings.database_url:
+        with connect(settings) as db:
+            postgres_store.init_schema(db, {1: postgres_store.bootstrap_statements(MIGRATIONS[1])}, CURRENT_VERSION)
+        return
     with connect(settings) as db, transaction(db):
         # Acquire the write lock before reading the version: web workers may
         # initialise the same database concurrently during application startup.
@@ -114,7 +153,7 @@ def init_db(settings: Settings):
             for statement in statements:
                 db.execute(statement)
             db.execute("INSERT INTO schema_versions(version,applied_at) VALUES (?,?)", (target, utcnow()))
-            set_schema_version(db, target)
+            sqlite_store.set_schema_version(db, target)
 
 
 def audit(db, actor, action, object_type, object_id, details=None):
