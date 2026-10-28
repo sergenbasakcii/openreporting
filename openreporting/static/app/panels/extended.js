@@ -99,6 +99,6 @@ export function renderExtended(container,frames,panel){
  if(option.calendar)option.calendar={...option.calendar,dayLabel:{color:theme.text},monthLabel:{color:theme.text},yearLabel:{color:theme.text}};
  option.series=option.series.map(s=>({...s,label:{...s.label,color:theme.text}}));
  const box=document.createElement('div');box.className='viz-chart';box.style.height='100%';container.replaceChildren(box);const chart=initChart(box);
- chart.setOption({animation:false,color:['#5794f2','#73bf69','#ff9830','#b877d9','#f2495c'],textStyle:{color:theme.text},grid:{left:50,right:25,top:30,bottom:50,containLabel:true},tooltip:{trigger:'item',confine:true,renderMode:'richText'},...option},true);
+ chart.setOption({animation:false,color:['#5794f2','#73bf69','#ff9830','#b877d9','#f2495c'],textStyle:{color:theme.text},grid:{left:50,right:25,top:30,bottom:50,containLabel:true},tooltip:{trigger:'item',confine:true,renderMode:'richText',backgroundColor:theme.tooltipBg,borderColor:theme.border,textStyle:{color:theme.text}},...option},true);
  return{chart,resize(){chart.resize();},destroy(){chart.dispose();},png(){return chart.getDataURL({type:'png',pixelRatio:2,backgroundColor:theme.bg});}};
 }

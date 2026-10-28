@@ -2,6 +2,12 @@
 
 ## Yayınlanmamış
 
+### Tema düzeltmeleri
+- Açılır seçim listeleri ve seçenek yüzeyleri koyu/açık temanın renklerini kullanır.
+- Yeni grafiklerin ipuçlarındaki beyaz arka plan giderildi; tema değişiminde açık paneller
+  mevcut veriyle yeniden çizilir, ek veri sorgusu yapılmaz. Sistem teması değişiklikleri izlenir.
+- PDF önizleme hazırlanırken açılan boş beyaz sekme yerine mevcut temaya uygun bekleme ekranı gösterilir.
+
 ### Veri kaynakları ve görselleştirmeler
 - Şelale, huni, ağaç haritası, hiyerarşi halkası, gül ve paralel koordinat panellerine vektör PDF eklendi; kalan tablo karşılığı sayısı 6 oldu.
 - Histogram, XY, balon, kutu ve mum grafiklerine yerel vektör PDF çizimi eklendi; tabloya aktarılan yeni tür sayısı 17’den 12’ye indi.

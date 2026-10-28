@@ -35,6 +35,13 @@ code, pre, .mono { font-family: "JetBrains Mono", Consolas, "Roboto Mono", monos
 
 /* ---- form controls ---- */
 button, input, select, textarea { font: inherit; color: inherit; }
+/* Native pickers have their own surface; transparent options can fall back to white. */
+input, select, textarea { color-scheme: inherit; }
+select { background-color: var(--bg-input); color: var(--text); }
+select option, select optgroup { background-color: var(--bg-elevated); color: var(--text); }
+select option:checked { background-color: var(--primary); color: #fff; }
+select option:disabled { color: var(--text-faint); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--radius);
   border: 1px solid var(--border-strong); background: var(--bg-elevated); color: var(--text); cursor: pointer; font-weight: 500; white-space: nowrap; font-size: 13.5px; }
 .btn:hover { background: var(--bg-active); color: var(--text-strong); }
@@ -148,7 +155,7 @@ table.list td.actions { text-align: right; white-space: nowrap; }
 .toast { min-width: 260px; max-width: 420px; padding: 10px 14px; border-radius: var(--radius); background: var(--bg-elevated); border: 1px solid var(--border-strong); border-left: 4px solid var(--primary); box-shadow: var(--shadow); font-size: 13px; animation: slidein .18s ease-out; }
 .toast.ok { border-left-color: var(--success-text); } .toast.error { border-left-color: var(--error-text); } .toast.warn { border-left-color: var(--warning); }
 @keyframes slidein { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
-.tooltip-pop { position: fixed; z-index: 400; background: #0b0c0e; color: #e9e9ef; padding: 6px 9px; border-radius: 3px; font-size: 12px; max-width: 360px; pointer-events: none; box-shadow: var(--shadow); }
+.tooltip-pop { position: fixed; z-index: 400; background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border-strong); padding: 6px 9px; border-radius: 3px; font-size: 12px; max-width: 360px; pointer-events: none; box-shadow: var(--shadow); }
 .spinner { width: 16px; height: 16px; border: 2px solid var(--border-strong); border-top-color: var(--primary-text); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .boot-splash { height: 100vh; display: grid; place-content: center; justify-items: center; gap: 14px; color: var(--text-muted); }

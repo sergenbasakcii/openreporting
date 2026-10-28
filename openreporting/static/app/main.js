@@ -12,8 +12,12 @@ function applyTheme(theme) {
   const resolved = theme === 'system' ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : (theme || 'dark');
   document.documentElement.dataset.theme = resolved;
   try { localStorage.setItem(THEME_KEY, theme || 'dark'); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('openreporting:themechange', { detail: resolved }));
 }
 try { applyTheme(localStorage.getItem(THEME_KEY) || 'dark'); } catch { applyTheme('dark'); }
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+  try { if (localStorage.getItem(THEME_KEY) === 'system') applyTheme('system'); } catch { /* ignore */ }
+});
 
 function loginPage(root) {
   const user = input({ autocomplete: 'username', placeholder: 'kullanıcı adı', label: 'Kullanıcı adı' });

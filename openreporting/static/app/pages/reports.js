@@ -5,6 +5,7 @@ import { get, post, put, del, api } from '../api.js';
 import { navigate, setBreadcrumbs } from '../router.js';
 import { QUICK_RANGES, effectiveZone } from '../time.js';
 import { resolveVariables, ALL } from '../variables.js';
+import { preparePreviewWindow } from '../preview.js';
 
 const LOGO_MAX_BYTES = 1_000_000;
 
@@ -207,7 +208,7 @@ export async function reportEditPage(root, { id, query, app }) {
   // and pointed at the rendered file once it arrives; if the browser blocked it the file is downloaded.
   const preview = async (format) => {
     const win = format === 'pdf' ? window.open('', '_blank') : null;
-    if (win) { win.opener = null; win.document.title = 'Önizleme hazırlanıyor…'; }
+    preparePreviewWindow(win);
     try {
       const res = await api('/api/dash-reports/preview', { method: 'POST', body: { ...cfg, name: cfg.name || 'Önizleme', format, max_sections: 3 }, raw: true });
       const blob = await res.blob();
