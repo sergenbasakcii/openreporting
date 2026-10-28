@@ -79,7 +79,7 @@ def _atomic_write(target: Path, data: bytes):
 
 @contextmanager
 def exclusive_worker(settings):
-    """One scheduler/SMTP owner per local NTFS/ext4 application data volume."""
+    """One scheduler/SMTP owner per PostgreSQL database or local SQLite volume."""
     if settings.database_url:
         from . import postgres_store
         with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms):

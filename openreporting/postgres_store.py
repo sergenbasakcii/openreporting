@@ -1,4 +1,4 @@
-"""PostgreSQL connection primitives; not yet enabled as an application backend.
+"""PostgreSQL application storage, migrations and worker ownership.
 
 Only application-owned SQL may use this adapter. Data source queries use their
 own read-only driver and must never pass through the qmark conversion below.
