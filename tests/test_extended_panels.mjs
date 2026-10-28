@@ -29,3 +29,11 @@ test('waterfall keeps the actual signed cumulative endpoints', () => {
   const values = [10, -20, 4].map((v,i)=>({...series[0],name:String(i),points:[[1000,v]]}));
   assert.deepEqual(extendedOption(values,panel('waterfall')).series[0].data, [[0,0,10],[1,10,-10],[2,-10,-6]]);
 });
+test('negative pie values are explained rather than silently omitted', () => {
+  const negative = [{...series[0], points:[[1000,-2]]}];
+  assert.ok(extendedOption(negative,panel('donut')).message);
+});
+test('unrelated missing columns do not discard valid XY pairs', () => {
+  const frame={type:'table',columns:[{name:'x',type:'number'},{name:'y',type:'number'},{name:'other',type:'number'}],rows:[[1,2,null]]};
+  assert.equal(extendedOption([frame],panel('scatter')).series[0].data.length,1);
+});

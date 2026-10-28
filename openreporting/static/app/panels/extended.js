@@ -21,6 +21,7 @@ export function extendedOption(frames, panel) {
  const items=vals.map(i=>({name:i.name,value:i.value}));
  if(['donut','rosepie','funnel','treemap','sunburst','radar','polarbar'].includes(type)) {
   if(!items.length) return null;
+  if(['donut','rosepie','funnel','treemap','sunburst'].includes(type)&&items.some(i=>i.value<0))return {message:'Bu grafik negatif değerleri desteklemez; çubuk veya zaman serisi grafiği seçin.'};
   if(['donut','rosepie'].includes(type)) return {series:[{type:'pie',radius:type==='donut'?['45%','70%']:'70%',roseType:type==='rosepie'?'area':undefined,data:items.filter(i=>i.value>=0),label:{show:false}}],legend:{type:'scroll',bottom:0}};
   if(type==='funnel') return {series:[{type:'funnel',left:'10%',right:'10%',top:20,bottom:20,data:items.filter(i=>i.value>=0),label:{position:'inside'}}]};
   if(type==='treemap') return {series:[{type:'treemap',roam:false,nodeClick:false,breadcrumb:{show:false},data:items.filter(i=>i.value>=0)}]};
@@ -47,7 +48,9 @@ export function extendedOption(frames, panel) {
  }
  if(['scatter','bubble','parallel','candlestick'].includes(type)) {
   if(!table||numbers.length<(type==='candlestick'?4:2))return {message:type==='candlestick'?'Mum grafiği için açılış, kapanış, düşük, yüksek sırasıyla dört sayısal sütun gerekir.':'En az iki sayısal sütun içeren bir tablo seçin.'};
-  const rows=table.rows.filter(r=>numbers.every(i=>finite(r[i]))); if(!rows.length)return null;
+  const used=type==='parallel'?numbers:numbers.slice(0,type==='candlestick'?4:type==='bubble'?3:2);
+  const rows=table.rows.filter(r=>used.every(i=>finite(r[i]))); if(!rows.length)return null;
+  if(type==='candlestick'&&rows.some(r=>r[numbers[2]]>Math.min(r[numbers[0]],r[numbers[1]])||r[numbers[3]]<Math.max(r[numbers[0]],r[numbers[1]])))return {message:'Mum verisinde düşük/açılış/kapanış/yüksek aralıklarını kontrol edin.'};
   if(type==='parallel')return {parallel:{left:55,right:30,top:35,bottom:35},parallelAxis:numbers.map((i,dim)=>({dim,name:table.columns[i].name})),series:[{type:'parallel',data:rows.map(r=>numbers.map(i=>r[i]))}]};
   if(type==='candlestick')return {xAxis:{type:'category',data:rows.map((r,i)=>String(r[table.columns.findIndex(c=>c.type!=='number')]??i+1))},yAxis:{type:'value',scale:true},series:[{type:'candlestick',data:rows.map(r=>numbers.slice(0,4).map(i=>r[i]))}]};
   return {xAxis:{type:'value',name:table.columns[numbers[0]].name},yAxis:{type:'value',name:table.columns[numbers[1]].name},series:[{type:'scatter',data:rows.map(r=>numbers.map(i=>r[i])),symbolSize:type==='bubble'?(v=>Math.max(5,Math.min(55,Math.sqrt(Math.abs(v[2]??1))*3))):8}]};
@@ -56,6 +59,8 @@ export function extendedOption(frames, panel) {
   if(!table)return {message:'Kaynak, hedef ve sayısal değer sütunları içeren tablo gerekir.'};
   const names=table.columns.map(c=>c.name.toLowerCase()), a=names.indexOf('source'),b=names.indexOf('target'),v=names.indexOf('value');
   if(a<0||b<0||v<0)return {message:'Tablo sütunları: source, target, value.'};
+  if(table.rows.length>5000)return {message:'Bağlantı grafikleri için en fazla 5.000 satır kullanın.'};
+  if(table.rows.some(r=>finite(r[v])&&r[v]<0))return {message:'Akış/bağlantı değeri negatif olamaz.'};
   const links=table.rows.filter(r=>r[a]!=null&&r[b]!=null&&finite(r[v])&&r[v]>=0).map(r=>({source:String(r[a]),target:String(r[b]),value:r[v]}));
   if(!links.length)return null; const data=[...new Set(links.flatMap(l=>[l.source,l.target]))].map(name=>({name}));
   if(type==='sankey'&&hasCycle(links))return {message:'Sankey döngü içeremez; bağlantı grafiğini seçin.'};
@@ -79,7 +84,13 @@ export function extendedOption(frames, panel) {
  return null;
 }
 function quantile(v,f){const i=(v.length-1)*f,l=Math.floor(i),h=Math.ceil(i);return v[l]+(v[h]-v[l])*(i-l);}
-function hasCycle(links){const edges=new Map();for(const l of links){if(!edges.has(l.source))edges.set(l.source,[]);edges.get(l.source).push(l.target);}const visiting=new Set(),done=new Set();function visit(n){if(visiting.has(n))return true;if(done.has(n))return false;visiting.add(n);for(const v of edges.get(n)||[])if(visit(v))return true;visiting.delete(n);done.add(n);return false;}return [...edges.keys()].some(visit);}
+function hasCycle(links) {
+ const edges=new Map(),degree=new Map();
+ for(const link of links){if(!edges.has(link.source))edges.set(link.source,[]);edges.get(link.source).push(link.target);if(!degree.has(link.source))degree.set(link.source,0);degree.set(link.target,(degree.get(link.target)||0)+1);}
+ const queue=[...degree].filter(([,n])=>n===0).map(([name])=>name);let visited=0;
+ for(let i=0;i<queue.length;i++){visited++;for(const next of edges.get(queue[i])||[]){degree.set(next,degree.get(next)-1);if(degree.get(next)===0)queue.push(next);}}
+ return visited!==degree.size;
+}
 export function renderExtended(container,frames,panel){
  const option=extendedOption(frames,panel);if(!option||option.message){noData(container,option?.message||'Veri yok');return{resize(){},destroy(){}};}
  const theme=chartTheme();
