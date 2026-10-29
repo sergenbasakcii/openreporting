@@ -126,7 +126,7 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 2
+CURRENT_VERSION = 3
 
 # Each migration is a tuple of complete statements, executed in one transaction.
 # Only the initial schema is split here; later migrations may contain triggers or
@@ -140,6 +140,10 @@ POSTGRES_MIGRATIONS = {1: postgres_store.bootstrap_statements(MIGRATIONS[1]), 2:
     "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
     f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK(type IN ({_SOURCE_TYPES}))",
 )}
+MIGRATIONS[3] = ("""CREATE TABLE external_identities(
+ user_id TEXT PRIMARY KEY REFERENCES users(id), provider TEXT NOT NULL CHECK(provider='ldap'),
+ subject TEXT NOT NULL, UNIQUE(provider,subject))""",)
+POSTGRES_MIGRATIONS[3] = MIGRATIONS[3]
 
 
 

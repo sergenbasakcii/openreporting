@@ -21,7 +21,7 @@ SPA_PREFIXES = ("d/", "dashboards", "dashboard/", "explore", "datasources", "rep
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=80)
-    password: str
+    password: str = Field(max_length=1024)
 
 
 def create_app(settings: Settings | None = None):

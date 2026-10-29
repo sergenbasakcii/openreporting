@@ -14,6 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  directory-contract:
+    name: LDAP TLS and group contract
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install isolated directory test tools
+        run: sudo apt-get update -qq && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq slapd ldap-utils
+      - name: Install package
+        run: python -m pip install ".[test]"
+      - name: Verify actual LDAP TLS, service bind, user bind and memberOf
+        env:
+          OPENREPORTING_TEST_SLAPD: "1"
+        run: python -m pytest -q tests/test_ldap_server.py
+
   postgres-driver:
     name: PostgreSQL driver contract
     runs-on: ubuntu-24.04

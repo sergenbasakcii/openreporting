@@ -252,3 +252,21 @@ def test_postgres_worker_generates_verified_report_without_replaying_uncertain_m
     assert (run["status"], run["delivery_status"]) == ("needs_review", "unknown")
     assert service.claim(settings) is None
     assert not (tmp_path / "worker.lock").exists()
+
+
+def test_postgres_directory_identity_and_role_sync(postgres_schema, tmp_path, monkeypatch):
+    from dataclasses import replace
+    from openreporting import directory_auth, security
+    from openreporting.config import Settings
+    settings = replace(Settings.from_env(), data_dir=tmp_path, database_url=postgres_schema.dsn, ldap_enabled=True)
+    application_db.init_db(settings)
+    identity = directory_auth.Identity('isolated-directory-id', 'editor')
+    monkeypatch.setattr(directory_auth, 'authenticate', lambda *args: identity)
+    token, _, _ = security.login(settings, 'reader', 'isolated-password')
+    identity = replace(identity, role='viewer')
+    security.login(settings, 'reader', 'isolated-password')
+    with application_db.connect(settings) as db:
+        assert db.execute("SELECT role FROM users WHERE username='reader'").fetchone()[0] == 'viewer'
+        assert db.execute("SELECT COUNT(*) FROM external_identities").fetchone()[0] == 1
+        assert db.execute("SELECT 1 FROM sessions WHERE token_hash=?", (security.digest(token),)).fetchone() is None
+        assert application_db.verify_audit(db) == (True, None)

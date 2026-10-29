@@ -50,7 +50,8 @@ function logoPicker(cfg, canEdit) {
 const STATUS = { queued: ['Kuyrukta', 'info'], running: ['Çalışıyor', 'info'], completed: ['Tamamlandı', 'ok'], partial: ['Kısmi veri', 'warn'],
   failed: ['Başarısız', 'err'], blocked: ['Engellendi', 'err'], needs_review: ['İnceleme gerekli', 'warn'] };
 const DELIVERY = { not_requested: 'E-posta yok', disabled: 'E-posta kapalı', pending: 'Gönderilecek', sending: 'Gönderiliyor', sent: 'Gönderildi',
-  unknown: 'Belirsiz (manuel kontrol)', blocked_partial: 'Kısmi veri nedeniyle gönderilmedi', blocked_revalidation: 'Yeniden doğrulama engelledi' };
+  failed: 'Sunucu reddetti', partial_rejected: 'Bazı alıcılara gönderilemedi (manuel kontrol)',
+  unknown: 'Belirsiz (manuel kontrol)', blocked_partial: 'Kısmi veri nedeniyle gönderilmedi', blocked_revalidation: 'Yeniden doğrulama engelledi', blocked_too_large: 'Ekler boyut sınırını aşıyor' };
 const CADENCES = [{ value: 'hourly', label: 'Saatlik' }, { value: 'daily', label: 'Günlük' }, { value: 'weekly', label: 'Haftalık' }, { value: 'monthly', label: 'Aylık' }, { value: 'yearly', label: 'Yıllık' }];
 const WEEKDAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
 const REPORT_RANGES = [['now-1d/d', 'now-1d/d', 'Dün'], ['now-1w/w', 'now-1w/w', 'Geçen hafta'], ['now-1M/M', 'now-1M/M', 'Geçen ay'], ['now-1y/y', 'now-1y/y', 'Geçen yıl'],

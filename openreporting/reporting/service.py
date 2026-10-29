@@ -9,15 +9,16 @@ import hashlib
 import json
 import logging
 import smtplib
-import ssl
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .. import dashboards
 from ..db import audit, connect, transaction, utcnow
 from ..domain import DomainError, canonical, identity, parse_utc, sha, validate_emails
 from ..postgres_store import assert_worker_ownership
+from ..mail_transport import connection as smtp_connection
 from ..timerange import TimeRangeError, resolve_range
 from ..worker import _atomic_write, completed_period, schedule_next
 from . import logos
@@ -35,6 +36,10 @@ MIME = {"pdf": ("application", "pdf"), "xlsx": ("application", "vnd.openxmlforma
 
 class ReportError(DomainError):
     pass
+
+
+class MailSetupError(Exception):
+    """Connection failed before any message delivery command was attempted."""
 
 
 def validate_config(body, settings):
@@ -499,8 +504,12 @@ def execute(settings, run_id):
         audit(db, "worker", "report_delivery.attempted", "dash_report_run", run_id)
     try:
         status = send_mail(settings, config, run, files, recipients, partial)
+    except (MailSetupError, smtplib.SMTPRecipientsRefused, smtplib.SMTPAuthenticationError, smtplib.SMTPSenderRefused,
+            smtplib.SMTPDataError, smtplib.SMTPNotSupportedError):
+        log.warning("Report mail delivery rejected for %s", run_id)
+        status = "failed"
     except Exception:  # noqa: BLE001 - SMTP may have accepted the message; never retry automatically
-        log.exception("Report mail delivery uncertain for %s", run_id)
+        log.warning("Report mail delivery uncertain for %s", run_id)
         status = "unknown"
     with connect(settings) as db, transaction(db):
         db.execute("UPDATE dash_report_runs SET delivery_status=? WHERE id=?", (status, run_id))
@@ -510,8 +519,6 @@ def execute(settings, run_id):
 def send_mail(settings, config, run, files, recipients, partial):
     if not settings.mail_enabled:
         return "disabled"
-    if not settings.smtp_starttls:
-        raise ReportError("SMTP STARTTLS zorunludur")
     recipients = validate_emails(recipients, settings.recipient_domains)
     tz = ZoneInfo(config["timezone"]) if config["timezone"] not in ("UTC", "utc") else timezone.utc
     start = parse_utc(run["period_start"]).astimezone(tz).strftime("%d.%m.%Y %H:%M")
@@ -521,6 +528,8 @@ def send_mail(settings, config, run, files, recipients, partial):
     message = EmailMessage()
     message["From"] = settings.smtp_from
     message["To"] = ", ".join(recipients)
+    message["Date"] = formatdate(localtime=False)
+    message["Message-ID"] = make_msgid(idstring=run["id"], domain=settings.smtp_from.rsplit("@", 1)[-1])
     message["Subject"] = subject.replace("\r", " ").replace("\n", " ")[:250]
     body = config.get("email_message") or "Rapor ektedir."
     if partial:
@@ -539,15 +548,17 @@ def send_mail(settings, config, run, files, recipients, partial):
             raise ReportError("Ekler 20 MB sınırını aşıyor")
         maintype, subtype = MIME[fmt]
         message.add_attachment(payload, maintype=maintype, subtype=subtype, filename=filename)
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=60) as smtp:
-        smtp.ehlo()
-        smtp.starttls(context=ssl.create_default_context())
-        smtp.ehlo()
-        if settings.smtp_user:
-            smtp.login(settings.smtp_user, settings.smtp_password)
-        assert_worker_ownership()
-        smtp.send_message(message)
-    return "sent"
+    ready = False
+    try:
+        with smtp_connection(settings) as smtp:
+            ready = True
+            assert_worker_ownership()
+            refused = smtp.send_message(message, from_addr=settings.smtp_from, to_addrs=recipients)
+    except Exception:
+        if not ready:
+            raise MailSetupError("SMTP connection or authentication failed before delivery") from None
+        raise
+    return "partial_rejected" if refused else "sent"
 
 
 def verified_file(settings, run_id, kind):

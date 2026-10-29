@@ -18,7 +18,7 @@ def backup(settings, target):
     print("Important: copy the archive/ directory independently and verify manifest hashes.")
 
 
-def doctor(settings):
+def doctor(settings, *, check_integrations=False):
     """Human-readable installation check; returns a process exit code."""
     import json
     import stat
@@ -65,8 +65,9 @@ def doctor(settings):
         report(integrity == "ok", label, integrity)
         valid, broken = verify_audit(db)
         report(valid, "Denetim zinciri", "geçerli" if valid else f"bozuk kayıt #{broken}")
-        admins = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
-        report(admins > 0, "Etkin yönetici hesabı", str(admins))
+        admins = db.execute("""SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
+                               AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)""").fetchone()[0]
+        report(admins > 0, "Etkin yerel kurtarma yöneticisi", str(admins))
         worker = db.execute("SELECT last_tick FROM worker_runtime WHERE singleton_id=1").fetchone()
     if worker:
         from .domain import parse_utc
@@ -76,6 +77,16 @@ def doctor(settings):
         report(False, "Rapor worker sinyali", "worker hiç çalışmadı (systemctl start openreporting-worker)")
     report(not settings.mail_enabled or bool(settings.smtp_host and settings.recipient_domains), "SMTP yapılandırması",
            "etkin" if settings.mail_enabled else "kapalı")
+    report(True, "LDAP yapılandırması", "etkin" if settings.ldap_enabled else "kapalı")
+    if check_integrations:
+        from . import directory_auth, mail_transport
+        for enabled, label, check in ((settings.ldap_enabled, "LDAP bağlantısı", directory_auth.check_connection),
+                                       (settings.mail_enabled, "SMTP bağlantısı", mail_transport.check_connection)):
+            if enabled:
+                try:
+                    report(True, label, check(settings))
+                except Exception:
+                    report(False, label, "DNS, port, TLS sertifikası veya hesap doğrulanamadı; sırlar gösterilmedi")
     report(settings.secure_cookie or os.name == "nt", "Güvenli çerez (HTTPS)", str(settings.secure_cookie))
     from . import datasources
     for ds in datasources.list_all(settings):
@@ -143,7 +154,10 @@ def main(argv=None):
                          help="Trust X-Forwarded-* from the local reverse proxy (127.0.0.1)")
     p_serve.add_argument("--allow-remote", action="store_true",
                          help="Allow a non-loopback bind (containers only; always put TLS in front)")
-    commands.add_parser("doctor", help="Check installation: paths, permissions, fonts, schema, worker, datasources")
+    p_doctor = commands.add_parser("doctor", help="Check installation: paths, permissions, fonts, schema, worker, datasources")
+    p_doctor.add_argument("--check-integrations", action="store_true", help="Check LDAP and SMTP TLS/authentication; never sends mail")
+    p_ldap = commands.add_parser("check-ldap", help="Test a directory user's password and group mapping without provisioning a user")
+    p_ldap.add_argument("username")
     p_export = commands.add_parser("export-dashboards", help="Write every dashboard as JSON into a directory")
     p_export.add_argument("directory")
     p_import = commands.add_parser("import-dashboards", help="Import/overwrite dashboards from *.json files (provisioning)")
@@ -175,6 +189,8 @@ def main(argv=None):
             target = db.execute("SELECT id FROM users WHERE username=?", (args.username.strip().lower(),)).fetchone()
             if not target:
                 raise SystemExit("User not found")
+            if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (target["id"],)).fetchone():
+                raise SystemExit("LDAP passwords must be changed in the directory")
             db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, target["id"]))
             db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
             audit(db, "os-admin", "user.password_rotated", "user", target["id"])
@@ -188,6 +204,11 @@ def main(argv=None):
                 remaining = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
                 if remaining <= 1:
                     raise SystemExit("Cannot disable the last active admin")
+                if not db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (target["id"],)).fetchone():
+                    remaining_local = db.execute("""SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
+                        AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)""").fetchone()[0]
+                    if remaining_local <= 1:
+                        raise SystemExit("Cannot disable the last local recovery admin")
             db.execute("UPDATE users SET active=0 WHERE id=?", (target["id"],))
             db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
             audit(db, "os-admin", "user.disabled", "user", target["id"])
@@ -210,7 +231,16 @@ def main(argv=None):
             from .web import create_app
             uvicorn.run(create_app(settings), workers=1, **common)
     elif args.action == "doctor":
-        raise SystemExit(doctor(settings))
+        raise SystemExit(doctor(settings, check_integrations=args.check_integrations))
+    elif args.action == "check-ldap":
+        from .directory_auth import authenticate as directory_login, DirectoryUnavailable
+        try:
+            result = directory_login(settings, args.username.strip().lower(), getpass.getpass("Directory password: "))
+        except DirectoryUnavailable as exc:
+            raise SystemExit(str(exc)) from None
+        if result is None:
+            raise SystemExit("LDAP authentication or group admission failed")
+        print(f"LDAP authentication and group mapping verified; role={result.role}. No account or session created.")
     elif args.action == "export-dashboards":
         export_dashboards(settings, args.directory)
     elif args.action == "import-dashboards":

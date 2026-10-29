@@ -129,4 +129,4 @@ def test_v1_to_v2_preserves_datasources_and_accepts_new_types(tmp_path):
     db.init_db(settings)
     with db.connect(settings) as connection:
         assert connection.execute("SELECT secure_json FROM datasources WHERE uid='keep'").fetchone()[0] == "ciphertext"
-        assert db.schema_version(connection) == 2
+        assert db.schema_version(connection) == db.CURRENT_VERSION

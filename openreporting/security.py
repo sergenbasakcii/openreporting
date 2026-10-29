@@ -47,20 +47,61 @@ def create_user(settings, username, password, role="admin"):
     return uid
 
 
+def _login_gate(db, username):
+    failures = db.execute("SELECT count,last_at FROM login_failures WHERE username=?", (username,)).fetchone()
+    if failures and failures["count"] >= 5:
+        if datetime.now(timezone.utc) - datetime.fromisoformat(failures["last_at"]) < timedelta(minutes=15):
+            raise HTTPException(429, "Too many attempts; retry after 15 minutes")
+        db.execute("DELETE FROM login_failures WHERE username=?", (username,))
+
+
 def login(settings, username: str, password: str):
+    from . import directory_auth
     username = username.strip().lower()
+    # Do not hold the application write lock during directory/network operations.
+    with connect(settings) as db, transaction(db):
+        _login_gate(db, username)
+        existing = db.execute("SELECT u.*,e.subject FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.username=?", (username,)).fetchone()
+        existing = dict(existing) if existing else None
+    identity = None
+    is_local = existing and existing["subject"] is None
+    if is_local:
+        valid = bool(existing["active"]) and check_password(password, existing["password_hash"])
+    elif existing and not existing["active"]:
+        valid = False
+    else:
+        try:
+            identity = directory_auth.authenticate(settings, username, password)
+        except directory_auth.DirectoryUnavailable:
+            raise HTTPException(503, "Directory authentication unavailable; contact your administrator") from None
+        valid = identity is not None
+        if not settings.ldap_enabled:
+            check_password(password, DUMMY_HASH)
     failure = False
     with connect(settings) as db, transaction(db):
-        failures = db.execute("SELECT count,last_at FROM login_failures WHERE username=?", (username,)).fetchone()
-        if failures and failures["count"] >= 5:
-            last = datetime.fromisoformat(failures["last_at"])
-            if datetime.now(timezone.utc) - last < timedelta(minutes=15):
-                raise HTTPException(429, "Too many attempts; retry after 15 minutes")
-            db.execute("DELETE FROM login_failures WHERE username=?", (username,))
-        user = db.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
-        # Consume similar work for unknown accounts to reduce enumeration side channels.
-        valid = check_password(password, user["password_hash"] if user else DUMMY_HASH)
-        if not user or not valid:
+        _login_gate(db, username)
+        user = db.execute("SELECT u.*,e.subject FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.username=?", (username,)).fetchone()
+        if is_local:
+            valid = valid and user is not None and user["active"] and user["subject"] is None and user["password_hash"] == existing["password_hash"]
+        elif valid:
+            # A local username can never be taken over by a directory identity.
+            if user:
+                valid = bool(user["active"]) and user["subject"] == identity.subject
+            elif db.execute("SELECT 1 FROM external_identities WHERE provider='ldap' AND subject=?", (identity.subject,)).fetchone():
+                valid = False  # Directory rename needs explicit operator reconciliation.
+            else:
+                uid = str(uuid.uuid4())
+                db.execute("INSERT INTO users(id,username,password_hash,role,email,display_name,created_at) VALUES(?,?,?,?,?,?,?)",
+                           (uid, username, "!ldap", identity.role, identity.email, identity.display_name, utcnow()))
+                db.execute("INSERT INTO external_identities(user_id,provider,subject) VALUES(?,'ldap',?)", (uid, identity.subject))
+                audit(db, uid, "user.directory_provisioned", "user", uid, {"role": identity.role})
+                user = db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+            if valid:
+                if user["role"] != identity.role:
+                    db.execute("DELETE FROM sessions WHERE user_id=?", (user["id"],))
+                    audit(db, user["id"], "user.directory_role_changed", "user", user["id"], {"role": identity.role})
+                db.execute("UPDATE users SET role=?,email=?,display_name=? WHERE id=?", (identity.role, identity.email, identity.display_name, user["id"]))
+        if not valid:
             db.execute("INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at", (username, utcnow()))
             audit(db, "anonymous", "auth.failed", "login", "redacted")
             failure = True
@@ -68,11 +109,14 @@ def login(settings, username: str, password: str):
             db.execute("DELETE FROM login_failures WHERE username=?", (username,))
             token = secrets.token_urlsafe(48)
             csrf = secrets.token_urlsafe(32)
-            expiry = (datetime.now(timezone.utc) + timedelta(hours=settings.session_hours)).isoformat(timespec="seconds")
+            minutes = settings.session_hours * 60
+            if identity:
+                minutes = min(minutes, settings.ldap_session_minutes)
+            expiry = (datetime.now(timezone.utc) + timedelta(minutes=minutes)).isoformat(timespec="seconds")
             db.execute("INSERT INTO sessions VALUES (?,?,?,?,?)", (digest(token), user["id"], digest(csrf), expiry, utcnow()))
             db.execute("UPDATE users SET last_login_at=? WHERE id=?", (utcnow(), user["id"]))
             db.execute("DELETE FROM sessions WHERE expires_at<?", (utcnow(),))
-            audit(db, user["id"], "auth.login", "session", "redacted")
+            audit(db, user["id"], "auth.login", "session", "redacted", {"provider": "ldap" if identity else "local"})
     if failure:
         raise HTTPException(401, "Invalid credentials")
     return token, csrf, expiry
@@ -84,9 +128,9 @@ def authenticate(request: Request):
         raise HTTPException(401, "Login required")
     settings = request.app.state.settings
     with connect(settings) as db:
-        row = db.execute("""SELECT u.id,u.username,u.role,u.active,s.csrf_hash,s.expires_at
-            FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?""", (digest(token),)).fetchone()
-    if not row or not row["active"] or datetime.fromisoformat(row["expires_at"]) <= datetime.now(timezone.utc):
+        row = db.execute("""SELECT u.id,u.username,u.role,u.active,s.csrf_hash,s.expires_at,e.provider
+            FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN external_identities e ON e.user_id=u.id WHERE s.token_hash=?""", (digest(token),)).fetchone()
+    if not row or not row["active"] or (row["provider"] == "ldap" and not settings.ldap_enabled) or datetime.fromisoformat(row["expires_at"]) <= datetime.now(timezone.utc):
         raise HTTPException(401, "Session expired")
     return dict(row)
 

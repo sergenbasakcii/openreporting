@@ -2,6 +2,16 @@
 
 ## Yayınlanmamış
 
+### Kurumsal kimlik ve posta bağlantıları
+- LDAP/Active Directory: doğrulanan LDAPS veya zorunlu StartTLS, salt okunur servis hesabı,
+  güvenli kullanıcı araması, kalıcı dizin kimliği ve doğrudan grup üyeliğinden rol eşleme.
+- Şema v3 dizin profillerini yerel hesaplardan ayırır; parola saklanmaz, yerel hesap devralınamaz.
+  Rol değişiminde oturum iptali ve son yerel kurtarma yöneticisinin korunması eklendi.
+- SMTP: STARTTLS ve başlangıçtan TLS, kurum CA zinciri, süre sınırı, AUTH veya TLS relay,
+  açık ret/kısmi ret/belirsiz teslimat ayrımı ve güvenli parola dosyaları.
+- Sunucu durumunda LDAP/SMTP bağlantı kontrolü; `doctor --check-integrations` ve `check-ldap`.
+  Kurulum ve kabul sınırları docs/ENTERPRISE_DEPLOYMENT.md içinde.
+
 ### Tema düzeltmeleri
 - Açılır seçim listeleri ve seçenek yüzeyleri koyu/açık temanın renklerini kullanır.
 - Yeni grafiklerin ipuçlarındaki beyaz arka plan giderildi; tema değişiminde açık paneller

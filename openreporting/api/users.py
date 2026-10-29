@@ -53,8 +53,9 @@ def _email(value):
 @router.get("/api/users")
 def list_users(request: Request, user=Depends(admin_read)):
     with connect(settings_of(request)) as db:
-        return [dict(r) for r in db.execute("""SELECT id,username,role,active,email,display_name,created_at,last_login_at
-                                               FROM users ORDER BY username""")]
+        return [dict(r) for r in db.execute("""SELECT u.id,username,role,active,email,display_name,created_at,last_login_at,
+                                               COALESCE(e.provider,'local') AS auth_provider
+                                               FROM users u LEFT JOIN external_identities e ON e.user_id=u.id ORDER BY username""")]
 
 
 @router.post("/api/users", status_code=201)
@@ -82,6 +83,9 @@ def update_user(user_id: str, body: UserPatch, request: Request, user=Depends(ad
         target = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if not target:
             raise HTTPException(404, "Kullanıcı bulunamadı")
+        external = db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user_id,)).fetchone()
+        if external and body.role is not None:
+            raise HTTPException(409, "LDAP rolleri dizin gruplarıyla yönetilir")
         role = body.role if body.role is not None else target["role"]
         active = int(body.active) if body.active is not None else target["active"]
         if role not in ROLES:
@@ -90,6 +94,11 @@ def update_user(user_id: str, body: UserPatch, request: Request, user=Depends(ad
             admins = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
             if admins <= 1:
                 raise HTTPException(409, "Son etkin yönetici devre dışı bırakılamaz veya rolü değiştirilemez")
+            if not external:
+                local_admins = db.execute("""SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
+                                            AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)""").fetchone()[0]
+                if local_admins <= 1:
+                    raise HTTPException(409, "Son yerel kurtarma yöneticisi korunmalıdır")
         if user_id == user["id"] and not active:
             raise HTTPException(409, "Kendi hesabınızı devre dışı bırakamazsınız")
         email = _email(body.email) if body.email is not None else target["email"]
@@ -109,6 +118,8 @@ def reset_password(user_id: str, body: PasswordReset, request: Request, user=Dep
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     with connect(settings_of(request)) as db, transaction(db):
+        if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user_id,)).fetchone():
+            raise HTTPException(409, "LDAP parolası dizin hizmetinde değiştirilmelidir")
         if not db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, user_id)).rowcount:
             raise HTTPException(404, "Kullanıcı bulunamadı")
         db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
@@ -119,7 +130,8 @@ def reset_password(user_id: str, body: PasswordReset, request: Request, user=Dep
 @router.get("/api/user")
 def current_user(request: Request, user=Depends(authenticate)):
     with connect(settings_of(request)) as db:
-        row = db.execute("SELECT id,username,role,email,display_name,last_login_at FROM users WHERE id=?",
+        row = db.execute("""SELECT u.id,username,role,email,display_name,last_login_at,COALESCE(e.provider,'local') AS auth_provider
+                            FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.id=?""",
                          (user["id"],)).fetchone()
         prefs = db.execute("SELECT theme,timezone,home_dashboard_uid FROM user_prefs WHERE user_id=?",
                            (user["id"],)).fetchone()
@@ -151,6 +163,8 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
 def change_password(body: PasswordChange, request: Request, user=Depends(viewer_write)):
     settings = settings_of(request)
     with connect(settings) as db:
+        if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user["id"],)).fetchone():
+            raise HTTPException(409, "LDAP parolası dizin hizmetinde değiştirilmelidir")
         row = db.execute("SELECT password_hash FROM users WHERE id=?", (user["id"],)).fetchone()
     if not row or not check_password(body.old_password, row["password_hash"]):
         raise HTTPException(403, "Mevcut parola hatalı")

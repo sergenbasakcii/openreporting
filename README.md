@@ -33,6 +33,9 @@ Kurulum; servis kullanıcısını, `/opt/openreporting` (kod + venv), `/var/lib/
 dizinlerini, `openreporting-web` / `openreporting-worker` servislerini, nginx HTTPS ters vekilini ve gece yedeğini hazırlar.
 Ayrıntılar: **[docs/LINUX_DEPLOYMENT.md](docs/LINUX_DEPLOYMENT.md)**.
 
+LDAP/Active Directory, SMTP TLS/kurum CA'sı, servis hesapları ve canlıya alma kontrolleri:
+**[docs/ENTERPRISE_DEPLOYMENT.md](docs/ENTERPRISE_DEPLOYMENT.md)** (henüz yayınlanmamış geliştirme sürümü).
+
 İlk girişten sonra:
 1. **Yönetim → Veri kaynakları → Veri kaynağı ekle → Zabbix**: `https://zabbix.../api_jsonrpc.php` + salt-okunur API token.
 2. **Dashboard’lar → Yeni dashboard** veya Grafana JSON’unu **İçe aktar**.
