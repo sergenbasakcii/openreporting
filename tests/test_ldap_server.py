@@ -127,9 +127,11 @@ def test_actual_directory_admission_role_changes_and_tls(directory, mode):
     # Our application service account truly has no directory write permission.
     with directory_auth._connection(settings, settings.ldap_bind_dn, settings.ldap_bind_password) as service:
         assert service.bind() and service.read_only
-        from ldap3.core.exceptions import LDAPConnectionIsReadOnlyError
-        with pytest.raises(LDAPConnectionIsReadOnlyError):
-            service.add('cn=forbidden,dc=example,dc=com', ['organizationalRole'], {'cn':'forbidden'})
+        assert service.add('cn=forbidden,dc=example,dc=com', ['organizationalRole'], {'cn':'forbidden'}) is False
+        # Verify the fixture's server ACL independently of ldap3's local guard.
+        service.read_only = False
+        assert service.add('cn=forbidden,dc=example,dc=com', ['organizationalRole'], {'cn':'forbidden'}) is False
+        assert service.result['result'] == 50  # insufficientAccessRights
     for override in ({'ldap_ca_file':''}, {'ldap_url':settings.ldap_url.replace('localhost','127.0.0.1')}):
         with pytest.raises(directory_auth.DirectoryUnavailable):
             directory_auth.check_connection(replace(settings, **override))
