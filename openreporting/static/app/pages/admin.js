@@ -102,7 +102,7 @@ export async function serverPage(root) {
             try { const result = await post(`/api/admin/integrations/${kind}/check`, {}); toast(result.message, result.ok ? 'ok' : 'error'); }
             catch (err) { toast(err.message, 'error'); }
             finally { if (control.isConnected) control.disabled = false; }
-          } }))));
+          } })))));
   };
   await draw();
 }

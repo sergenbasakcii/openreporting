@@ -92,7 +92,7 @@ jobs:
         with:
           node-version: "22"
       - name: JS syntax
-        run: find openreporting/static/app -name '*.js' -print0 | xargs -0 -n1 node --check
+        run: node tests/check_app_syntax.cjs
       - name: Visualization models
         run: node --test tests/test_extended_panels.mjs
 

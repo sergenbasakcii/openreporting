@@ -62,8 +62,10 @@ memberof-group-oc groupOfNames
 memberof-member-ad member
 memberof-memberof-ad memberOf
 ''', encoding='utf8')
+    checked = subprocess.run([executable, '-Tt', '-u', '-f', str(config)], capture_output=True, text=True, timeout=10)
+    assert checked.returncode == 0, 'Isolated directory config invalid: ' + checked.stderr[-2000:]
     with (tmp_path / 'slapd.log').open('w') as log:
-        process = subprocess.Popen([executable, '-f', str(config), '-h', f'ldap://127.0.0.1:{port} ldaps://127.0.0.1:{ssl_port}', '-d', '0'], stdout=log, stderr=log)
+        process = subprocess.Popen([executable, '-f', str(config), '-h', f'ldap://127.0.0.1:{port} ldaps://127.0.0.1:{ssl_port}', '-d', '256'], stdout=log, stderr=log)
         root = None
         try:
             tls = ldap3.Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=str(ca))
