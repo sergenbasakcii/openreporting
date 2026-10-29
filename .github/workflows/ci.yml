@@ -24,12 +24,16 @@ jobs:
           python-version: "3.13"
       - name: Install isolated directory test tools
         run: sudo apt-get update -qq && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq slapd ldap-utils
+      - name: Prepare isolated paths allowed by the existing slapd AppArmor policy
+        run: |
+          sudo install -d -o "$(id -un)" -g "$(id -gn)" -m 0700 /etc/ldap/openreporting-ci /var/lib/ldap/openreporting-ci
       - name: Install package
         run: python -m pip install ".[test]"
       - name: Verify actual LDAP TLS, service bind, user bind and memberOf
         env:
           OPENREPORTING_TEST_SLAPD: "1"
-        run: python -m pytest -q tests/test_ldap_server.py
+          OPENREPORTING_TEST_LDAP_DATA_ROOT: /var/lib/ldap/openreporting-ci
+        run: python -m pytest -q tests/test_ldap_server.py --basetemp=/etc/ldap/openreporting-ci/pytest
 
   postgres-driver:
     name: PostgreSQL driver contract

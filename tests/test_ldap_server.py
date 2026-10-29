@@ -11,6 +11,7 @@ import ssl
 import subprocess
 import time
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -27,7 +28,9 @@ def directory(tmp_path):
     assert os.path.isfile(executable), 'LDAP CI requires slapd; do not silently skip a missing server'
     import ldap3
     ca, cert, key = certificates(tmp_path)
-    database = tmp_path / 'mdb'
+    # Ubuntu confines slapd to its standard config/data roots. Keep that policy
+    # enabled and provision only unique test-owned directories inside those roots.
+    database = Path(os.environ.get('OPENREPORTING_TEST_LDAP_DATA_ROOT', str(tmp_path))) / tmp_path.name
     database.mkdir()
     def free_port():
         with socket.socket() as sock:
@@ -39,8 +42,6 @@ def directory(tmp_path):
 include /etc/ldap/schema/core.schema
 include /etc/ldap/schema/cosine.schema
 include /etc/ldap/schema/inetorgperson.schema
-pidfile {tmp_path}/slapd.pid
-argsfile {tmp_path}/slapd.args
 modulepath /usr/lib/ldap
 moduleload back_mdb
 moduleload memberof
