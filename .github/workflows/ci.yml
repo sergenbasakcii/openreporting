@@ -30,10 +30,12 @@ jobs:
       - name: Install package
         run: python -m pip install ".[test]"
       - name: Verify actual LDAP TLS, service bind, user bind and memberOf
-        env:
-          OPENREPORTING_TEST_SLAPD: "1"
-          OPENREPORTING_TEST_LDAP_DATA_ROOT: /var/lib/ldap/openreporting-ci
-        run: python -m pytest -q tests/test_ldap_server.py --basetemp=/etc/ldap/openreporting-ci/pytest
+        # Only the isolated fixture harness needs root to traverse Ubuntu's
+        # existing private /var/lib/ldap parent. No service policy is relaxed.
+        run: |
+          sudo env OPENREPORTING_TEST_SLAPD=1 OPENREPORTING_TEST_LDAP_DATA_ROOT=/var/lib/ldap/openreporting-ci \
+            LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$(command -v python)" -m pytest -q tests/test_ldap_server.py \
+            --basetemp=/etc/ldap/openreporting-ci/pytest
 
   postgres-driver:
     name: PostgreSQL driver contract
