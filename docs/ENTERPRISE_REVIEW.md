@@ -13,21 +13,23 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Son backend doğrulaması: `d79d1cf` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40989996711).
-Yerelde **216 Python testi başarılı, 12 ortam bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
+Son yayımlanmamış temel: `2510505` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40991930615).
+Yeni HTTP gözlemlenebilirliğiyle yerelde **222 Python testi başarılı, 12 ortam bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
 Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
-bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son arayüz commitinin CI sonucu PROGRESS.md'de izlenir.
+bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son commitlerin CI sonucu PROGRESS.md'de izlenir.
 Test dosyası referansları o başlığın kanıt alanını gösterir; her satır için ayrı bir yeni test yazıldığı iddia edilmez.
 
 Gövde sınırı, Host/Origin izolasyonu, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.
-Öncelikli kalanlar: ölçülmüş yük/uzun çalışma kanıtı ve gerçek kurum kabulü. MFA/SSO, tenant ACL,
+16 sentetik viewer ile 120 saniyede 7.404 HTTP isteği, sıfır hata; sorgu p95 445,654 ms ölçüldü.
+Bu kısa ve tek süreçli test gerçek kaynak/worker kapasitesini veya uzun soak kabulünü kanıtlamaz.
+Öncelikli kalanlar: gerçek kaynaklı yük/uzun çalışma ve kurum kabulü. MFA/SSO, tenant ACL,
 deneysel PostgreSQL işletimi ve anahtar döndürme kurumsal kabul kararında ayrıca değerlendirilmelidir.
 Kullanıcı adına lisans/üretim kabul kararı verilmez.
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 75, R: 24, P: 7, O: 8, E: 6.
+Durum dağılımı: V: 76, R: 25, P: 8, O: 5, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -41,7 +43,7 @@ Durum dağılımı: V: 75, R: 24, P: 7, O: 8, E: 6.
 | A06 | Yapılandırma tür ve sınır doğrulaması | V | P1 | [tests/test_enterprise_settings.py](../tests/test_enterprise_settings.py) — Güvensiz entegrasyon ayarları reddediliyor |
 | A07 | API/driver/rapor modül sınırları | R | P2 | [openreporting/api/deps.py](../openreporting/api/deps.py) — Kaynak sorguları uygulama DB adapterine yönlendirilmiyor |
 | A08 | Resmi veri akışı ve tehdit modeli | R | P1 | [docs/THREAT_MODEL.md](../docs/THREAT_MODEL.md) — Varlıklar, aktörler, güven sınırları ve kötüye kullanım senaryoları kaydedildi; bağımsız denetim değil |
-| A09 | Kapasite ve kullanıcı yükü ölçümü | O | P1 | [docs/LINUX_DEPLOYMENT.md](../docs/LINUX_DEPLOYMENT.md) — Kapasite önerisi var, ölçülmüş yük testi yok |
+| A09 | Kapasite ve kullanıcı yükü ölçümü | P | P1 | [docs/PERFORMANCE_ACCEPTANCE.md](../docs/PERFORMANCE_ACCEPTANCE.md) — Gerçek loopback HTTP, geçici SQLite ve kayıtlı panel tanımıyla sentetik viewer ölçümü; gerçek kaynak/kurum kapasitesi açık |
 | A10 | Eksik veri ve bağımlılık hatasında kapalı davranış | V | P1 | [tests/test_reporting.py](../tests/test_reporting.py) — Kısmi raporda e-posta engeli testli |
 
 ## B — Yerel kimlik ve hesaplar
@@ -174,10 +176,10 @@ Durum dağılımı: V: 75, R: 24, P: 7, O: 8, E: 6.
 | J04 | Prometheus metrics localhost sınırı | R | P1 | [openreporting/api/system.py](../openreporting/api/system.py) — Proxy /metrics 404; yerel scrape |
 | J05 | LDAP/SMTP tanılama mutasyonsuzluğu | V | P1 | [tests/test_smtp_transport.py](../tests/test_smtp_transport.py) — SMTP kontrolü MAIL/RCPT/DATA üretmez |
 | J06 | Sır içermeyen gönderim hatası günlükleri | V | P1 | [tests/test_smtp_transport.py](../tests/test_smtp_transport.py) — Parola caplog çıktısında yok |
-| J07 | Yapısal request kimliği ve gecikme metrikleri | O | P2 | [openreporting/web.py](../openreporting/web.py) — Sistematik request_id/latency izleme yok |
+| J07 | Yapısal request kimliği ve gecikme metrikleri | V | P2 | [tests/test_http_telemetry.py](../tests/test_http_telemetry.py) — 5 kabul testi: sunucu IDsi, redakte JSON HTTP olayları, hata/reddetme, sınırlı etiketli süreç histogramı ve eksik yanıt; çok süreçli toplama kurum işi |
 | J08 | SLO hata bütçesi ve alarm sahipliği | E | P1 | [docs/LINUX_DEPLOYMENT.md](../docs/LINUX_DEPLOYMENT.md) — Kurum SLO/on-call eşiği kabul edilmedi |
-| J09 | Uçtan uca yük/soak ve p95 ölçümü | O | P1 | [openreporting/query_engine.py](../openreporting/query_engine.py) — Kod bütçesi var; gerçek kapasite kanıtı yok |
-| J10 | Arıza ve incident müdahale runbooku | P | P1 | [docs/LINUX_DEPLOYMENT.md](../docs/LINUX_DEPLOYMENT.md) — Temel komutlar var; senaryolu runbook genişletilecek |
+| J09 | Uçtan uca yük/soak ve p95 ölçümü | P | P1 | [docs/PERFORMANCE_ACCEPTANCE.md](../docs/PERFORMANCE_ACCEPTANCE.md) — Sentetik eşzamanlı HTTP p50/p95/p99 ölçümü var; uzun soak, gerçek kaynak ve eşzamanlı worker kabulü açık |
+| J10 | Arıza ve incident müdahale runbooku | R | P1 | [docs/OPERATIONS_RUNBOOK.md](../docs/OPERATIONS_RUNBOOK.md) — 12 olay senaryosu, güvenli tanılama, kurtarma kabulü ve kapanış ölçütü yazıldı; gerçek nöbetçi/olay tatbikatı kurumda yapılacak |
 
 ## K — Yedek kurtarma ve dağıtım
 

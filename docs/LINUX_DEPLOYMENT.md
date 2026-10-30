@@ -1,15 +1,20 @@
 # OpenReporting 1.0 — Ubuntu Sunucu Kurulumu ve İşletimi
 
-Desteklenen: **Ubuntu 24.04 LTS (önerilir)**, Ubuntu 22.04 LTS, Debian 12. Gereksinim: systemd, Python ≥ 3.11.
+CI ile doğrulanan üretim tabanı: **Ubuntu 24.04 LTS**, systemd, Python 3.11–3.13 ve yerel SQLite.
+Ubuntu 22.04/Debian 12 bu kabul matrisinde doğrulanmadı; ayrı ortam kabulü gerekir.
 
 ## 1. Kapasite
 
-| Ölçek | CPU | RAM | Disk |
+Ölçüm öncesi donanım planı (kullanıcı/host veya günlük rapor kapasitesi garantisi değildir):
+
+| Plan | CPU | RAM | Disk |
 | --- | --- | --- | --- |
-| ≤ 50 kullanıcı, ≤ 5.000 host, günlük birkaç yüz rapor | 4 vCPU | 8 GB | 50 GB SSD (arşiv saklama süresine göre büyütün) |
-| Daha büyük | 8 vCPU | 16 GB | arşiv × saklama gün sayısı |
+| İlk kabul ortamı | 4 vCPU | 8 GB | 50 GB SSD (arşiv saklama süresine göre büyütün) |
+| Daha yoğun iş yükü için aday bütçe | 8 vCPU | 16 GB | arşiv × saklama gün sayısı |
 
 Veritabanı SQLite (WAL) ve yerel diskte olmalıdır; NFS/SMB üzerinde çalıştırmayın.
+Ölçülmüş sentetik HTTP sonuçları ve sınırları [performans kabul kaydındadır](PERFORMANCE_ACCEPTANCE.md).
+Gerçek kaynak/rapor/TLS/LDAP/SMTP yüküyle kurum kabulü yapılmadan bu tablo üretim kapasitesi sayılmaz.
 
 ## 2. Kurulum
 

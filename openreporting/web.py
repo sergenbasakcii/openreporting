@@ -14,6 +14,7 @@ from .domain import DomainError
 from .healthchecks import database_ready
 from .request_limits import RequestBodyLimitMiddleware
 from .http_security import OriginValidationMiddleware, trusted_hosts
+from .http_telemetry import HttpMetrics, HttpTelemetryMiddleware
 from .security import authenticate, digest, login, logout, require_csrf, require_role
 
 log = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None):
     datasource_registry.provision(settings)
     app = FastAPI(title="OpenReporting", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings
+    app.state.http_metrics = HttpMetrics()
     static = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
     for module in (datasources_api, dashboards_api, users_api, reports_api, system_api):
@@ -48,7 +50,12 @@ def create_app(settings: Settings | None = None):
 
     @app.middleware("http")
     async def headers(request, call_next):
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Request contents and exception messages can contain credentials.
+            # The correlated HTTP 500 event is emitted by the outer telemetry layer.
+            response = JSONResponse({'detail': 'Internal server error'}, status_code=500)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -143,4 +150,5 @@ def create_app(settings: Settings | None = None):
             return (static / "index.html").read_text(encoding="utf8")
         raise HTTPException(404, "Not found")
 
+    app.add_middleware(HttpTelemetryMiddleware, metrics=app.state.http_metrics)
     return app

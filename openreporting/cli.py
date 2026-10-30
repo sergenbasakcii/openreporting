@@ -235,10 +235,12 @@ def main(argv=None):
         if args.host not in ("127.0.0.1", "::1") and not args.allow_remote:
             raise SystemExit("API must bind to loopback; use an approved HTTPS reverse proxy for remote access")
         import uvicorn
+        from .http_telemetry import logging_config
         workers = max(1, min(args.workers, 16))
         common = {"host": args.host, "port": args.port, "proxy_headers": args.proxy_headers,
                   "forwarded_allow_ips": "127.0.0.1,::1" if args.proxy_headers else None,
-                  "server_header": False, "date_header": True, "timeout_keep_alive": 15}
+                  "server_header": False, "date_header": True, "timeout_keep_alive": 15, "access_log": False,
+                  "log_config":logging_config()}
         if workers > 1 and os.name != "nt":
             # Each worker builds its own app from the same environment.
             uvicorn.run("openreporting.web:create_app", factory=True, workers=workers, **common)

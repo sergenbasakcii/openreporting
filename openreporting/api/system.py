@@ -131,4 +131,4 @@ def metrics(request: Request):
         lines.append(f"openreporting_worker_heartbeat_age_seconds {age:.1f}")
     disk = disk_usage(settings.data_dir)
     lines.append(f"openreporting_data_disk_free_bytes {disk.free}")
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n" + request.app.state.http_metrics.exposition()

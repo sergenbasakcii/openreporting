@@ -78,10 +78,10 @@
       "id": "A09",
       "area": "Mimari ve kapsam",
       "control": "Kapasite ve kullanıcı yükü ölçümü",
-      "status": "O",
+      "status": "P",
       "priority": "P1",
-      "evidence": "docs/LINUX_DEPLOYMENT.md",
-      "note": "Kapasite önerisi var, ölçülmüş yük testi yok"
+      "evidence": "docs/PERFORMANCE_ACCEPTANCE.md",
+      "note": "Gerçek loopback HTTP, geçici SQLite ve kayıtlı panel tanımıyla sentetik viewer ölçümü; gerçek kaynak/kurum kapasitesi açık"
     },
     {
       "id": "A10",
@@ -870,10 +870,10 @@
       "id": "J07",
       "area": "Gözlemlenebilirlik ve dayanıklılık",
       "control": "Yapısal request kimliği ve gecikme metrikleri",
-      "status": "O",
+      "status": "V",
       "priority": "P2",
-      "evidence": "openreporting/web.py",
-      "note": "Sistematik request_id/latency izleme yok"
+      "evidence": "tests/test_http_telemetry.py",
+      "note": "5 kabul testi: sunucu IDsi, redakte JSON HTTP olayları, hata/reddetme, sınırlı etiketli süreç histogramı ve eksik yanıt; çok süreçli toplama kurum işi"
     },
     {
       "id": "J08",
@@ -888,19 +888,19 @@
       "id": "J09",
       "area": "Gözlemlenebilirlik ve dayanıklılık",
       "control": "Uçtan uca yük/soak ve p95 ölçümü",
-      "status": "O",
+      "status": "P",
       "priority": "P1",
-      "evidence": "openreporting/query_engine.py",
-      "note": "Kod bütçesi var; gerçek kapasite kanıtı yok"
+      "evidence": "docs/PERFORMANCE_ACCEPTANCE.md",
+      "note": "Sentetik eşzamanlı HTTP p50/p95/p99 ölçümü var; uzun soak, gerçek kaynak ve eşzamanlı worker kabulü açık"
     },
     {
       "id": "J10",
       "area": "Gözlemlenebilirlik ve dayanıklılık",
       "control": "Arıza ve incident müdahale runbooku",
-      "status": "P",
+      "status": "R",
       "priority": "P1",
-      "evidence": "docs/LINUX_DEPLOYMENT.md",
-      "note": "Temel komutlar var; senaryolu runbook genişletilecek"
+      "evidence": "docs/OPERATIONS_RUNBOOK.md",
+      "note": "12 olay senaryosu, güvenli tanılama, kurtarma kabulü ve kapanış ölçütü yazıldı; gerçek nöbetçi/olay tatbikatı kurumda yapılacak"
     },
     {
       "id": "K01",

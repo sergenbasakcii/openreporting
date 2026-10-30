@@ -37,3 +37,8 @@ sınırı + tek ifade kontrolü. Tüm mutasyonlar CSRF başlığı + rol kontrol
 
 **Şema.** `db.py` tek bir başlangıç şeması (sürüm 1) içerir; sonraki değişiklikler numaralı adımlar olarak eklenir ve
 uygulama açılışında sırayla, otomatik uygulanır. Uygulama kendinden yeni bir şemayı açmayı reddeder.
+
+**HTTP işletimi.** Dış ASGI katmanı sunucunun ürettiği istek kimliği, sınırlı etiketli süreç
+metrikleri ve gövde tamamlanmasına kadar gecikme üretir. CLI, ham URL/başlık/gövde içermeyen
+JSON erişim olaylarını her web sürecinde yapılandırır. `/metrics` loopback ile sınırlıdır;
+çok süreçli toplam ölçüm için ayrı toplama gerekir. Ayrıntılar [işletim yönergesinde](OPERATIONS_RUNBOOK.md).

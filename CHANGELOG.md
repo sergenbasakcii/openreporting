@@ -3,6 +3,10 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- Sunucunun ürettiği istek kimliği, veri içermeyen yapısal HTTP kaydı, süreç bazlı gecikme
+  histogramı ve kesilen yanıt sayacı eklendi. Beklenmeyen 500 ayrıntıları istemciye taşınmaz.
+- Sentetik viewer yükü gerçek HTTP üzerinde ayrı geçici uygulamada ölçülür; işletim olay
+  senaryoları ve ölçüm sınırları belgelendi. Üretim kapasitesi/kurum kabulü iddiası yoktur.
 - Host başlığı yalnız loopback, kayıtlı PUBLIC_URL ve açıkça tanımlanan DNS/IP alias'larına kabul edilir;
   cross-origin tarayıcı mutasyonları ve belirsiz Host/Origin başlıkları reddedilir. Ağır audit readiness yöneticilerle sınırlıdır.
 - İstek gövdeleri başlık eksik/yanlış olsa ve chunked gelse de 2 MB akış sınırından geçer;
