@@ -18,7 +18,7 @@ def client(tmp_path):
                        ldap_enabled=False, mail_enabled=False, zabbix_url='', zabbix_token_file='')
     app = web.create_app(settings)
     security.create_user(settings, 'admin1', 'isolated-health-password', 'admin')
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         yield http
 
 

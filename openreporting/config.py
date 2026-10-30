@@ -68,6 +68,7 @@ class Settings:
     ldap_ca_file: str = ""
     ldap_timeout: int = 10
     ldap_session_minutes: int = 60
+    allowed_hosts: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls):
@@ -117,13 +118,14 @@ class Settings:
             ldap_ca_file=os.getenv("OPENREPORTING_LDAP_CA_FILE", "").strip(),
             ldap_timeout=int(os.getenv("OPENREPORTING_LDAP_TIMEOUT", "10")),
             ldap_session_minutes=int(os.getenv("OPENREPORTING_LDAP_SESSION_MINUTES", "60")),
+            allowed_hosts=tuple(x.strip() for x in os.getenv("OPENREPORTING_ALLOWED_HOSTS", "").split(',') if x.strip()),
         )
         if not 1 <= data.query_concurrency <= 64 or not 10_000 <= data.max_series_points <= 50_000_000:
             raise ValueError("Invalid query concurrency or point budget")
         if not 0 <= data.report_retention_days <= 36500:
             raise ValueError("Invalid report retention")
-        if data.public_url and not data.public_url.startswith(("https://", "http://")):
-            raise ValueError("OPENREPORTING_PUBLIC_URL must be an http(s) URL")
+        from .http_security import trusted_hosts
+        trusted_hosts(data)
         if not 1 <= data.session_hours <= 168 or not 1 <= data.max_rows <= 1_000_000:
             raise ValueError("Invalid session duration or max rows")
         if not 1000 <= data.query_timeout_ms <= 300_000:

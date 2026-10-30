@@ -20,6 +20,14 @@ PostgreSQL uygulama veritabanı işletim/geri yükleme desteği hâlâ deneyseld
 5. Aşağıdaki ayarları yaptıktan sonra web ve worker servislerini **birlikte** yeniden başlatın.
 6. Bağlantı ve kabul kontrollerini tamamlayıp küçük bir deneme raporunu onaylı test alıcısına gönderin.
 
+HTTP sınırı: `OPENREPORTING_PUBLIC_URL` yalnız gerçek HTTP(S) origin olmalıdır; kullanıcı/parola,
+path prefix, query veya fragment içermez. Secure cookie açıkken HTTPS gerekir. Loopback ve bu
+URL'nin hostname'i otomatik izinlidir. Ek kurum DNS/IP adlarını `OPENREPORTING_ALLOWED_HOSTS`
+ile virgülle ayırın; port, URL veya wildcard kullanmayın. Bilinmeyen Host başlıkları ve cross-origin
+tarayıcı mutasyonları reddedilir. Proxy'nin `X-Forwarded-Proto` ayarı ve uygulamanın yalnız
+loopback proxy'ye güveni korunmalıdır; HTTPS kurulumunda Origin/protokol uyumunu test edin.
+Origin göndermeyen CLI/API istemcileri mevcut cookie+CSRF/rol kontrolünü kullanır; CORS açılmaz.
+
 ```bash
 sudo systemctl restart openreporting-web openreporting-worker
 sudo /opt/openreporting/app/deploy/openreporting-admin.sh doctor --check-integrations

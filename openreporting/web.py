@@ -6,12 +6,14 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import Settings
 from .db import connect, init_db, transaction, verify_audit
 from .domain import DomainError
 from .healthchecks import database_ready
 from .request_limits import RequestBodyLimitMiddleware
+from .http_security import OriginValidationMiddleware, trusted_hosts
 from .security import authenticate, digest, login, logout, require_csrf, require_role
 
 log = logging.getLogger(__name__)
@@ -41,6 +43,8 @@ def create_app(settings: Settings | None = None):
     for module in (datasources_api, dashboards_api, users_api, reports_api, system_api):
         app.include_router(module.router)
     app.add_middleware(RequestBodyLimitMiddleware)
+    app.add_middleware(OriginValidationMiddleware)
+    app.add_middleware(TrustedHostMiddleware,allowed_hosts=trusted_hosts(settings),www_redirect=False)
 
     @app.middleware("http")
     async def headers(request, call_next):
@@ -55,7 +59,8 @@ def create_app(settings: Settings | None = None):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         if settings.secure_cookie:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        if request.url.path.startswith("/static/") and not request.url.path.endswith((".html",)):
+        path = request.scope.get("path", "")
+        if path.startswith("/static/") and not path.endswith((".html",)):
             response.headers["Cache-Control"] = "no-cache"
         return response
 
@@ -73,6 +78,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get("/readyz")
     def ready(user=Depends(authenticate)):
+        require_role(user, "admin")
         database_ok, audit_ok, broken_id = False, None, None
         try:
             with connect(settings) as db:

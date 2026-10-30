@@ -175,7 +175,7 @@ def test_application_uses_postgres_for_login_dashboard_and_report_queue(postgres
                        secret_key_file="", zabbix_url="", zabbix_token_file="")
     app = create_app(settings)
     create_user(settings, "admin1", "an-admin-password-123", "admin")
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         for _ in range(2):
             assert http.post("/api/login", json={"username": "admin1", "password": "wrong"}).status_code == 401
         response = http.post("/api/login", json={"username": "admin1", "password": "an-admin-password-123"})

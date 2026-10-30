@@ -447,10 +447,10 @@
       "id": "E10",
       "area": "HTTP ve API savunmaları",
       "control": "URL/Host ve origin sınırları",
-      "status": "P",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/web.py",
-      "note": "TrustedHost ve Origin politikası ayrı test edilecek"
+      "evidence": "tests/test_http_security.py",
+      "note": "24 Host/Origin yapılandırma ve HTTP senaryosu; rebinding/alias/IPv6/CSRF destekleyen same-origin sınırı, yeni CI bekliyor"
     },
     {
       "id": "F01",

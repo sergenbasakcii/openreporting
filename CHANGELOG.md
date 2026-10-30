@@ -3,6 +3,8 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- Host başlığı yalnız loopback, kayıtlı PUBLIC_URL ve açıkça tanımlanan DNS/IP alias'larına kabul edilir;
+  cross-origin tarayıcı mutasyonları ve belirsiz Host/Origin başlıkları reddedilir. Ağır audit readiness yöneticilerle sınırlıdır.
 - İstek gövdeleri başlık eksik/yanlış olsa ve chunked gelse de 2 MB akış sınırından geçer;
   reddedilen gövde endpoint mutasyonuna ulaşmaz.
 - Cryptography 46 sürümünde taranan güvenlik duyuruları nedeniyle bağımlılık 50.0.2+ olarak güncellendi;

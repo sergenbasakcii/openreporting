@@ -23,7 +23,7 @@ kurumsal kabul kararında ayrıca değerlendirilmelidir. Kullanıcı adına lisa
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 73, R: 25, P: 7, O: 9, E: 6.
+Durum dağılımı: V: 74, R: 25, P: 6, O: 9, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -98,7 +98,7 @@ Durum dağılımı: V: 73, R: 25, P: 7, O: 9, E: 6.
 | E07 | Giriş/API/ağır işlem rate limit | R | P1 | [deploy/nginx/openreporting.conf](../deploy/nginx/openreporting.conf) — nginx IP limitleri var; doğrudan API global limit yok |
 | E08 | Proxy başlıklarına sınırlı güven | R | P1 | [openreporting/cli.py](../openreporting/cli.py) — Yalnız loopback forwarded_allow_ips |
 | E09 | Bilinmeyen API yollarında SPA fallback reddi | V | P2 | [tests/test_platform_core.py](../tests/test_platform_core.py) — 404 davranışı testli |
-| E10 | URL/Host ve origin sınırları | P | P1 | [openreporting/web.py](../openreporting/web.py) — TrustedHost ve Origin politikası ayrı test edilecek |
+| E10 | URL/Host ve origin sınırları | V | P1 | [tests/test_http_security.py](../tests/test_http_security.py) — 24 Host/Origin yapılandırma ve HTTP senaryosu; rebinding/alias/IPv6/CSRF destekleyen same-origin sınırı, yeni CI bekliyor |
 
 ## F — Veri kaynakları ve sorgular
 

@@ -175,7 +175,7 @@ def test_schedule_rules_and_tick(env):
 
 def test_report_api_permissions_preview_and_export(env):
     settings, app, _ = env
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         csrf = http.post("/api/login", json={"username": "viewer1", "password": "a-viewer-password-123"}).json()["csrf"]
         h = {"X-CSRF-Token": csrf}
         assert http.post("/api/dash-reports", json={"name": "x1", "dashboard_uid": "rep-test"}, headers=h).status_code == 403
@@ -213,7 +213,7 @@ def test_customer_logo_upload_and_pdf_embedding(env):
     from fastapi.testclient import TestClient
     from openreporting.reporting import logos
     settings, app, user = env
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         csrf = http.post("/api/login", json={"username": "viewer1", "password": "a-viewer-password-123"}).json()["csrf"]
         data = "data:image/png;base64," + base64.b64encode(_png()).decode()
         assert http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf}, json={"data": data}).status_code == 403

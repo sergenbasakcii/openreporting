@@ -77,7 +77,7 @@ def test_application_rejects_large_stream_with_security_headers_and_keeps_login(
                        ldap_enabled=False,mail_enabled=False,zabbix_url='',zabbix_token_file='')
     app = create_app(settings)
     create_user(settings,'admin1','isolated-body-limit-password','admin')
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://localhost") as client:
         response = client.post('/api/login',content=iter([b'x'*1_000_001,b'x'*1_000_001]),headers={'Content-Type':'application/json'})
         assert response.status_code == 413 and response.headers['x-content-type-options'] == 'nosniff'
         assert response.headers['cache-control'] == 'no-store'

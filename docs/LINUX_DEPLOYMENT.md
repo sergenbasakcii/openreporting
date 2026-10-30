@@ -126,7 +126,7 @@ ve `SHA256SUMS` yazar. Elle: `sudo systemctl start openreporting-backup`. Yedekl
 dosyalarını ve kurum CA dosyalarını ayrıca kontrollü kurtarma planına dahil edin.
 
 Sağlık izleme: `/healthz` süreç canlılığını, `/api/health` yerel DB/şema erişimini gösterir
-(arıza: HTTP 503). Oturum gerektiren `/readyz` ayrıca audit zincirini doğrular; bozuk zincir
+(arıza: HTTP 503). Yönetici oturumu gerektiren `/readyz` ayrıca audit zincirini doğrular; bozuk zincir
 veya erişilemeyen DB başarılı readiness sayılmaz. Bu kontroller harici veri kaynağına sorgu veya e-posta göndermez.
 
 > **Şifreleme anahtarı (`/etc/openreporting/secret.key`) varsayılan olarak yedeğe konmaz** — veritabanı yedeği çalınsa bile

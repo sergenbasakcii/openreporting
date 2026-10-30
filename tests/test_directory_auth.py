@@ -93,7 +93,7 @@ def test_directory_provision_sync_and_no_password_fallback(settings, monkeypatch
     # Stable identity under another username is not silently duplicated/reassigned.
     with pytest.raises(HTTPException):
         security.login(settings, "renamed-reader", "directory-password")
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         response = http.post('/api/login', json={"username": "reader", "password": "directory-password"})
         assert response.status_code == 200
         headers = {"X-CSRF-Token": response.json()["csrf"]}
@@ -137,7 +137,7 @@ def test_external_password_and_role_admin_guards(settings, monkeypatch):
     security.create_user(settings, "admin1", "local-recovery-password-123", "admin")
     monkeypatch.setattr(ldap, "authenticate", lambda *args: ldap.Identity("subject", "viewer"))
     security.login(settings, "reader", "password")
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         res = http.post('/api/login', json={"username":"admin1", "password":"local-recovery-password-123"})
         headers = {"X-CSRF-Token": res.json()["csrf"]}
         user = next(x for x in http.get('/api/users').json() if x['username'] == 'reader')
@@ -190,9 +190,9 @@ def test_disabled_ldap_invalidates_external_sessions_and_keeps_recovery_admin(se
     app = create_app(settings)
     security.create_user(settings, 'admin1', 'local-recovery-password-123', 'admin')
     monkeypatch.setattr(ldap, 'authenticate', lambda *args:ldap.Identity('subject','admin'))
-    with TestClient(app) as directory_http:
+    with TestClient(app, base_url="http://localhost") as directory_http:
         assert directory_http.post('/api/login',json={'username':'reader','password':'password'}).status_code == 200
-        with TestClient(app) as local_http:
+        with TestClient(app, base_url="http://localhost") as local_http:
             res = local_http.post('/api/login',json={'username':'admin1','password':'local-recovery-password-123'})
             headers = {'X-CSRF-Token':res.json()['csrf']}
             target = next(u for u in local_http.get('/api/users').json() if u['username']=='admin1')
