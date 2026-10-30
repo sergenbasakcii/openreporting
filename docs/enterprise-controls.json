@@ -305,8 +305,8 @@
       "control": "Yönetici/editör/izleyici rol sınırları",
       "status": "V",
       "priority": "P1",
-      "evidence": "tests/test_reporting.py",
-      "note": "API izinleri ve rapor erişimi testli"
+      "evidence": "tests/test_report_authorization.py",
+      "note": "API hesap iptali ve güncel rolün kuyruk/zamanlama/render/SMTP devrinde yeniden kontrolü testli; test_reporting.py API rol sınırlarını korur. Tenant/klasör ACL D10 açık."
     },
     {
       "id": "D05",

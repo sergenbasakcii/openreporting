@@ -42,6 +42,32 @@ class MailSetupError(Exception):
     """Connection failed before any message delivery command was attempted."""
 
 
+def _actor_authorized(db,settings,actor_id,*,admin=False):
+    row=db.execute('''SELECT u.active,u.role,e.provider FROM users u
+        LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.id=?''',(actor_id,)).fetchone()
+    return bool(row and row['active'] and row['role'] in (('admin',) if admin else ('admin','editor'))
+                and (row['provider']!='ldap' or settings.ldap_enabled))
+
+
+def _run_authorized(db,settings,run):
+    if run['schedule_id']:
+        schedule=db.execute('SELECT * FROM dash_report_schedules WHERE id=?',(run['schedule_id'],)).fetchone()
+        if not schedule or not schedule['enabled'] or schedule['report_id']!=run['report_id']:
+            return False
+        dashboard=db.execute('''SELECT d.version FROM dashboards d JOIN dash_reports r ON r.dashboard_uid=d.uid
+            WHERE r.id=?''',(run['report_id'],)).fetchone()
+        return bool(dashboard and schedule['approved_config_sha256']==run['config_sha256']
+                    and schedule['approved_dashboard_version']==dashboard['version']
+                    and _actor_authorized(db,settings,schedule['approved_by'],admin=True))
+    return _actor_authorized(db,settings,run['created_by'],admin=bool(json.loads(run['recipients_json'])))
+
+
+def _block_authorization(db,run_id):
+    db.execute("UPDATE dash_report_runs SET status='blocked',delivery_status='blocked_revalidation',error=?,finished_at=? WHERE id=?",
+               ('Rapor çalıştırma veya zamanlama onay yetkisi artık geçerli değil',utcnow(),run_id))
+    audit(db,'worker','report_run.blocked_authorization','dash_report_run',run_id)
+
+
 def validate_config(body, settings):
     if not isinstance(body, dict):
         raise ReportError("Rapor yapılandırması geçersiz")
@@ -239,6 +265,8 @@ def save_schedule(settings, user, report_id, body, schedule_id=None):
         report = db.execute("SELECT * FROM dash_reports WHERE id=?", (report_id,)).fetchone()
         if not report:
             raise ReportError("Rapor bulunamadı")
+        if not _actor_authorized(db,settings,user['id'],admin=enabled):
+            raise ReportError('Rapor zamanlama yetkisi artık geçerli değil')
         dash = db.execute("SELECT version FROM dashboards WHERE uid=?", (report["dashboard_uid"],)).fetchone()
         approval = (report["config_sha256"], dash["version"] if dash else None, user["id"]) if enabled else (None, None, None)
         if schedule_id:
@@ -317,6 +345,8 @@ def request_run(settings, user, report_id, body):
         recipients = validate_emails(body["recipients"], settings.recipient_domains)
     with connect(settings) as db, transaction(db):
         row = db.execute("SELECT * FROM dash_reports WHERE id=?", (report_id,)).fetchone()
+        if not _actor_authorized(db,settings,user['id'],admin=bool(recipients)):
+            raise ReportError('Rapor çalıştırma yetkisi artık geçerli değil')
         run_id = enqueue(db, row, user["id"], start.isoformat(), end.isoformat(), None, recipients)
     return {"run_id": run_id, "status": "queued"}
 
@@ -366,6 +396,10 @@ def _tick_one(settings, schedule_id, now):
             return
         report = db.execute("SELECT * FROM dash_reports WHERE id=?", (sched["report_id"],)).fetchone()
         if report is None:
+            return
+        if not _actor_authorized(db,settings,sched['approved_by'],admin=True):
+            db.execute('UPDATE dash_report_schedules SET enabled=0,updated_at=? WHERE id=?',(utcnow(),sched['id']))
+            audit(db,'scheduler','report_schedule.disabled_authorization','dash_report_schedule',sched['id'])
             return
         dash = db.execute("SELECT version FROM dashboards WHERE uid=?", (report["dashboard_uid"],)).fetchone()
         if (sched["approved_config_sha256"] != report["config_sha256"]
@@ -434,6 +468,10 @@ def execute(settings, run_id):
     with connect(settings) as db:
         run = db.execute("SELECT * FROM dash_report_runs WHERE id=?", (run_id,)).fetchone()
         report = db.execute("SELECT * FROM dash_reports WHERE id=?", (run["report_id"],)).fetchone() if run else None
+        if run is not None and not _run_authorized(db,settings,run):
+            with transaction(db):
+                _block_authorization(db,run_id)
+            return
     if run is None:
         return
     if report is None or report["config_sha256"] != run["config_sha256"]:
@@ -446,6 +484,10 @@ def execute(settings, run_id):
     try:
         collected, outputs, dashboard = build_outputs(settings, config, config["name"], parse_utc(run["period_start"]),
                                                       parse_utc(run["period_end"]))
+        with connect(settings) as db,transaction(db):
+            if not _run_authorized(db,settings,run):
+                _block_authorization(db,run_id)
+                return
         stamp = parse_utc(run["period_start"]).strftime("%Y%m%d-%H%M")
         safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in config["name"])[:60] or "rapor"
         files = {}
@@ -491,7 +533,7 @@ def execute(settings, run_id):
         current = db.execute("SELECT config_sha256 FROM dash_reports WHERE id=?", (report["id"],)).fetchone()
         schedule = db.execute("SELECT enabled FROM dash_report_schedules WHERE id=?", (run["schedule_id"],)).fetchone() \
             if run["schedule_id"] else None
-        if not current or current["config_sha256"] != run["config_sha256"] or (run["schedule_id"] and (not schedule or not schedule["enabled"])):
+        if not current or current["config_sha256"] != run["config_sha256"] or (run["schedule_id"] and (not schedule or not schedule["enabled"])) or not _run_authorized(db,settings,run):
             db.execute("UPDATE dash_report_runs SET delivery_status='blocked_revalidation' WHERE id=?", (run_id,))
             audit(db, "worker", "report_delivery.blocked", "dash_report_run", run_id)
             return

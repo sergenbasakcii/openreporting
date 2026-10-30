@@ -22,7 +22,7 @@ PY=/opt/openreporting/venv/bin/python
 "$PY" tools/check_runtime_lock.py
 "$PY" tools/check_runtime_lock.py --scope build
 "$PY" tools/check_runtime_lock.py --scope test
-"$PY" -m pytest -q tests/test_deploy_platform.py tests/test_install_key_guard.py tests/test_portable.py tests/test_mfa.py tests/test_security_acceptance.py
+"$PY" -m pytest -q tests/test_deploy_platform.py tests/test_install_key_guard.py tests/test_portable.py tests/test_mfa.py tests/test_security_acceptance.py tests/test_report_authorization.py
 
 id openreporting >/dev/null 2>&1 || useradd --system --user-group --home-dir /var/lib/openreporting --no-create-home --shell /sbin/nologin openreporting
 install -d -o openreporting -g openreporting -m 0750 /var/lib/openreporting

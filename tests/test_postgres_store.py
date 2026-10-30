@@ -298,3 +298,25 @@ def test_postgres_mfa_setup_replay_and_session_cascade(postgres_schema,tmp_path,
         conn.execute('DELETE FROM sessions WHERE user_id=?',(uid,))
         assert conn.execute('SELECT count(*) FROM mfa_sessions').fetchone()[0]==0
         assert application_db.verify_audit(conn)==(True,None)
+
+
+def test_postgres_queued_report_respects_actor_revocation(postgres_schema,tmp_path,monkeypatch):
+    from dataclasses import replace
+    from openreporting import dashboards,datasources,security
+    from openreporting.config import Settings
+    from openreporting.reporting import service
+    settings=replace(Settings.from_env(),data_dir=tmp_path,database_url=postgres_schema.dsn,secret_key_file='',
+                     mail_enabled=False,ldap_enabled=False,mfa_required_roles=(),zabbix_url='',zabbix_token_file='')
+    application_db.init_db(settings);datasources.provision(settings)
+    user={'id':security.create_user(settings,'revoked_owner','isolated-pg-owner-password'),'role':'admin'}
+    dashboards.save(settings,user,{'uid':'revoke-pg','title':'Revocation fixture','panels':[{'id':1,'type':'stat',
+        'targets':[{'refId':'A','scenario':'sine','datasource':{'uid':'testdata'}}]}]})
+    report=service.save_report(settings,user,{'name':'Revocation report','dashboard_uid':'revoke-pg','formats':['csv']})
+    run=service.request_run(settings,user,report['id'],{})['run_id']
+    with application_db.connect(settings) as conn,application_db.transaction(conn):
+        conn.execute('UPDATE users SET active=0 WHERE id=?',(user['id'],))
+    monkeypatch.setattr(service,'build_outputs',lambda *a,**k:pytest.fail('Revoked PostgreSQL owner must not render'))
+    service.execute(settings,run)
+    assert service.list_runs(settings,report['id'])[0]['status']=='blocked'
+    with application_db.connect(settings) as conn:
+        assert application_db.verify_audit(conn)==(True,None)

@@ -76,3 +76,25 @@ Alarm eşikleri ve hata bütçesi kurumla kabul edilmedi. En azından DB/şema s
 worker yaşlanması, disk, 5xx, kesilen yanıtlar ve yedek doğrulama hatası izlenmelidir.
 Olay kapanışı: normal akışın küçük kabulü, veri bütünlüğü, yinelenen posta kontrolü,
 etki/zaman çizelgesi ve takip işi kaydı. Bu yönerge bağımsız olay tatbikatı değildir.
+
+## Rapor çalıştırma yetkisinin geri alınması
+
+Kuyruk ve zamanlama, hesabın eski rolünü kalıcı yetki saymaz. Anlık arşiv çalışması
+için güncel etkin yönetici/editör; anlık e-posta için güncel etkin yönetici gerekir.
+Zamanlamada onay veren hesap hâlâ etkin yönetici olmalıdır. LDAP bağlantısı kapatılmışsa
+LDAP hesabına bağlı bu yetkiler geçersizdir. Dizin içindeki değişiklikler uygulama
+kimlik/rol kaydına yansımadan bilinmez; worker LDAP parolası veya yeni MFA kodu istemez.
+
+Kontrol kuyruğa alımda, zamanlamanın zamanı geldiğinde, render öncesinde, arşiv dosyası
+yazılmadan önce ve SMTP devrinden önce tekrarlanır. Onay hesabı geçersiz zamanlama
+devre dışı kalır (`report_schedule.disabled_authorization`); yetkisiz kuyruk çalışması
+`blocked` / `blocked_revalidation` olur (`report_run.blocked_authorization`). Render
+sırasında yetki kalkarsa üretilen bellek çıktıları arşive yazılmaz. Dosyalar tamamlandıktan
+sonra, SMTP devrinden önce yetki kalkarsa gönderim engellenir; arşiv sonucu korunur.
+Zamanlamanın bağlı rapor özeti ve dashboard sürümü de tekrar karşılaştırılır.
+
+`sending` kaydı SMTP devri için yetkilendirmenin işlem noktasıdır. DB ve posta sunucusu
+tek atomik işlem değildir; bu noktadan sonra başlamış/relay tarafından alınmış teslimat
+geri çağrılamaz. `unknown` gönderim otomatik tekrar edilmez. Engellenmiş çalışmayı
+kuyruk durumunu elle değiştirerek zorlamayın; geçerli hesap ve onayla yeni çalışma isteyin.
+Bu kontrol klasör/tenant ACL desteği veya merkezi SSO kabulü değildir; bu açıklar sürer.
