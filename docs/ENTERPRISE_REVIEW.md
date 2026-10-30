@@ -13,7 +13,7 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Son yayımlanmamış temel: `ad4ffce` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40998244642).
+Son yayımlanmamış temel: `e5a640e` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/41000917869).
 Hashli build/runtime QA ortamında yerelde **248 Python testi başarılı, 13 ortam/Windows yetkisi bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
 Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
@@ -206,7 +206,7 @@ Durum dağılımı: V: 86, R: 16, P: 8, O: 4, E: 6.
 | L04 | Bağımlılıkların tekrarlanabilir kilitlenmesi | P | P1 | [docs/DEPENDENCY_LOCK.md](../docs/DEPENDENCY_LOCK.md) — Runtime/build/test wheel SHA kilitleri; temiz offline kurulum, drift/CVE/SBOM ve aynı ortamda iki wheel SHA eşliği; host bootstrap/OS/runner/audit ortamı ve signed provenance açık |
 | L05 | Bağımlılık zafiyet taraması | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — 30 Ekim 2026: 28 yerel runtime paketi pip-audit ile tarandı; cryptography 50.0.2 sonrası bilinen açık yok; yeni CI bekliyor |
 | L06 | SBOM ve bileşen envanteri | V | P2 | [tools/runtime_requirements.py](../tools/runtime_requirements.py) — CycloneDX runtime SBOM üretildi; özel paket/yol aktarılmaz, test/audit closure dışında |
-| L07 | İmzalı sürüm/provenance | O | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Taslak PR var; imzalı release/supply-chain attest yok |
+| L07 | İmzalı sürüm/provenance | O | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — CI action SHA sabitleme/checkout token koruması ve aynı ortam wheel tekrar kanıtı var; imzalı uygulama release/provenance attestasyonu yok |
 | L08 | Güvenlik bildirim ve güncelleme politikası | P | P1 | [SECURITY.md](../SECURITY.md) — Bildirim/güncelleme ve olay ilk adımları yazıldı; kalıcı özel iletişim kanalı ve SLA sahibi kurum/maintainer tarafından tanımlanmalı |
 | L09 | Uygulama lisansı ve hak sahipliği | E | P1 | [README.md](../README.md) — Karar kullanıcıda; lisans seçilmedi ve repo private |
 | L10 | Gerçek kurum kabulü ve bağımsız güvenlik incelemesi | E | P1 | [docs/ENTERPRISE_DEPLOYMENT.md](../docs/ENTERPRISE_DEPLOYMENT.md) — İzole testler Google onayı veya bağımsız sertifika değildir |

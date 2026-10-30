@@ -1053,7 +1053,7 @@
       "status": "O",
       "priority": "P1",
       "evidence": ".github/workflows/ci.yml",
-      "note": "Taslak PR var; imzalı release/supply-chain attest yok"
+      "note": "CI action SHA sabitleme/checkout token koruması ve aynı ortam wheel tekrar kanıtı var; imzalı uygulama release/provenance attestasyonu yok"
     },
     {
       "id": "L08",

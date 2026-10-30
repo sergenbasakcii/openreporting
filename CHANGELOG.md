@@ -3,6 +3,8 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- CI uzak action'ları resmî upstream tag→commit kaydıyla SHA'ya sabitlendi; checkout Git
+  credential persistence kapatıldı ve sabitleme kontrolü eklendi. Release imzası değildir.
 - Build backend ve test araçları da ayrı wheel SHA kilitlerine alındı; hazırlanan backend ile
   ağsız uygulama wheel'i iki kez üretilip aynı dosya hash'i doğrulanır. CI build/test CVE
   taramaları ve SBOM'ları ekler; OS/runner ve imzalı provenance kapsamı ayrıca açıktır.

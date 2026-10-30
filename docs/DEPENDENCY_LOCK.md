@@ -36,6 +36,19 @@ bu kanıtı JSON artefakt olarak saklar. Bu yalnız **aynı ortamdaki** tekrar �
 Windows/Linux eşdeğerliği, bütün hostun hermetikliği veya imzalı provenance değildir.
 Git metadata'sı olmayan kaynak paketinde epoch açıkça verilmelidir.
 
+## CI kaynak referansları
+
+Workflow'un 13 uzak action referansı dört resmî upstream repository'nin etiketleri REST
+API ile commit'e çözülerek 40 karakter SHA'ya sabitlendi. Kayıt:
+[ci-action-refs-2026-10-30.json](evidence/ci-action-refs-2026-10-30.json).
+Checkout sonrası Git tokeninin yerel Git ayarlarında kalması `persist-credentials: false`
+ile kapatıldı. `tools/check_workflow_pins.py` uzak hareketli referansı veya bu ayarın
+kaybolmasını CI'da reddeder. Action güncellemesinde SHA/değişiklik incelemesi gerekir.
+
+Bu bir referans sabitleme ve yanlışlıkla gevşemeyi yakalama kontrolüdür; repository/CI
+platformunun bütünüyle güvenli olduğunu veya uygulama release'inin imzalandığını kanıtlamaz.
+Runner/OS, ilk bootstrap, audit araç ortamı ve kaynak incelemesi güven sınırları devam eder.
+
 ## Güncelleme süreci
 
 1. Ayrı Windows QA ortamında aday runtime sürümlerini kurun; ana uygulama/kurum verisine dokunmayın.
