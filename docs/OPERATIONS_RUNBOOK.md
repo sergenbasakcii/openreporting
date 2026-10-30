@@ -34,7 +34,7 @@ Kurumun olay sorumlusu, nöbetçi, alarm hedefi, RPO/RTO ve duyuru kanalı henü
 | Kaynak sorgusu yavaş / 422 / 429 | Kaynak erişimi, filtre/nokta bütçesi, sorgu süresi, nginx limitleri, kaynak hesabının salt okunurluğu | Sınırları topluca kapatmak yerine pahalı paneli daraltın. Viewer izolasyonu ve kaynağın READ ONLY/GET sözleşmesi korunur. |
 | HTTP 400/403 sonrası giriş yapılamıyor | `PUBLIC_URL`, açık Host alias'ları, proxy scheme/port, Secure cookie, Origin | Gerçek HTTPS origin/alias ayarını düzeltin. Wildcard Host/CORS açmayın, üretim çerez politikasını gevşetmeyin. |
 | Beklenmeyen 500 / kesilen yanıt | `X-Request-ID` ile JSON HTTP olayı, durum ve route şablonu, incomplete sayacı | Gövde/başlık/sırları loglamadan etkiyi belirleyin. Gerekirse izole sentetik kopyada yeniden üretin. HTTP 500 genel mesajı exception ayrıntısını istemciye taşımaz. |
-| Anahtar kayıp / şifreli kaynak açılamıyor | Ayrı anahtar emaneti ve eşleşen yedek; dosya izinleri | Yeni anahtarla mevcut sırların üstüne yazmayın. Eşleşen anahtarı yetkili emanetten kurtarın. Çok anahtarlı rotasyon henüz desteklenmiyor. |
+| Anahtar kayıp / şifreli kaynak açılamıyor | Ayrı anahtar emaneti ve eşleşen yedek; dosya izinleri | Yeni anahtarla mevcut sırların üstüne yazmayın. Eşleşen anahtarı yetkili emanetten kurtarın. Kontrollü değişim için [offline rotasyon yönergesi](KEY_ROTATION.md) kullanılır. |
 | Yükseltme başarısız | Yükseltme öncesi yedek, `app.prev`, şema sürümü, kurulu bağımlılıklar | Kod geri dönüşü DB downgrade değildir. DB/anahtar/arşiv/logo ve eşleşen kod birlikte bakım planıyla kurtarılır; eski kod yeni şemayı reddeder. |
 
 ## Kurtarma kabulü

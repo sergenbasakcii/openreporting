@@ -4,15 +4,19 @@ The key lives in its own 0600 file outside SQLite (``OPENREPORTING_SECRET_KEY_FI
 or ``<data_dir>/secret.key``). Secrets are write-only through the API: the
 browser only ever learns *whether* a secret is configured.
 """
+import base64
+import hashlib
 import json
 import os
 import threading
 from pathlib import Path
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 _lock = threading.Lock()
-_cache: dict[str, Fernet] = {}
+_cache: dict[str, Fernet | MultiFernet] = {}
+KEYRING_FORMAT = 'openreporting-fernet-keyring-v1'
+MAX_KEYS = 8
 
 
 class SecretError(RuntimeError):
@@ -24,7 +28,44 @@ def key_path(settings) -> Path:
     return Path(explicit) if explicit else settings.data_dir / "secret.key"
 
 
-def _fernet(settings) -> Fernet:
+def key_id(key: bytes) -> str:
+    return hashlib.sha256(key).hexdigest()[:16]
+
+
+def read_keys(path: Path) -> list[bytes]:
+    """Legacy raw key or a bounded versioned ring, primary first. Never generate."""
+    try:
+        with path.open('rb') as handle:
+            raw = handle.read(16385)
+        if len(raw) > 16384:
+            raise ValueError('oversize')
+        raw = raw.strip()
+        if not raw.startswith(b'{'):
+            Fernet(raw)
+            return [base64.urlsafe_b64encode(base64.urlsafe_b64decode(raw))]
+        def unique_object(pairs):
+            result = dict(pairs)
+            if len(result)!=len(pairs):
+                raise ValueError('duplicate fields')
+            return result
+        ring = json.loads(raw,object_pairs_hook=unique_object)
+        if set(ring)!={'format','keys'} or ring['format']!=KEYRING_FORMAT or not isinstance(ring['keys'],list) or not 1<=len(ring['keys'])<=MAX_KEYS:
+            raise ValueError('invalid format')
+        keys = []
+        for row in ring['keys']:
+            if not isinstance(row,dict) or set(row)!={'id','key'} or not isinstance(row['key'],str):
+                raise ValueError('invalid key record')
+            key = row['key'].encode('ascii')
+            Fernet(key)
+            if len(key)!=44 or base64.urlsafe_b64encode(base64.urlsafe_b64decode(key))!=key or row['id']!=key_id(key) or key in keys:
+                raise ValueError('invalid identity')
+            keys.append(key)
+        return keys
+    except (OSError,ValueError,TypeError,KeyError,UnicodeError,RecursionError):
+        raise SecretError('Secret key file unreadable or invalid') from None
+
+
+def _fernet(settings) -> Fernet | MultiFernet:
     path = key_path(settings)
     cache_key = str(path)
     with _lock:
@@ -45,11 +86,8 @@ def _fernet(settings) -> Fernet:
             else:
                 with os.fdopen(fd, "wb") as handle:
                     handle.write(key)
-        try:
-            key = path.read_bytes().strip()
-            fernet = Fernet(key)
-        except (OSError, ValueError) as exc:
-            raise SecretError(f"Secret key file unreadable or invalid: {path}") from exc
+        keys = read_keys(path)
+        fernet = MultiFernet([Fernet(key) for key in keys]) if len(keys)>1 else Fernet(keys[0])
         _cache[cache_key] = fernet
         return fernet
 

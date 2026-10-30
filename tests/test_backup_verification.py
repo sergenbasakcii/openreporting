@@ -156,3 +156,27 @@ def test_unpacked_budget_and_duplicate_manifest_entries_are_rejected(bundle):
     manifest = backup / 'SHA256SUMS';text=manifest.read_text();manifest.write_text(text+text.splitlines()[0]+'\n')
     with pytest.raises(BackupVerificationError,match='Invalid backup checksum'):
         verify_backup(backup)
+
+
+def test_multikey_rotation_and_primary_only_backup_recovery(bundle,tmp_path):
+    from openreporting.key_rotation import prepare_rotation,prepare_retirement,rekey_secrets
+    settings,backup = bundle
+    ring = tmp_path / 'rotation-ring.json'
+    prepare_rotation(settings,ring)
+    rotating = replace(settings,secret_key_file=str(ring))
+    assert verify_backup(backup,key_file=ring)['encrypted_sources']==1
+    assert rekey_secrets(rotating,services_stopped=True)['sources_rekeyed']==1
+    retired = tmp_path / 'primary-only.json'
+    prepare_retirement(rotating,retired,services_stopped=True)
+    with pytest.raises(BackupVerificationError):
+        verify_backup(backup,key_file=retired)
+    # The old backup remains recoverable with its old key or the retained ring.
+    assert verify_backup(backup,key_file=settings.data_dir / 'secret.key')['ok']
+    restored = tmp_path / 'new-backup';restored.mkdir()
+    for name in ('archive.tar.gz','openreporting.env'):
+        shutil.copyfile(backup / name,restored / name)
+    db.backup_database(rotating,restored / 'state.sqlite3')
+    checksum(restored)
+    assert verify_backup(restored,key_file=retired)['encrypted_sources']==1
+    with pytest.raises(BackupVerificationError):
+        verify_backup(restored,key_file=settings.data_dir / 'secret.key')

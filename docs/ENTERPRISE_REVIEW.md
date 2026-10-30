@@ -13,8 +13,8 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Son yayımlanmamış temel: `2510505` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40991930615).
-Yeni HTTP gözlemlenebilirliğiyle yerelde **222 Python testi başarılı, 12 ortam bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
+Son yayımlanmamış temel: `1a97cad` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40995372593).
+Yeni anahtar rotasyonuyla yerelde **238 Python testi başarılı, 13 ortam/Windows yetkisi bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
 Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
 bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son commitlerin CI sonucu PROGRESS.md'de izlenir.
@@ -24,12 +24,12 @@ Gövde sınırı, Host/Origin izolasyonu, logo yedeği, izole kurtarma doğrulay
 16 sentetik viewer ile 120 saniyede 7.404 HTTP isteği, sıfır hata; sorgu p95 445,654 ms ölçüldü.
 Bu kısa ve tek süreçli test gerçek kaynak/worker kapasitesini veya uzun soak kabulünü kanıtlamaz.
 Öncelikli kalanlar: gerçek kaynaklı yük/uzun çalışma ve kurum kabulü. MFA/SSO, tenant ACL,
-deneysel PostgreSQL işletimi ve anahtar döndürme kurumsal kabul kararında ayrıca değerlendirilmelidir.
+deneysel PostgreSQL işletimi ve gerçek kurum anahtar bakım/emanet kabulü ayrıca değerlendirilmelidir.
 Kullanıcı adına lisans/üretim kabul kararı verilmez.
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 76, R: 25, P: 8, O: 5, E: 6.
+Durum dağılımı: V: 77, R: 25, P: 8, O: 4, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -133,7 +133,7 @@ Durum dağılımı: V: 76, R: 25, P: 8, O: 5, E: 6.
 | G06 | Daha yeni schema ile eski kodu reddetme | V | P1 | [tests/test_platform_core.py](../tests/test_platform_core.py) — Sessiz downgrade yok |
 | G07 | v3te yerel kullanıcı ve kimlik koruması | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — v2den geçiş ve tekrar init testli |
 | G08 | PostgreSQL audit append-only ve kilit | V | P1 | [tests/test_postgres_store.py](../tests/test_postgres_store.py) — Gerçek PGde FK ve audit tetikleyicileri |
-| G09 | Anahtar rotasyonu ve anahtar versiyonlama | O | P1 | [openreporting/secrets_store.py](../openreporting/secrets_store.py) — Kontrollü çok anahtarlı rotasyon aracı yok |
+| G09 | Anahtar rotasyonu ve anahtar versiyonlama | V | P1 | [tests/test_key_rotation.py](../tests/test_key_rotation.py) — Raw uyumlu bounded ring, ayrı hazırlık, SQLite offline atomik rekey/audit/rollback ve doğrulanan retirement; yedek eski/yeni anahtar kabulü testli; kurum bakım/emanet kabulü ayrıca gerekli |
 | G10 | Disk/DB/yedek şifreleme kurum politikası | E | P1 | [docs/ENTERPRISE_DEPLOYMENT.md](../docs/ENTERPRISE_DEPLOYMENT.md) — Fernet yalnız kaynak sırlarını kapsar; tam disk kuruma bağlı |
 
 ## H — Rapor ve teslimat doğruluğu

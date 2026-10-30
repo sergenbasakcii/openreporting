@@ -241,6 +241,32 @@ jobs:
       - name: Restore acceptance in disposable storage
         run: |
           sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1); /opt/openreporting/venv/bin/openreporting verify-backup "$latest" --key-file /etc/openreporting/secret.key --require-logos'
+      - name: Offline key rotation and primary-only backup acceptance
+        run: |
+          sudo systemctl stop openreporting-worker openreporting-web
+          sudo /opt/openreporting/app/deploy/openreporting-admin.sh prepare-key-rotation --output /var/lib/openreporting/staged-ring.json
+          sudo install -o root -g openreporting -m 0640 /var/lib/openreporting/staged-ring.json /etc/openreporting/keyring-ci.json
+          sudo sed -i 's#^OPENREPORTING_SECRET_KEY_FILE=.*#OPENREPORTING_SECRET_KEY_FILE=/etc/openreporting/keyring-ci.json#' /etc/openreporting/openreporting.env
+          sudo /opt/openreporting/app/deploy/openreporting-admin.sh rekey-secrets --services-stopped
+          sudo /opt/openreporting/app/deploy/openreporting-admin.sh prepare-key-retirement --services-stopped --output /var/lib/openreporting/staged-primary.json
+          sudo install -o root -g openreporting -m 0640 /var/lib/openreporting/staged-primary.json /etc/openreporting/keyring-primary-ci.json
+          sudo sed -i 's#^OPENREPORTING_SECRET_KEY_FILE=.*#OPENREPORTING_SECRET_KEY_FILE=/etc/openreporting/keyring-primary-ci.json#' /etc/openreporting/openreporting.env
+          sudo systemctl start openreporting-web openreporting-worker
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8810/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8810/api/health
+          sudo systemd-run --quiet --wait --pipe --collect -p User=openreporting -p Group=openreporting \
+            -p EnvironmentFile=/etc/openreporting/openreporting.env /opt/openreporting/venv/bin/python - <<'EOF'
+          from openreporting.config import Settings
+          from openreporting import datasources
+          settings = Settings.from_env()
+          source = datasources.get(settings, 'testdata')
+          print('Source successfully opened with primary-only keyring')
+          EOF
+          sudo systemctl start openreporting-backup.service
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1); /opt/openreporting/venv/bin/openreporting verify-backup "$latest" --key-file /etc/openreporting/keyring-primary-ci.json --require-logos'
+          sudo env OPENREPORTING_DATA_DIR=/var/lib/openreporting OPENREPORTING_BACKUP_INCLUDE_KEY=true \
+            OPENREPORTING_BACKUP_DIR=/var/backups/openreporting-included /opt/openreporting/app/deploy/backup.sh
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting-included/*/ | tail -1); cmp -s "$latest/secret.key" /etc/openreporting/keyring-primary-ci.json && /opt/openreporting/venv/bin/openreporting verify-backup "$latest" --require-logos'
       - name: Upgrade from a fresh copy
         run: |
           cp -a "$GITHUB_WORKSPACE" /tmp/openreporting-next

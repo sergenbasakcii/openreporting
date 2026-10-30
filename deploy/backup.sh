@@ -3,7 +3,7 @@
 # service user and streamed to root over a pipe (root never opens paths the service
 # user can write, so a planted symlink cannot redirect root's file operations).
 #
-# The Fernet key (/etc/openreporting/secret.key) is NOT copied by default: keep it in separate
+# The configured Fernet key/keyring is NOT copied by default: keep it in separate
 # custody (password manager / offline media). Opt in with OPENREPORTING_BACKUP_INCLUDE_KEY=true.
 # Set OPENREPORTING_BACKUP_GPG_RECIPIENT to encrypt every backup file with that public key.
 #
@@ -56,8 +56,20 @@ fi
 
 # 3) Configuration (root-owned files only).
 cp -p "$OPENREPORTING_ENV" "$DEST/openreporting.env"
-if [ "$INCLUDE_KEY" = "true" ] && [ -f "$OPENREPORTING_ETC/secret.key" ]; then
-  cp -p "$OPENREPORTING_ETC/secret.key" "$DEST/secret.key"
+if [ "$INCLUDE_KEY" = "true" ]; then
+  # Resolve the active raw key/keyring from service settings. Reading as the service
+  # identity prevents a writable configured path/symlink from escalating root reads.
+  as_openreporting "$OPENREPORTING_VENV/bin/python" -c '
+from openreporting.config import Settings
+from openreporting.secrets_store import key_path, read_keys
+import sys
+path = key_path(Settings.from_env())
+read_keys(path)
+with path.open("rb") as handle:
+    content = handle.read(16385)
+if len(content) > 16384:
+    raise SystemExit("Invalid active key size")
+sys.stdout.buffer.write(content)' > "$DEST/secret.key"
 fi
 
 # 4) Optional encryption at rest.
@@ -74,4 +86,4 @@ chmod -R go-rwx "$DEST"
 
 find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -name '20*' -mtime +"$KEEP_DAYS" -exec rm -rf {} +
 ok "Yedek: $DEST ($(du -sh "$DEST" | cut -f1))"
-[ "$INCLUDE_KEY" = "true" ] || warn "secret.key yedeğe dahil edilmedi; anahtarı ayrı ve güvenli bir yerde saklayın: $OPENREPORTING_ETC/secret.key"
+[ "$INCLUDE_KEY" = "true" ] || warn "Etkin anahtar/keyring yedeğe dahil edilmedi; ayrı ve güvenli emanette saklayın."

@@ -170,6 +170,13 @@ def main(argv=None):
     p_verify.add_argument("--key-file", help="Separately held encryption key (never printed or copied into the backup)")
     p_verify.add_argument("--max-unpacked-mb", type=int, default=2048)
     p_verify.add_argument("--require-logos", action="store_true")
+    p_rotate = commands.add_parser('prepare-key-rotation',help='Create a new versioned key ring; active key and database stay unchanged')
+    p_rotate.add_argument('--output',required=True)
+    p_rekey = commands.add_parser('rekey-secrets',help='Offline SQLite maintenance: re-encrypt datasource credentials to the prepared primary key')
+    p_rekey.add_argument('--services-stopped',action='store_true',help='Acknowledge every web process and worker is stopped for maintenance')
+    p_retire = commands.add_parser('prepare-key-retirement',help='Create a primary-only ring after verifying every stored credential uses it')
+    p_retire.add_argument('--output',required=True)
+    p_retire.add_argument('--services-stopped',action='store_true')
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -185,6 +192,18 @@ def main(argv=None):
         print(json.dumps(result))
         return  # Never initialize, migrate, replace or connect to the live application state.
     settings = Settings.from_env()
+    if args.action in {'prepare-key-rotation','rekey-secrets','prepare-key-retirement'}:
+        import json
+        from .key_rotation import prepare_rotation,prepare_retirement,rekey_secrets
+        from .secrets_store import SecretError
+        try:
+            result = (prepare_rotation(settings,args.output) if args.action=='prepare-key-rotation' else
+                      prepare_retirement(settings,args.output,services_stopped=args.services_stopped) if args.action=='prepare-key-retirement' else
+                      rekey_secrets(settings,services_stopped=args.services_stopped))
+        except SecretError as exc:
+            raise SystemExit(str(exc)) from None
+        print(json.dumps(result))
+        return  # Never initialize/migrate a store or change active key configuration.
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     init_db(settings)
     if args.action == "init":

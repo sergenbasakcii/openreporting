@@ -618,10 +618,10 @@
       "id": "G09",
       "area": "Depolama kripto ve geçişler",
       "control": "Anahtar rotasyonu ve anahtar versiyonlama",
-      "status": "O",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/secrets_store.py",
-      "note": "Kontrollü çok anahtarlı rotasyon aracı yok"
+      "evidence": "tests/test_key_rotation.py",
+      "note": "Raw uyumlu bounded ring, ayrı hazırlık, SQLite offline atomik rekey/audit/rollback ve doğrulanan retirement; yedek eski/yeni anahtar kabulü testli; kurum bakım/emanet kabulü ayrıca gerekli"
     },
     {
       "id": "G10",

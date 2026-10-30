@@ -3,6 +3,9 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- Eski raw anahtarla uyumlu sürümlü keyring ve SQLite için ayrı hazırlık, atomik offline
+  kaynak sırrı rekey ve doğrulanan primary-only retirement komutları eklendi. Aktif anahtar
+  otomatik değiştirilmez; hata tam rollback olur, kullanıcı parolaları/oturumları korunur.
 - Test edilmiş runtime sürümleri wheel SHA-256 kilidine alındı; Ubuntu/Windows/Docker
   kurulum yolları hash kontrolü ve kaynak paket fallback reddi kullanır. Build/OS araçları
   bu runtime kilidinin dışındadır; hermetik/imzalı release iddiası yoktur.
