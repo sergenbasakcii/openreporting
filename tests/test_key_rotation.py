@@ -75,7 +75,7 @@ def test_offline_rekey_retirement_and_account_session_preservation(state,tmp_pat
         users = [tuple(r) for r in connection.execute('SELECT * FROM users')]
         sessions = [tuple(r) for r in connection.execute('SELECT * FROM sessions')]
     result = rotation.rekey_secrets(next_settings,services_stopped=True)
-    assert result=={'primary_id':key_id(keys[0]),'sources_rekeyed':2}
+    assert result=={'primary_id':key_id(keys[0]),'sources_rekeyed':2,'mfa_secrets_rekeyed':0}
     updated = stored(settings)
     for old,new in zip(tokens,updated):
         assert primary.extract_timestamp(new.encode())==previous.extract_timestamp(old.encode())

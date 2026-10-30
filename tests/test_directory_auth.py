@@ -160,7 +160,7 @@ def test_v2_to_v3_preserves_local_users(settings, monkeypatch):
     db.init_db(settings)
     db.init_db(settings)
     with db.connect(settings) as conn:
-        assert db.schema_version(conn) == 3
+        assert db.schema_version(conn) == db.CURRENT_VERSION
         assert conn.execute("SELECT id FROM users WHERE username='admin1'").fetchone()[0] == uid
         assert conn.execute("SELECT COUNT(*) FROM external_identities").fetchone()[0] == 0
 

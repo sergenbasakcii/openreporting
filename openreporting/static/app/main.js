@@ -3,6 +3,7 @@ import { h, button, input, field, menu, toast, clear } from './dom.js';
 import { icon } from './icons.js';
 import { get, post, setCsrf, onUnauthorized, refreshCsrf } from './api.js';
 import { route, startRouter, navigate, setCrumbHost, render, teardown } from './router.js';
+import { enrollmentPage } from './mfa.js';
 
 const app = { user: null, prefs: null, settings: null, pendingDashboard: null };
 const NAV_KEY = 'openreporting.nav.collapsed';
@@ -23,23 +24,30 @@ function loginPage(root) {
   const user = input({ autocomplete: 'username', placeholder: 'kullanıcı adı', label: 'Kullanıcı adı' });
   const pass = input({ type: 'password', autocomplete: 'current-password', placeholder: 'parola', label: 'Parola' });
   const error = h('div', { class: 'alert error', hidden: true, role: 'alert' });
+  const code = input({ autocomplete: 'one-time-code', maxlength: 128 });
+  const codeField = field('Doğrulayıcı veya kurtarma kodu', code, '6 haneli güncel kodu veya tek kullanımlık kurtarma kodunu girin.');
+  codeField.hidden = true;
   const submit = button('Giriş yap', { variant: 'primary', type: 'submit' });
   const form = h('form', { class: 'login-card', onsubmit: async (e) => {
     e.preventDefault();
     error.hidden = true;
     submit.disabled = true;
     try {
-      const res = await post('/api/login', { username: user.value.trim(), password: pass.value });
+      const res = await post('/api/login', { username: user.value.trim(), password: pass.value, otp: codeField.hidden ? null : code.value.trim() });
       setCsrf(res.csrf);
+      pass.value = ''; code.value = '';
       await boot();
     } catch (err) {
-      error.textContent = err.status === 401 ? 'Kullanıcı adı veya parola hatalı.' : err.message;
+      const needsCode = err.detail?.detail?.code === 'mfa_required';
+      if (needsCode) codeField.hidden = false;
+      error.textContent = needsCode ? 'Devam etmek için doğrulayıcı veya kurtarma kodunuzu girin.' : err.status === 401 ? 'Giriş bilgileri veya doğrulama kodu hatalı.' : err.message;
       error.hidden = false;
       submit.disabled = false;
-      pass.select();
+      if (!codeField.hidden) code.focus(); else pass.select();
     }
   } }, h('div', { class: 'brand-logo', text: 'O' }), h('h1', { text: 'OpenReporting' }), h('p', { text: 'Gözlem, dashboard ve raporlama platformu' }),
-  error, field('Kullanıcı adı', user), field('Parola', pass), submit);
+  error, field('Kullanıcı adı', user), field('Parola', pass), codeField, submit);
+  user.addEventListener('input', () => { codeField.hidden = true; code.value = ''; });
   root.replaceChildren(h('main', { class: 'login-page' }, form));
   setTimeout(() => user.focus(), 20);
 }
@@ -142,6 +150,12 @@ async function boot() {
     const session = await get('/api/session');
     app.user = session.user;
     loggedOut = false;
+    if (session.mfa_enrollment_required) {
+      teardown();
+      await refreshCsrf();
+      enrollmentPage(root);
+      return;
+    }
   } catch (err) {
     if (err.status === 401) { loginPage(root); return; }
     root.replaceChildren(h('div', { class: 'page' }, h('div', { class: 'alert error', text: `Sunucuya ulaşılamadı: ${err.message}` })));
@@ -160,6 +174,7 @@ async function boot() {
 
 // Many panels can receive 401 at once: stop the current page (timers, refreshes) and show the login form once.
 let loggedOut = false;
+window.addEventListener('openreporting:factorchanged', () => { loggedOut = true; teardown(); });
 onUnauthorized(() => {
   if (loggedOut) return;
   loggedOut = true;

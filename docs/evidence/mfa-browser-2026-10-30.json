@@ -1,0 +1,112 @@
+{
+  "ok": true,
+  "scans": 20,
+  "results": [
+    {
+      "stage": "optional-profile",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "optional-profile",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "setup-password",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "setup-password",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "setup-confirm",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "setup-confirm",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "recovery-once",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "recovery-once",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "enabled-profile",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "enabled-profile",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "disabled",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "disabled",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "required-gate",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "required-gate",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "setup-password",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "setup-password",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "setup-confirm",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "setup-confirm",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "recovery-once",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "recovery-once",
+      "theme": "light",
+      "violations": []
+    }
+  ],
+  "pageErrors": [],
+  "environment": "Windows local disposable loopback fixture",
+  "playwright": "1.62.1",
+  "axe": "4.14.0",
+  "date": "2026-10-30",
+  "scope": "Optional/required enrollment, recovery rotation, disable, old-server404 fallback; no live accounts or secrets recorded"
+}

@@ -144,7 +144,7 @@ table.list td.actions { text-align: right; white-space: nowrap; }
 .modal { background: var(--bg-elevated); border: 1px solid var(--border); box-shadow: var(--shadow); border-radius: var(--radius-lg); width: min(640px, 100%); display: flex; flex-direction: column; max-height: 88vh; }
 .modal.lg { width: min(1000px, 100%); } .modal.xl { width: min(1300px, 100%); }
 .modal-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
-.modal-head h3 { margin: 0; flex: 1; } .modal-body { padding: 18px; overflow-y: auto; } .modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.modal-head h2 { margin: 0; flex: 1; font-size: 16px; } .modal-body { padding: 18px; overflow-y: auto; } .modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 96vw); background: var(--bg-elevated); border-left: 1px solid var(--border); box-shadow: var(--shadow); z-index: 90; display: flex; flex-direction: column; }
 .menu { position: fixed; z-index: 200; min-width: 180px; background: var(--bg-elevated); border: 1px solid var(--border-strong); box-shadow: var(--shadow); border-radius: var(--radius); padding: 4px 0; max-height: 70vh; overflow-y: auto; }
 .menu button, .menu a { display: flex; width: 100%; gap: 10px; align-items: center; text-align: left; background: none; border: 0; padding: 7px 14px; cursor: pointer; color: var(--text); font-size: 13.5px; text-decoration: none; }
@@ -344,3 +344,5 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .section-heading { font-size: 16px; }
 .card .section-heading { margin-bottom: 10px; }
 .subsection-heading { font-size: 14px; }
+/* Security setup uses existing theme surfaces; one-time codes remain selectable. */
+.mfa-codes { overflow-x: auto; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 13px; line-height: 1.7; }

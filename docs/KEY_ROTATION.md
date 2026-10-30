@@ -1,6 +1,8 @@
 # Veri kaynağı anahtarının kontrollü değişimi
 
-Kapsam: desteklenen tek host SQLite üretim tabanında **veri kaynağı `secure_json`** alanları.
+Kapsam: desteklenen tek host SQLite üretim tabanında **veri kaynağı `secure_json` ve
+kullanıcıya bağlı MFA `secret_json` seedleri**. İkisi aynı transaction içinde yenilenir;
+sonuç ayrı `sources_rekeyed` / `mfa_secrets_rekeyed` sayıları döndürür.
 Kullanıcı parolaları/oturumları, LDAP/SMTP ayrı parola dosyaları, disk şifreleme veya KMS/HSM
 rotasyonu değildir. Deneysel PostgreSQL için bu bakım komutları yazma yapmadan reddedilir.
 Mevcut tek satırlık Fernet anahtarı yeni kodda çalışmaya devam eder; otomatik geçiş yoktur.

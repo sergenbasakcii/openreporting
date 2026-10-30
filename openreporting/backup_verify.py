@@ -125,6 +125,14 @@ def _verify_copy(target,key,require_logos):
                 raise BackupVerificationError('Encryption key is required to verify stored credentials')
             decrypt(settings,row[0])
             secrets += 1
+        factors = 0
+        from .key_rotation import _valid_payload
+        for row in db.execute("SELECT user_id,secret_json FROM user_mfa WHERE secret_json<>''"):
+            if key is None:
+                raise BackupVerificationError('Encryption key is required to verify stored factors')
+            payload = decrypt(settings,row['secret_json'])
+            _valid_payload(json.dumps(payload),'user_mfa',row['user_id'])
+            factors += 1
     logo_files = list((target / 'logos').glob('*.png'))
     for image_file in logo_files:
         if not re.fullmatch(r'[a-f0-9]{64}',image_file.stem) or _hash(image_file) != image_file.stem:
@@ -136,7 +144,7 @@ def _verify_copy(target,key,require_logos):
     logo_count = len(logo_files)
     if require_logos and not logo_count:
         raise BackupVerificationError('Expected report logos are missing from backup')
-    return {'ok':True,'schema_version':CURRENT_VERSION,'reports':reports,'artifacts':artifacts,'logos':logo_count,'encrypted_sources':secrets}
+    return {'ok':True,'schema_version':CURRENT_VERSION,'reports':reports,'artifacts':artifacts,'logos':logo_count,'encrypted_sources':secrets,'encrypted_factors':factors}
 
 
 def verify_backup(directory,*,key_file=None,max_unpacked_bytes=2 * 1024**3,require_logos=False):

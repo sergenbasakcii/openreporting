@@ -177,10 +177,10 @@
       "id": "B10",
       "area": "Yerel kimlik ve hesaplar",
       "control": "Çok faktörlü kimlik doğrulama",
-      "status": "O",
+      "status": "P",
       "priority": "P1",
-      "evidence": "docs/ENTERPRISE_DEPLOYMENT.md",
-      "note": "MFA/SSO desteği yok; yüksek güvence kurum kabul engeli"
+      "evidence": "tests/test_mfa.py",
+      "note": "Yerel/LDAP TOTP, rol-zorunlu kurulum izolasyonu, tek kullanımlık kurtarma, replay/race/oturum iptali ve key/backup roundtrip testli; SSO/WebAuthn/kimlik avına dayanıklı kurum politikası açık. docs/MFA.md sınırları açıklar."
     },
     {
       "id": "C01",

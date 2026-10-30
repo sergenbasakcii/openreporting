@@ -270,3 +270,31 @@ def test_postgres_directory_identity_and_role_sync(postgres_schema, tmp_path, mo
         assert db.execute("SELECT COUNT(*) FROM external_identities").fetchone()[0] == 1
         assert db.execute("SELECT 1 FROM sessions WHERE token_hash=?", (security.digest(token),)).fetchone() is None
         assert application_db.verify_audit(db) == (True, None)
+
+
+def test_postgres_mfa_setup_replay_and_session_cascade(postgres_schema,tmp_path,monkeypatch):
+    from dataclasses import replace
+    import pyotp
+    from openreporting import mfa,security
+    from openreporting.config import Settings
+    settings=replace(Settings.from_env(),data_dir=tmp_path,database_url=postgres_schema.dsn,
+                     secret_key_file='',ldap_enabled=False,mfa_required_roles=('admin',))
+    application_db.init_db(settings)
+    uid=security.create_user(settings,'factorpg','isolated-factor-pg-password')
+    user={'id':uid,'username':'factorpg','role':'admin'}
+    now=1800000000
+    monkeypatch.setattr(mfa,'now_seconds',lambda:now)
+    security.login(settings,'factorpg','isolated-factor-pg-password')
+    started=mfa.start_setup(settings,user,'isolated-factor-pg-password')
+    confirmed=mfa.confirm_setup(settings,user,'isolated-factor-pg-password',pyotp.TOTP(started['secret']).at(now),started['setup_token'])
+    with application_db.connect(settings) as conn:
+        assert conn.execute('SELECT count(*) FROM sessions').fetchone()[0]==0
+    security.login(settings,'factorpg','isolated-factor-pg-password',confirmed['recovery_codes'][0])
+    with pytest.raises(Exception) as failed:
+        security.login(settings,'factorpg','isolated-factor-pg-password',confirmed['recovery_codes'][0])
+    assert getattr(failed.value,'status_code',None)==401
+    with application_db.connect(settings) as conn,application_db.transaction(conn):
+        assert conn.execute('SELECT count(*) FROM mfa_sessions').fetchone()[0]==1
+        conn.execute('DELETE FROM sessions WHERE user_id=?',(uid,))
+        assert conn.execute('SELECT count(*) FROM mfa_sessions').fetchone()[0]==0
+        assert application_db.verify_audit(conn)==(True,None)

@@ -27,12 +27,13 @@ SPA_PREFIXES = ("d/", "dashboards", "dashboard/", "explore", "datasources", "rep
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=80)
     password: str = Field(max_length=1024)
+    otp: str | None = Field(default=None,max_length=128)
 
 
 def create_app(settings: Settings | None = None):
     from . import __version__, datasources as datasource_registry
     from .api import dashboards as dashboards_api, datasources as datasources_api, reports as reports_api
-    from .api import system as system_api, users as users_api
+    from .api import system as system_api, users as users_api, mfa as mfa_api
 
     settings = settings or Settings.from_env()
     init_db(settings)
@@ -42,7 +43,7 @@ def create_app(settings: Settings | None = None):
     app.state.http_metrics = HttpMetrics()
     static = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
-    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api):
+    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api,mfa_api):
         app.include_router(module.router)
     app.add_middleware(RequestBodyLimitMiddleware)
     app.add_middleware(OriginValidationMiddleware)
@@ -99,8 +100,10 @@ def create_app(settings: Settings | None = None):
                             status_code=200 if database_ok and audit_ok else 503)
 
     @app.post("/api/login")
-    def sign_in(body: Credentials, response: Response):
-        token, csrf, expiry = login(settings, body.username, body.password)
+    def sign_in(body: Credentials, request: Request,response: Response):
+        if body.otp:
+            mfa_api.ensure_transport(request)
+        token, csrf, expiry = login(settings, body.username, body.password,body.otp)
         response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=settings.secure_cookie,
                             samesite="strict", max_age=settings.session_hours * 3600, path="/")
         return {"csrf": csrf, "expires_at": expiry}
@@ -117,7 +120,7 @@ def create_app(settings: Settings | None = None):
         # The CSRF token is minted on login and held in JS memory. A tab reload
         # logs the user into the same cookie session via a CSRF rotation endpoint.
         return {"user": {"id": user["id"], "username": user["username"], "role": user["role"]},
-                "expires_at": user["expires_at"]}
+                "expires_at": user["expires_at"],'mfa_enrollment_required':user['mfa_enrollment_required']}
 
     @app.post("/api/session/csrf")
     def csrf_refresh(request: Request, user=Depends(authenticate)):

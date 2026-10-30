@@ -13,23 +13,27 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Son yayımlanmamış temel: `e5a640e` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/41000917869).
-Hashli build/runtime QA ortamında yerelde **248 Python testi başarılı, 13 ortam/Windows yetkisi bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
+Önceki doğrulanmış temel: `e805577` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/41001681852).
+Hashli build/runtime QA ortamında yerelde **269 Python testi başarılı, 14 ortam/Windows yetkisi bağımlı test atlandı**; önceki temelin gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kontrolleri başarılı.
+Yeni MFA sürümünün bütün CI sonucu ayrıca doğrulanacak; yerel test sayısı kurum kabulü değildir.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
 Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
 bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son commitlerin CI sonucu PROGRESS.md'de izlenir.
+Yeni MFA akışlarında geçici Chromium uygulamasında iki temada ek 20 tarama temizdir;
+[yerel kanıt](evidence/mfa-browser-2026-10-30.json) sır veya şirket verisi içermez.
 Test dosyası referansları o başlığın kanıt alanını gösterir; her satır için ayrı bir yeni test yazıldığı iddia edilmez.
 
 Gövde sınırı, Host/Origin izolasyonu, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.
 16 sentetik viewer ile 120 saniyede 7.404 HTTP isteği, sıfır hata; sorgu p95 445,654 ms ölçüldü.
 Bu kısa ve tek süreçli test gerçek kaynak/worker kapasitesini veya uzun soak kabulünü kanıtlamaz.
-Öncelikli kalanlar: gerçek kaynaklı yük/uzun çalışma ve kurum kabulü. MFA/SSO, tenant ACL,
+TOTP kurulum/giriş/kurtarma ve şifreli seed yaşam döngüsü eklendi; B10 kısmi.
+Öncelikli kalanlar: gerçek kaynaklı yük/uzun çalışma ve kurum kabulü. SSO/WebAuthn, tenant ACL,
 deneysel PostgreSQL işletimi ve gerçek kurum anahtar bakım/emanet kabulü ayrıca değerlendirilmelidir.
 Kullanıcı adına lisans/üretim kabul kararı verilmez.
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 86, R: 16, P: 8, O: 4, E: 6.
+Durum dağılımı: V: 86, R: 16, P: 9, O: 3, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -59,7 +63,7 @@ Durum dağılımı: V: 86, R: 16, P: 8, O: 4, E: 6.
 | B07 | Son yerel kurtarma yöneticisi korunması | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — LDAP yöneticisi varken de yerel yönetici korunuyor |
 | B08 | Pasif kullanıcının erişiminin reddi | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — Dizin girişi yerel pasifliği geri alamaz |
 | B09 | Parola sıfırlamada oturum iptali | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — API ve CLI resetinde iki eski oturumun iptali, eski/yeni parola ve sır içermeyen CLI çıktı kabulü testli |
-| B10 | Çok faktörlü kimlik doğrulama | O | P1 | [docs/ENTERPRISE_DEPLOYMENT.md](../docs/ENTERPRISE_DEPLOYMENT.md) — MFA/SSO desteği yok; yüksek güvence kurum kabul engeli |
+| B10 | Çok faktörlü kimlik doğrulama | P | P1 | [tests/test_mfa.py](../tests/test_mfa.py) — Yerel/LDAP TOTP, rol-zorunlu kurulum izolasyonu, tek kullanımlık kurtarma, replay/race/oturum iptali ve key/backup roundtrip testli; SSO/WebAuthn/kimlik avına dayanıklı kurum politikası açık. docs/MFA.md sınırları açıklar. |
 
 ## C — LDAP ve dizin güveni
 

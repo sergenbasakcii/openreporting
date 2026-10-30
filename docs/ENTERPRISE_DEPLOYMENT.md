@@ -88,7 +88,8 @@ sertifika doğrulamasını kapatma ve otomatik referral takibi yoktur. Sistem g�
   Mevcut oturumlar en çok `LDAP_SESSION_MINUTES` (varsayılan 60; aralık 5–240 dakika) sürer;
   dizin her HTTP isteğinde sorgulanmaz. Acil iptal için uygulamada hesabı pasifleştirin.
   `LDAP_ENABLED=false` yapılıp servis yeniden başlatıldığında LDAP oturumları da reddedilir.
-- Kerberos/Windows bütünleşik SSO, MFA ve LDAP parola değiştirme bu sürümün kapsamı değildir.
+- Kerberos/Windows bütünleşik SSO ve LDAP parola değiştirme desteklenmez. Yerel/LDAP hesaplarında
+  doğrulayıcı ve kurtarma kodlarıyla [iki adımlı giriş](MFA.md) kullanılabilir; TOTP kimlik avına dayanıklı değildir.
 
 ## SMTP / kurum relay'i
 
@@ -139,8 +140,9 @@ home dizinleri sertleştirilmiş servislerden erişilemez. Windows denemelerinde
 yalnız çalıştıran kullanıcıyla sınırlandırın. `windows/Settings.local.ps1` örnek ayarları alabilir;
 SMTP için başlatıcıda mevcut `-AllowEmail` seçeneği gerekir.
 
-Şema v3 mevcut yerel kullanıcıları, parolalarını ve rapor kayıtlarını koruyarak
-`external_identities` tablosu ekler. Yükseltmeden önce tutarlı DB yedeği, arşiv, şifreleme anahtarı
+Şema v3 `external_identities`, v4 ise MFA ve faktör doğrulanmış oturum tablolarını
+ekler; kullanıcı/parola/rapor kayıtları korunur. Eski bütün web/worker süreçleri durdurulmuş
+bakım penceresi gerekir. Yükseltmeden önce tutarlı DB yedeği, arşiv, şifreleme anahtarı
 ve ayrı entegrasyon sırlarının kurtarma kopyasını alın. Yeni şemayı eski uygulama sürümüyle açmayın;
 geri dönüşte birbiriyle eşleşen kod/DB yedeği ve anahtar gerekir. Genel dizin taşımalarında yeni
 kimliklerin eski profillerle eşleştirilmesi ayrıca planlanmalıdır.

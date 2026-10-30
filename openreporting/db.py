@@ -41,7 +41,10 @@ def backup_database(settings, target):
 def has_encrypted_secrets(settings):
     if settings.database_url:
         with connect(settings) as db:
-            return db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None
+            if db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None:
+                return True
+            exists = db.execute("SELECT to_regclass('user_mfa')").fetchone()[0]
+            return bool(exists and db.execute("SELECT 1 FROM user_mfa WHERE secret_json<>'' LIMIT 1").fetchone())
     return sqlite_store.has_encrypted_secrets(settings)
 
 
@@ -126,7 +129,7 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 3
+CURRENT_VERSION = 4
 
 # Each migration is a tuple of complete statements, executed in one transaction.
 # Only the initial schema is split here; later migrations may contain triggers or
@@ -144,6 +147,13 @@ MIGRATIONS[3] = ("""CREATE TABLE external_identities(
  user_id TEXT PRIMARY KEY REFERENCES users(id), provider TEXT NOT NULL CHECK(provider='ldap'),
  subject TEXT NOT NULL, UNIQUE(provider,subject))""",)
 POSTGRES_MIGRATIONS[3] = MIGRATIONS[3]
+MIGRATIONS[4] = ("""CREATE TABLE user_mfa(
+ user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ secret_json TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+ pending_expires_at TEXT NOT NULL DEFAULT '', setup_hash TEXT NOT NULL DEFAULT '', last_counter INTEGER NOT NULL DEFAULT -1,
+ recovery_hashes TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)""",
+ """CREATE TABLE mfa_sessions(token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE)""")
+POSTGRES_MIGRATIONS[4] = MIGRATIONS[4]
 
 
 

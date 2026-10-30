@@ -10,6 +10,18 @@ from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from .db import CURRENT_VERSION, audit, schema_version, transaction, verify_audit
 from .secrets_store import KEYRING_FORMAT, MAX_KEYS, SecretError, key_id, key_path, read_keys
 
+LOCATIONS = (('datasources','id','secure_json'),('user_mfa','user_id','secret_json'))
+
+
+def _valid_payload(payload,table,identity):
+    data = json.loads(payload)
+    if not isinstance(data,dict):
+        raise ValueError('Invalid credential record')
+    if table=='user_mfa':
+        import re
+        if set(data)!={'type','user_id','secret'} or data['type']!='mfa-totp-v1' or data['user_id']!=identity or not isinstance(data['secret'],str) or not re.fullmatch('[A-Z2-7]{32}',data['secret']):
+            raise ValueError('Invalid bound factor')
+
 
 def _write_new(settings, output, keys):
     target = Path(output).absolute()
@@ -59,24 +71,23 @@ def rekey_secrets(settings, *, services_stopped=False):
     try:
         with closing(_connection(settings)) as db, transaction(db):
             _check_database(db)
-            changed = 0
-            for row in db.execute("SELECT id,secure_json FROM datasources WHERE secure_json<>''").fetchall():
-                token = row['secure_json'].encode('ascii')
-                # Idempotent: don't rewrite tokens already on the primary key.
-                try:
-                    if not isinstance(json.loads(primary.decrypt(token)),dict):
-                        raise ValueError('Invalid credential record')
-                    continue
-                except InvalidToken:
-                    pass
-                rotated = cipher.rotate(token)
-                if not isinstance(json.loads(primary.decrypt(rotated)),dict):
-                    raise ValueError('Invalid credential record')
-                db.execute('UPDATE datasources SET secure_json=? WHERE id=?',(rotated.decode('ascii'),row['id']))
-                changed += 1
-            if changed:
-                audit(db,'os-admin','secrets.rekeyed','keyring',key_id(keys[0]),{'sources':changed,'retained_key_ids':[key_id(k) for k in keys[1:]]})
-        return {'primary_id':key_id(keys[0]),'sources_rekeyed':changed}
+            changed = {}
+            for table,identity,column in LOCATIONS:
+                changed[table] = 0
+                for row in db.execute(f"SELECT {identity},{column} FROM {table} WHERE {column}<>''").fetchall():
+                    token = row[column].encode('ascii')
+                    try:
+                        _valid_payload(primary.decrypt(token),table,row[identity])
+                        continue
+                    except InvalidToken:
+                        pass
+                    rotated = cipher.rotate(token)
+                    _valid_payload(primary.decrypt(rotated),table,row[identity])
+                    db.execute(f'UPDATE {table} SET {column}=? WHERE {identity}=?',(rotated.decode('ascii'),row[identity]))
+                    changed[table] += 1
+            if sum(changed.values()):
+                audit(db,'os-admin','secrets.rekeyed','keyring',key_id(keys[0]),{'sources':changed['datasources'],'factors':changed['user_mfa'],'retained_key_ids':[key_id(k) for k in keys[1:]]})
+        return {'primary_id':key_id(keys[0]),'sources_rekeyed':changed['datasources'],'mfa_secrets_rekeyed':changed['user_mfa']}
     except SecretError:
         raise
     except Exception:
@@ -92,9 +103,9 @@ def prepare_retirement(settings, output, *, services_stopped=False):
         with closing(_connection(settings,readonly=True)) as db:
             db.execute('BEGIN')
             _check_database(db)
-            for row in db.execute("SELECT secure_json FROM datasources WHERE secure_json<>''"):
-                if not isinstance(json.loads(primary.decrypt(row[0].encode('ascii'))),dict):
-                    raise ValueError('Invalid credential record')
+            for table,identity,column in LOCATIONS:
+                for row in db.execute(f"SELECT {identity},{column} FROM {table} WHERE {column}<>''"):
+                    _valid_payload(primary.decrypt(row[column].encode('ascii')),table,row[identity])
     except SecretError:
         raise
     except Exception:

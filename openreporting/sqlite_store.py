@@ -110,4 +110,7 @@ def has_encrypted_secrets(settings: Settings):
         return False
     uri = path.resolve().as_uri() + "?mode=ro"
     with _connect_uri(uri) as db:
-        return db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None
+        if db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None:
+            return True
+        exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_mfa'").fetchone()
+        return bool(exists and db.execute("SELECT 1 FROM user_mfa WHERE secret_json<>'' LIMIT 1").fetchone())

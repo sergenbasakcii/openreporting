@@ -1,8 +1,9 @@
 # Runtime paket kilidi ve kurulum doğrulaması
 
-`requirements-runtime.lock`, test edilmiş 28 runtime paketinin sürümünü ve o sürümlerin
+`requirements-runtime.lock`, test edilmiş 29 runtime paketinin sürümünü ve o sürümlerin
 PyPI'daki yanked olmayan wheel dosyalarının SHA-256 değerlerini saklar. `tzdata` yalnız
-Windows marker'ıyla kurulur; Linux kapanışı 27 pakettir. Özel index, hesap, token veya yerel yol yoktur.
+Windows marker'ıyla kurulur; Linux kapanışı 28 pakettir. PyOTP 2.9.0 TOTP içindir.
+Özel index, hesap, token veya yerel yol yoktur.
 
 Ubuntu kurulum/yükseltme, Windows başlatıcı kurulumu ve Docker örneği önce
 `--require-hashes --only-binary=:all:` ile runtime kurar; uygulama sonra `--no-deps` ile

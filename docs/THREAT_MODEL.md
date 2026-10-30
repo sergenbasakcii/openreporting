@@ -16,7 +16,7 @@ arşiv/manifest ve yedekler. Kimlik bilgileri kaynakta salt okunur ve en az kaps
 | Viewer → kayıtlı panel | Tarayıcı target/dönüşüm yerine kayıtlı tanım; güvenli değişken biçimi | Genel roller tüm kurum kapsamındadır; tenant/klasör ACL yok |
 | Editör → veri kaynağı | Ad hoc okuma sorgusu izinli, kaynakta READ ONLY/get/GET | Kaynak hesabının erişebildiği kapsam editöre güven sınırıdır |
 | Yönetici → kaynak/entegrasyon | Kaynak origin ve rol eşlemesi ayrıcalıklı yapılandırmadır | Admin kötü niyeti ve hatalı kaynak hesabı yetkisi uygulama tarafından tümüyle çözülemez |
-| API/worker → LDAP | Zincir/DNS doğrulamalı TLS, salt okunur servis araması, kullanıcı bind, sabit grup eşlemesi | İç içe grup, SSO, MFA yok; mevcut oturumun dizin değişimine tepki üst sınırı var |
+| API/worker → LDAP | Zincir/DNS doğrulamalı TLS, salt okunur servis araması, kullanıcı bind, sabit grup eşlemesi; aynı kimlik/rol ile TOTP adım yükseltme | İç içe grup/SSO yok; TOTP kimlik avına dayanıklı değil; dizin değişimine tepki üst sınırı var |
 | API/worker → SMTP | Zorunlu TLS, alıcı domain listesi, belirsizlikte otomatik tekrar yok | Relay teslim/karantina ve OAuth2 kurum entegrasyonuna bağlı |
 | Worker → dosya/audit | Atomik dosya, SHA manifesti, audit çapası ve tek worker | Dosya+SMTP+DB tek dağıtık işlem değildir; unknown durumu korunur |
 | Yedek → izole doğrulama | Hash, DB/audit, arşiv/logo, anahtar kontrolü; yol/link/cihaz reddi | SHA zinciri bağımsız imza değildir; canlı restore işletmeci işlemidir |
@@ -31,6 +31,7 @@ arşiv/manifest ve yedekler. Kimlik bilgileri kaynakta salt okunur ve en az kaps
 | HTTP kaynağıyla metadata/redirect hedeflenir | Sabit origin, gerçek peer metadata reddi, redirects kapalı | Yöneticiye verilen dahili ağ erişiminin kurumda sınırlandırılması |
 | LDAP adı yerel admini devralır veya pasifliği kaldırır | Kalıcı kimlik ve yerel hesap çakışma/pasiflik testleri | Dizin yeniden adlandırma işletimi |
 | Dizin/DB arızası geniş yetki veya sahte yeşil sağlık üretir | LDAP fallback reddi; auth/health/readiness 503 testleri | Kurum alarm ve on-call sahipliği |
+| Ele geçen parola veya tekrar kullanılan kod | tests/test_mfa.py: rol-zorunlu kurulum izolasyonu, TOTP/kurtarma tek kullanımı, ortak başarısızlık kapısı ve tüm oturumları iptal | SSO/WebAuthn ve kimlik avına dayanıklı merkezi politika açık |
 | Rapor metni Excel formülü veya HTML çalıştırır | Güvenli hücre/DOM/Markdown, CSP ve regression testleri | Tam bağımsız XSS/a11y incelemesi |
 | Logo veya arşiv açma yoluyla host dosyası yazılır | Logo yeniden kodlama; restore whitelist, boyut ve link reddi testleri | Üretim yedek emanet/erişim izinleri |
 | SMTP yanıtı kaybolduğunda çift gönderim | unknown/partial_rejected, replay etmeyen worker testleri | Posta sunucusu kayıtlarının gerçek kabulü |

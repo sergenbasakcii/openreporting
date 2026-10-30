@@ -168,7 +168,7 @@ export function modal({ title, body, footer, size = '', onClose, closeOnBackdrop
     else if (!e.shiftKey && (document.activeElement === last || !box.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
   };
   const box = h('div', { class: ['modal', size].join(' '), role: 'dialog', 'aria-modal': 'true', 'aria-label': title, tabindex: '-1' },
-    h('div', { class: 'modal-head' }, h('h3', { text: title }), button('', { icon: 'close', variant: 'ghost', title: 'Kapat', onClick: () => close() })),
+    h('div', { class: 'modal-head' }, h('h2', { text: title }), button('', { icon: 'close', variant: 'ghost', title: 'Kapat', onClick: () => close() })),
     h('div', { class: 'modal-body' }, body),
     footer ? h('div', { class: 'modal-foot' }, footer) : null);
   const backdrop = h('div', { class: 'modal-backdrop', onmousedown: (e) => { if (e.target === backdrop && closeOnBackdrop) close(); } }, box);

@@ -69,6 +69,7 @@ class Settings:
     ldap_timeout: int = 10
     ldap_session_minutes: int = 60
     allowed_hosts: tuple[str, ...] = ()
+    mfa_required_roles: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls):
@@ -119,6 +120,7 @@ class Settings:
             ldap_timeout=int(os.getenv("OPENREPORTING_LDAP_TIMEOUT", "10")),
             ldap_session_minutes=int(os.getenv("OPENREPORTING_LDAP_SESSION_MINUTES", "60")),
             allowed_hosts=tuple(x.strip() for x in os.getenv("OPENREPORTING_ALLOWED_HOSTS", "").split(',') if x.strip()),
+            mfa_required_roles=tuple(dict.fromkeys(x.strip() for x in os.getenv('OPENREPORTING_MFA_REQUIRED_ROLES','').split(',') if x.strip())),
         )
         if not 1 <= data.query_concurrency <= 64 or not 10_000 <= data.max_series_points <= 50_000_000:
             raise ValueError("Invalid query concurrency or point budget")
@@ -126,6 +128,8 @@ class Settings:
             raise ValueError("Invalid report retention")
         from .http_security import trusted_hosts
         trusted_hosts(data)
+        if any(role not in {'admin','editor','viewer'} for role in data.mfa_required_roles):
+            raise ValueError('Invalid MFA required role policy')
         if not 1 <= data.session_hours <= 168 or not 1 <= data.max_rows <= 1_000_000:
             raise ValueError("Invalid session duration or max rows")
         if not 1000 <= data.query_timeout_ms <= 300_000:

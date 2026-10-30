@@ -8,4 +8,6 @@ def database_ready(db):
     # SELECT 1 alone also succeeds for an accidentally replaced/empty SQLite file.
     db.execute("SELECT id FROM users LIMIT 1").fetchone()
     db.execute("SELECT token_hash FROM sessions LIMIT 1").fetchone()
+    db.execute('SELECT user_id FROM user_mfa LIMIT 1').fetchone()
+    db.execute('SELECT token_hash FROM mfa_sessions LIMIT 1').fetchone()
     return True

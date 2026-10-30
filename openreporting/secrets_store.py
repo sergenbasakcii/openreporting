@@ -1,8 +1,9 @@
-"""Encryption at rest for datasource credentials (Fernet: AES-128-CBC + HMAC).
+"""Encryption at rest for source credentials and bound TOTP seeds (Fernet).
 
 The key lives in its own 0600 file outside SQLite (``OPENREPORTING_SECRET_KEY_FILE``
 or ``<data_dir>/secret.key``). Secrets are write-only through the API: the
-browser only ever learns *whether* a secret is configured.
+browser only ever learns *whether* a source secret is configured. TOTP setup
+returns its own new seed once, under password reauthentication + CSRF.
 """
 import base64
 import hashlib

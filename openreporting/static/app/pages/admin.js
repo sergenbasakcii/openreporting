@@ -132,6 +132,8 @@ export async function profilePage(root, { app, applyTheme }) {
   setBreadcrumbs([{ label: 'Profil' }]);
   const me = await get('/api/user');
   const dashboards = await get('/api/search').catch(() => []);
+  const { mfaCard } = await import('../mfa.js');
+  const factorCard = await mfaCard();
   const prefs = { ...me.preferences };
   const pw = { old_password: '', new_password: '', confirm: '' };
   root.append(h('div', { class: 'page' }, h('div', { class: 'page-header' }, h('div', h('h1', icon('user'), me.display_name || me.username), h('p', { class: 'sub', text: `${ROLE_LABELS[me.role] || me.role} · son giriş ${fmtDateTime(me.last_login_at)}` }))),
@@ -148,7 +150,7 @@ export async function profilePage(root, { app, applyTheme }) {
         button('Parolayı değiştir', { onClick: async () => {
           if (pw.new_password !== pw.confirm) { toast('Yeni parolalar eşleşmiyor', 'error'); return; }
           try { await put('/api/user/password', { old_password: pw.old_password, new_password: pw.new_password }); toast('Parola değiştirildi; diğer oturumlar kapatıldı', 'ok'); } catch (err) { toast(err.message, 'error'); }
-        } })))));
+        } }))), factorCard));
 }
 
 export { toggle };

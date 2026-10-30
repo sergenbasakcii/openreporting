@@ -177,6 +177,9 @@ def main(argv=None):
     p_retire = commands.add_parser('prepare-key-retirement',help='Create a primary-only ring after verifying every stored credential uses it')
     p_retire.add_argument('--output',required=True)
     p_retire.add_argument('--services-stopped',action='store_true')
+    p_mfa = commands.add_parser('reset-mfa',help='OS-operator factor recovery; revoke sessions without changing password')
+    p_mfa.add_argument('username')
+    p_mfa.add_argument('--reason',required=True,choices=['lost-device','compromise','recovery'])
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -192,6 +195,19 @@ def main(argv=None):
         print(json.dumps(result))
         return  # Never initialize, migrate, replace or connect to the live application state.
     settings = Settings.from_env()
+    if args.action=='reset-mfa':
+        import json
+        import sqlite3
+        from psycopg import Error as PostgresError
+        from .mfa import admin_reset
+        try:
+            result = admin_reset(settings,args.username,args.reason)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from None
+        except (sqlite3.Error,PostgresError,OSError):
+            raise SystemExit('Factor recovery storage unavailable; no implicit migration or replacement performed') from None
+        print(json.dumps(result))
+        return  # Recovery must not migrate a live/older store implicitly.
     if args.action in {'prepare-key-rotation','rekey-secrets','prepare-key-retirement'}:
         import json
         from .key_rotation import prepare_rotation,prepare_retirement,rekey_secrets
