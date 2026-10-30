@@ -37,9 +37,11 @@ sudo ./deploy/install-ubuntu.sh --domain openreporting.sirket.local --self-signe
 
 Ubuntu 22.04 sistem Python’u 3.10 olduğundan `--use-deadsnakes` ekleyin (Python 3.12 kurulur) veya `--python /yol/python3.12` verin.
 İnternetsiz ortamda önce internet erişimi olan, aynı Ubuntu ve Python sürümündeki bir makinede depo klasöründe
-`python3 -m pip wheel -w wheels . pip setuptools wheel` ile uygulama, bağımlılık ve kurulum aracı wheel’lerini
-hazırlayıp sunucuya taşıyın ve
+önce `python3 -m pip download --require-hashes --only-binary=:all: -r requirements-runtime.lock -d wheels`,
+sonra `python3 -m pip wheel --no-deps -w wheels .` ve `python3 -m pip wheel -w wheels pip setuptools wheel`
+ile runtime, uygulama ve kurulum aracı wheel’lerini hazırlayıp kaynak ağacıyla sunucuya taşıyın ve
 `--wheelhouse /yol/wheels` kullanın.
+Kapsam ve güncelleme kabulü [paket kilidi yönergesindedir](DEPENDENCY_LOCK.md).
 
 Betik **idempotent**tir; tekrar çalıştırmak mevcut `/etc/openreporting/openreporting.env` ve anahtarı korur.
 

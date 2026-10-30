@@ -23,7 +23,12 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install application and separate audit tooling
-        run: python -m pip install . pip-audit==2.10.1
+        run: |
+          python -m pip install pip-audit==2.10.1
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps .
+          python -m pip check
+          python tools/check_runtime_lock.py
       - name: Inventory installed runtime dependencies
         run: python tools/runtime_requirements.py --output build/runtime-audit.txt
       - name: Audit known vulnerabilities and generate CycloneDX SBOM
@@ -51,7 +56,12 @@ jobs:
         run: |
           sudo install -d -o "$(id -un)" -g "$(id -gn)" -m 0700 /etc/ldap/openreporting-ci /var/lib/ldap/openreporting-ci
       - name: Install package
-        run: python -m pip install ".[test]"
+        run: |
+          python -m pip install "httpx>=0.27,<1" "pytest>=8,<10"
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps .
+          python -m pip check
+          python tools/check_runtime_lock.py
       - name: Verify actual LDAP TLS, service bind, user bind and memberOf
         # Only the isolated fixture harness needs root to traverse Ubuntu's
         # existing private /var/lib/ldap parent. No service policy is relaxed.
@@ -83,7 +93,12 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install package
-        run: python -m pip install ".[test]"
+        run: |
+          python -m pip install "httpx>=0.27,<1" "pytest>=8,<10"
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps .
+          python -m pip check
+          python tools/check_runtime_lock.py
       - name: Test PostgreSQL primitives against isolated server
         env:
           OPENREPORTING_TEST_POSTGRES_DSN: postgresql://openreporting_test:isolated-ci-password@localhost:5432/openreporting_test
@@ -104,7 +119,12 @@ jobs:
       - name: Install fonts
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
       - name: Install package
-        run: python -m pip install --upgrade pip && python -m pip install ".[test]"
+        run: |
+          python -m pip install "httpx>=0.27,<1" "pytest>=8,<10"
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps .
+          python -m pip check
+          python tools/check_runtime_lock.py
       - name: Pytest
         run: python -m pytest -q -p no:cacheprovider
       - name: Enterprise evidence matrix consistency

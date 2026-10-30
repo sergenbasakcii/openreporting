@@ -3,6 +3,9 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- Test edilmiş runtime sürümleri wheel SHA-256 kilidine alındı; Ubuntu/Windows/Docker
+  kurulum yolları hash kontrolü ve kaynak paket fallback reddi kullanır. Build/OS araçları
+  bu runtime kilidinin dışındadır; hermetik/imzalı release iddiası yoktur.
 - Sunucunun ürettiği istek kimliği, veri içermeyen yapısal HTTP kaydı, süreç bazlı gecikme
   histogramı ve kesilen yanıt sayacı eklendi. Beklenmeyen 500 ayrıntıları istemciye taşınmaz.
 - Sentetik viewer yükü gerçek HTTP üzerinde ayrı geçici uygulamada ölçülür; işletim olay

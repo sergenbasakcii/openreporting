@@ -37,9 +37,17 @@ if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
 
 Push-Location $projectRoot
 try {
-    Write-Host 'Installing application dependencies and test runner...'
-    & $venvPython -m pip install '.[test]'
+    Write-Host 'Verifying and installing pinned application dependencies...'
+    & $venvPython -m pip install --require-hashes '--only-binary=:all:' -r requirements-runtime.lock
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Check pip/network access.' }
+    & $venvPython -m pip install --no-deps .
+    if ($LASTEXITCODE -ne 0) { throw 'Application installation failed.' }
+    & $venvPython -m pip install 'httpx>=0.27,<1' 'pytest>=8,<10'
+    if ($LASTEXITCODE -ne 0) { throw 'Test runner installation failed.' }
+    & $venvPython -m pip check
+    if ($LASTEXITCODE -ne 0) { throw 'Installed dependencies are inconsistent.' }
+    & $venvPython tools/check_runtime_lock.py
+    if ($LASTEXITCODE -ne 0) { throw 'Installed runtime differs from the reviewed dependency lock.' }
 
     . (Join-Path $PSScriptRoot 'Import-Settings.ps1')
     New-Item -ItemType Directory -Path $env:OPENREPORTING_DATA_DIR -Force | Out-Null

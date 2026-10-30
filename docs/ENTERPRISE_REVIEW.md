@@ -203,7 +203,7 @@ Durum dağılımı: V: 76, R: 25, P: 8, O: 5, E: 6.
 | L01 | Python sürüm matrisi | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — 3.11/3.12/3.13 testleri |
 | L02 | Tarayıcı ES modüllerinin açık parse kontrolü | V | P1 | [tests/check_app_syntax.cjs](../tests/check_app_syntax.cjs) — Otomatik js mod seçimi hatası kapatıldı |
 | L03 | Gerçek LDAP/PG ve Ubuntu CI kanıtı | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — 60f58d1 CI tüm işler başarılı |
-| L04 | Bağımlılıkların tekrarlanabilir kilitlenmesi | P | P1 | [pyproject.toml](../pyproject.toml) — Aralık sınırları var; hashli lock yok |
+| L04 | Bağımlılıkların tekrarlanabilir kilitlenmesi | P | P1 | [docs/DEPENDENCY_LOCK.md](../docs/DEPENDENCY_LOCK.md) — 28 runtime sürümü ve wheel SHA kilidi; offline temiz Windows kurulumu/hash reddi; Python/Ubuntu CI hash yolu. Build/test/OS/container base ve release provenance ayrıca açık |
 | L05 | Bağımlılık zafiyet taraması | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — 30 Ekim 2026: 28 yerel runtime paketi pip-audit ile tarandı; cryptography 50.0.2 sonrası bilinen açık yok; yeni CI bekliyor |
 | L06 | SBOM ve bileşen envanteri | V | P2 | [tools/runtime_requirements.py](../tools/runtime_requirements.py) — CycloneDX runtime SBOM üretildi; özel paket/yol aktarılmaz, test/audit closure dışında |
 | L07 | İmzalı sürüm/provenance | O | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Taslak PR var; imzalı release/supply-chain attest yok |

@@ -1025,8 +1025,8 @@
       "control": "Bağımlılıkların tekrarlanabilir kilitlenmesi",
       "status": "P",
       "priority": "P1",
-      "evidence": "pyproject.toml",
-      "note": "Aralık sınırları var; hashli lock yok"
+      "evidence": "docs/DEPENDENCY_LOCK.md",
+      "note": "28 runtime sürümü ve wheel SHA kilidi; offline temiz Windows kurulumu/hash reddi; Python/Ubuntu CI hash yolu. Build/test/OS/container base ve release provenance ayrıca açık"
     },
     {
       "id": "L05",
