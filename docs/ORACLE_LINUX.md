@@ -5,6 +5,13 @@ paket kurulumunda, nginx yollarında ve host güvenlik politikasındadır. Bu s�
 `install-linux.sh` ortak akışını ve `install-oracle-linux.sh` girişini ekler.
 Ubuntu/Debian girişi korunur; mevcut Windows önizlemesi değiştirilmez.
 
+31 Ekim 2026 kabulünde resmî imajlarda **Oracle Linux 8.10, 9.8 ve 10.2 / x86_64 /
+Python 3.12.15** gerçekten çalıştırıldı. Her ortamda 60 Python testi, gerçek nginx HTTPS,
+zorunlu MFA/kurtarma girişi ve worker ile PDF/XLSX/CSV üretimi geçti.
+[Ham ortam/digest kanıtı](evidence/oracle-linux-userspace-2026-10-31.json) hangi kapsamın
+test edildiğini ve tam VM kabulünün beklediğini açıkça kaydeder. Bu sonuç diğer bütün
+alt sürüm/donanım/kurum politikalarının denendiği anlamına gelmez.
+
 ## Hedef matris
 
 | Ortam | Hedef Python | Kabul kapsamı |
@@ -13,7 +20,7 @@ Ubuntu/Debian girişi korunur; mevcut Windows önizlemesi değiştirilmez.
 | Oracle Linux 9.4+, x86_64 | Resmî paralel python3.12 | Aynı kapsam; güncel resmî AppStream depoları gerekli |
 | Oracle Linux 10, x86_64 | Dağıtım python3, 3.12+ | Aynı kapsam; işletim sisteminin CPU gereksinimleri geçerli |
 | ARM/aarch64 | Uygun Python 3.11+ wheel'leri | Bu matris için gerçek ARM kabulü yapılmadı |
-| Oracle Linux 7 ve daha eski / 8.10 öncesi | — | Yerel kurulum betiği reddeder; uyumluluk iddia edilmez |
+| Oracle Linux 7 ve daha eski / 8.10 veya 9.4 öncesi | — | Yerel kurulum betiği reddeder; uyumluluk iddia edilmez |
 | FIPS etkin host | — | Mevcut scrypt/kripto kapanışı doğrulanmadı; kurulum FIPS/kripto politikasını değiştirmeden durur |
 
 CI `oraclelinux:8`, `:9`, `:10` resmî kullanıcı alanı imajlarını ayrı geçici container'larda

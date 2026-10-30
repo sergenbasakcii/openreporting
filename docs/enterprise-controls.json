@@ -630,7 +630,7 @@
       "status": "E",
       "priority": "P1",
       "evidence": "docs/ENTERPRISE_DEPLOYMENT.md",
-      "note": "Fernet yalnız kaynak sırlarını kapsar; tam disk kuruma bağlı"
+      "note": "Fernet kaynak sırları ve TOTP seedlerini kapsar; tam disk/DB/yedek politikası kuruma bağlı"
     },
     {
       "id": "H01",

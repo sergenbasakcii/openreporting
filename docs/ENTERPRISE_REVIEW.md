@@ -22,6 +22,10 @@ Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 tara
 bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son commitlerin CI sonucu PROGRESS.md'de izlenir.
 Yeni MFA akışlarında geçici Chromium uygulamasında iki temada ek 20 tarama temizdir;
 [yerel kanıt](evidence/mfa-browser-2026-10-30.json) sır veya şirket verisi içermez.
+Oracle Linux 8.10/9.8/10.2 kullanıcı alanında kurulum paketleri, servis dosyası ayrıştırma,
+gerçek nginx HTTPS/MFA ve PDF/XLSX/CSV worker kabulü başarılıdır;
+[ortam kanıtı](evidence/oracle-linux-userspace-2026-10-31.json) PID1/SELinux Enforcing
+ve tam VM/kurum kabulünün açık kaldığını kaydeder. Ubuntu dışındaki bu kapsam tam host kabulü değildir.
 Test dosyası referansları o başlığın kanıt alanını gösterir; her satır için ayrı bir yeni test yazıldığı iddia edilmez.
 
 Gövde sınırı, Host/Origin izolasyonu, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.
@@ -139,7 +143,7 @@ Durum dağılımı: V: 86, R: 16, P: 9, O: 3, E: 6.
 | G07 | v3te yerel kullanıcı ve kimlik koruması | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — v2den geçiş ve tekrar init testli |
 | G08 | PostgreSQL audit append-only ve kilit | V | P1 | [tests/test_postgres_store.py](../tests/test_postgres_store.py) — Gerçek PGde FK ve audit tetikleyicileri |
 | G09 | Anahtar rotasyonu ve anahtar versiyonlama | V | P1 | [tests/test_key_rotation.py](../tests/test_key_rotation.py) — Raw uyumlu bounded ring, ayrı hazırlık, SQLite offline atomik rekey/audit/rollback ve doğrulanan retirement; yedek eski/yeni anahtar kabulü testli; kurum bakım/emanet kabulü ayrıca gerekli |
-| G10 | Disk/DB/yedek şifreleme kurum politikası | E | P1 | [docs/ENTERPRISE_DEPLOYMENT.md](../docs/ENTERPRISE_DEPLOYMENT.md) — Fernet yalnız kaynak sırlarını kapsar; tam disk kuruma bağlı |
+| G10 | Disk/DB/yedek şifreleme kurum politikası | E | P1 | [docs/ENTERPRISE_DEPLOYMENT.md](../docs/ENTERPRISE_DEPLOYMENT.md) — Fernet kaynak sırları ve TOTP seedlerini kapsar; tam disk/DB/yedek politikası kuruma bağlı |
 
 ## H — Rapor ve teslimat doğruluğu
 
