@@ -319,8 +319,12 @@ export function emptyState(title, text, actions = []) {
 
 export function section(title, body, { open = true, onToggle } = {}) {
   const sec = h('div', { class: ['opt-section', open ? '' : 'closed'].join(' ') });
-  const head = h('div', { class: 'sec-head', role: 'button', tabindex: '0', onclick: () => { sec.classList.toggle('closed'); onToggle && onToggle(!sec.classList.contains('closed')); },
-    onkeydown: (e) => { if (e.key === 'Enter') head.click(); } }, icon('chevron-down'), title);
+  const head = h('div', { class: 'sec-head', role: 'button', tabindex: '0', 'aria-expanded': String(open), onclick: () => {
+    sec.classList.toggle('closed');
+    const expanded = !sec.classList.contains('closed');
+    head.setAttribute('aria-expanded', String(expanded));
+    onToggle && onToggle(expanded);
+  }, onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); head.click(); } } }, icon('chevron-down'), title);
   sec.append(head, h('div', { class: 'sec-body' }, body));
   return sec;
 }

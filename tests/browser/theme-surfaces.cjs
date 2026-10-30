@@ -68,7 +68,8 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
       await page.waitForTimeout(100);
       assert.equal(queries, before, 'Theme changes must use cached data');
       for (const label of ['Zaman aralığı', 'Otomatik yenileme', 'Diğer']) {
-        await page.getByRole('button', { name: label, exact: true }).first().click();
+        const control = label === 'Zaman aralığı' ? page.getByTitle(label, { exact: true }) : page.getByRole('button', { name: label, exact: true });
+        await control.first().click();
         await surface('.menu');
         await page.keyboard.press('Escape');
       }

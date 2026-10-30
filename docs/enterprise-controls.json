@@ -780,19 +780,19 @@
       "id": "I07",
       "area": "Arayüz erişilebilirlik ve kullanım",
       "control": "Modal odak tuzağı ve klavye menüsü",
-      "status": "R",
+      "status": "V",
       "priority": "P2",
-      "evidence": "openreporting/static/app/dom.js",
-      "note": "Uygulama var; tam erişilebilirlik test paketi yok"
+      "evidence": "tests/browser/accessibility-surfaces.cjs",
+      "note": "Gerçek Chromium: modal Tab/Shift+Tab, Escape/odak dönüşü, menü okları ve bölüm Space/Enter kabulü; tam ekran okuyucu kabulü değil"
     },
     {
       "id": "I08",
       "area": "Arayüz erişilebilirlik ve kullanım",
       "control": "WCAG/ekran okuyucu ve kontrast denetimi",
-      "status": "O",
+      "status": "P",
       "priority": "P2",
-      "evidence": "openreporting/static/app/app.css",
-      "note": "Bağımsız a11y kabulü tamamlanmadı"
+      "evidence": "tests/browser/accessibility-surfaces.cjs",
+      "note": "axe-core 4.14: giriş + 8 rota, koyu/açık 17 taramada bulgu yok; gerçek ekran okuyucu/bağımsız WCAG kabulü açık"
     },
     {
       "id": "I09",

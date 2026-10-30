@@ -98,7 +98,7 @@ export async function reportsPage(root, { app }) {
       h('p', { class: 'sub', text: 'Dashboard’ları PDF / Excel / CSV rapora dönüştürün; host grubu değişkenine göre her host için ayrı bölüm üretin, zamanlayın ve e-postayla gönderin.' })),
     canEdit ? button('Yeni rapor', { icon: 'plus', variant: 'primary', onClick: () => navigate('/reports/new') }) : null));
     if (!reports.length) {
-      page.append(h('div', { class: 'empty-state' }, h('h3', { text: 'Henüz rapor yok' }),
+      page.append(h('div', { class: 'empty-state' }, h('h2', { class: 'section-heading', text: 'Henüz rapor yok' }),
         h('p', { text: 'Bir dashboard seçip rapor tanımı oluşturun. Örnek: "Ağ Operasyon Özeti" dashboard’u, $host değişkenine göre bölümlenmiş haftalık PDF.' }),
         canEdit ? h('div', { class: 'toolbar' }, button('Yeni rapor', { icon: 'plus', variant: 'primary', onClick: () => navigate('/reports/new') })) : null));
     } else {
@@ -120,9 +120,9 @@ export async function reportsPage(root, { app }) {
       for (const s of schedules) table.append(h('tr', h('td', { text: s.report_name }), h('td', { text: (CADENCES.find((c) => c.value === s.cadence) || {}).label || s.cadence }),
         h('td', { text: fmtDateTime(s.next_due) }), h('td', { text: s.recipients.length ? s.recipients.join(', ') : 'yalnızca arşiv' }),
         h('td', s.enabled ? h('span', { class: 'badge ok', text: 'etkin' }) : h('span', { class: 'badge', text: 'pasif' }))));
-      page.append(h('h3', { text: 'Zamanlamalar' }), h('div', { class: 'card' }, table));
+      page.append(h('h2', { class: 'section-heading', text: 'Zamanlamalar' }), h('div', { class: 'card' }, table));
     }
-    page.append(h('div', { class: 'toolbar', style: { justifyContent: 'space-between' } }, h('h3', { text: 'Son çalıştırmalar ve arşiv', style: { margin: '0' } }), button('Yenile', { icon: 'refresh', size: 'sm', onClick: draw })),
+    page.append(h('div', { class: 'toolbar', style: { justifyContent: 'space-between' } }, h('h2', { class: 'section-heading', text: 'Son çalıştırmalar ve arşiv', style: { margin: '0' } }), button('Yenile', { icon: 'refresh', size: 'sm', onClick: draw })),
       h('div', { class: 'card', style: { marginTop: '10px' } }, runsTable(runs)));
     clearTimeout(timer);
     if (runs.some((r) => r.status === 'queued' || r.status === 'running')) timer = setTimeout(() => draw().catch(() => {}), 4000);
@@ -186,7 +186,7 @@ export async function reportEditPage(root, { id, query, app }) {
         cfg.panel_ids = selected.size === panels.length ? [] : [...selected];
       } }), p.title || `${p.type} #${p.id}`)));
     dashHost.append(
-      vars.length ? h('div', h('h4', { text: 'Değişken değerleri' }), h('div', { class: 'form-grid' }, varFields)) : h('p', { class: 'muted', text: 'Bu dashboard’da değişken yok.' }),
+      vars.length ? h('div', h('h3', { class: 'subsection-heading', text: 'Değişken değerleri' }), h('div', { class: 'form-grid' }, varFields)) : h('p', { class: 'muted', text: 'Bu dashboard’da değişken yok.' }),
       field('Grup bazlı bölümleme', splitSel, 'Örn. $host seçilirse gruptaki her host için başlıklı ayrı bölüm (ve içindekiler) üretilir.'),
       field(`Rapora dahil paneller (${panels.length})`, panelBox, 'Hiçbiri seçili değilse tüm paneller dahil edilir.'));
   };
@@ -239,15 +239,15 @@ export async function reportEditPage(root, { id, query, app }) {
   };
 
   const form = h('div', { class: 'split-2' },
-    h('div', h('div', { class: 'card' }, h('h3', { text: 'Genel' }),
+    h('div', h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Genel' }),
       field('Rapor adı', input({ value: cfg.name, placeholder: 'Ör. WAN Router Haftalık Performans', onChange: (e) => { cfg.name = e.target.value; } })),
       field('Açıklama', textarea({ value: cfg.description, rows: 2, onChange: (e) => { cfg.description = e.target.value; } })),
       field('Dashboard', dashSel),
       h('div', { class: 'form-grid' }, field('Zaman aralığı', rangeSel), field('Saat dilimi', select(['Europe/Istanbul', 'UTC', 'Europe/London', 'Europe/Berlin'].map((z) => ({ value: z, label: z })), cfg.timezone, (v) => { cfg.timezone = v; }))),
       h('div', { class: 'form-grid' }, field('Başlangıç', fromIn), field('Bitiş', toIn)),
       h('p', { class: 'hint', text: 'Zamanlanmış çalıştırmalarda varsayılan olarak "önceki tam dönem" (dün, geçen hafta, geçen ay) kullanılır.' })),
-    h('div', { class: 'card' }, h('h3', { text: 'Dashboard içeriği' }), dashHost)),
-    h('div', h('div', { class: 'card' }, h('h3', { text: 'Çıktı ve düzen' }),
+    h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Dashboard içeriği' }), dashHost)),
+    h('div', h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Çıktı ve düzen' }),
       field('Biçimler', formatBoxes),
       h('div', { class: 'form-grid' },
         field('Sayfa düzeni', select([{ value: 'grid', label: 'Dashboard ızgarası (birebir)' }, { value: 'simple', label: 'Akış (panel başına tam genişlik)' }], cfg.layout, (v) => { cfg.layout = v; })),
@@ -259,7 +259,7 @@ export async function reportEditPage(root, { id, query, app }) {
       field('Müşteri logosu', logoPicker(cfg, canEdit),
         'PNG, JPG, WebP veya GIF; en fazla 1 MB. Saydam arka planlı PNG en iyi sonucu verir. Kapakta sağ üstte, sayfalarda başlığın sağında yer alır.'),
       field('Alt bilgi metni', input({ value: cfg.footer_text, placeholder: 'Ör. Ağ Operasyon Merkezi · Gizli', onChange: (e) => { cfg.footer_text = e.target.value; } }))),
-    h('div', { class: 'card' }, h('h3', { text: 'E-posta' }),
+    h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'E-posta' }),
       settings.mailEnabled ? null : h('div', { class: 'alert warn', text: 'SMTP kapalı: raporlar arşivlenir, e-posta gönderilmez. Etkinleştirmek için /etc/openreporting/openreporting.env içinde OPENREPORTING_MAIL_ENABLED=true ve SMTP ayarlarını yapın.' }),
       field('Konu şablonu', input({ value: cfg.email_subject, placeholder: '{report} | {from} – {to}', onChange: (e) => { cfg.email_subject = e.target.value; } })),
       field('Mesaj', textarea({ value: cfg.email_message, rows: 3, placeholder: 'Rapor ektedir.', onChange: (e) => { cfg.email_message = e.target.value; } })),
@@ -280,7 +280,7 @@ export async function reportEditPage(root, { id, query, app }) {
 
   const scheduleHost = h('div', { class: 'card' });
   const runsHost = h('div', { class: 'card' });
-  page.append(h('h3', { text: 'Zamanlamalar' }), scheduleHost, h('h3', { text: 'Çalıştırma geçmişi' }), runsHost);
+  page.append(h('h2', { class: 'section-heading', text: 'Zamanlamalar' }), scheduleHost, h('h2', { class: 'section-heading', text: 'Çalıştırma geçmişi' }), runsHost);
   const drawSchedules = async () => {
     const list = await get(`/api/dash-reports/${id}/schedules`);
     clear(scheduleHost);

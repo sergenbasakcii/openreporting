@@ -29,7 +29,7 @@ export async function browsePage(root, { app, query, folderUid }) {
       h('button', { type: 'button', text: 'Liste', onclick: (e) => { state.view = 'list'; e.currentTarget.classList.add('on'); e.currentTarget.previousSibling.classList.remove('on'); draw(); } }))), listHost);
   root.append(page);
   get('/api/dashboards/tags').then((tags) => {
-    tagSel.append(select([{ value: '', label: 'Tüm etiketler' }, ...tags.map((t) => ({ value: t.term, label: `${t.term} (${t.count})` }))], state.tag, (v) => { state.tag = v; draw(); }));
+    tagSel.append(select([{ value: '', label: 'Tüm etiketler' }, ...tags.map((t) => ({ value: t.term, label: `${t.term} (${t.count})` }))], state.tag, (v) => { state.tag = v; draw(); }, { label: 'Etiket filtresi' }));
   });
   let seq = 0;
   async function draw() {

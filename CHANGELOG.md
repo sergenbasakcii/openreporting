@@ -26,7 +26,11 @@
 - Sunucu durumunda LDAP/SMTP bağlantı kontrolü; `doctor --check-integrations` ve `check-ldap`.
   Kurulum ve kabul sınırları docs/ENTERPRISE_DEPLOYMENT.md içinde.
 
-### Tema düzeltmeleri
+### Tema ve erişilebilirlik düzeltmeleri
+- Koyu/açık temada düşük kontrastlı yardımcı metinler ve renkli değerler okunur hale getirildi;
+  kayıtlı grafik/eşik paletleri ve sayfa düzeni korundu.
+- Etiket, zaman aralığı erişilebilir adı, başlık sırası ve giriş ana bölgesi düzeltildi;
+  klavye ile bölüm açma/kapama ve odak dönüşü gerçek tarayıcıda doğrulandı.
 - Açılır seçim listeleri ve seçenek yüzeyleri koyu/açık temanın renklerini kullanır.
 - Yeni grafiklerin ipuçlarındaki beyaz arka plan giderildi; tema değişiminde açık paneller
   mevcut veriyle yeniden çizilir, ek veri sorgusu yapılmaz. Sistem teması değişiklikleri izlenir.

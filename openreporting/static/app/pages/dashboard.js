@@ -482,7 +482,7 @@ export async function dashboardPage(root, { uid, query, app }) {
         meta.isStarred = !meta.isStarred; drawToolbar(); invalidate('search');
       } catch (err) { toast(err.message, 'error'); }
     } });
-    const titleBox = h('div', { class: 'dash-title' }, h('span', { class: 'folder hide-kiosk', text: `${meta.folderTitle || 'Genel'} /` }), h('span', { class: 't', text: dash.title, title: dash.title }), starBtn,
+    const titleBox = h('div', { class: 'dash-title' }, h('span', { class: 'folder hide-kiosk', text: `${meta.folderTitle || 'Genel'} /` }), h('h1', { class: 't', text: dash.title, title: dash.title }), starBtn,
       state.viewPanel ? button('Dashboard’a dön', { size: 'sm', icon: 'arrow-up', onClick: () => { state.viewPanel = null; updateUrl(); rerenderAll(); } }) : null);
     tp = timePicker({ range: state.range, timezone: dash.timezone, onChange: setRange, getResolved: async () => state.resolved || (state.resolved = await resolveRange(state.range, dash.timezone, state.now)) });
     rp = refreshPicker({ value: state.refresh, onRefresh: refreshAll, onInterval: setAutoRefresh });

@@ -1,7 +1,7 @@
 // DOM visualizations: stat, bar gauge, table, status grid (group health), text.
 import { h } from '../dom.js';
 import { formatValue, resolveUnit } from '../units.js';
-import { fieldConfigFor, color, alpha, contrastText, thresholdColor, applyMappings } from '../colors.js';
+import { fieldConfigFor, color, alpha, contrastText, thresholdColor, applyMappings, readableColor, cssVar } from '../colors.js';
 import { reducedValues, display, noData, timeSeries, tables, reduce, REDUCERS, fitText, chartTheme, minOf, maxOf } from './common.js';
 import { renderMarkdown } from '../markdown.js';
 import { fmtDateTime } from '../dom.js';
@@ -65,7 +65,7 @@ export function renderStat(container, frames, panel) {
       if (showName) box.append(h('div', { class: 'stat-name', text: item.name }));
       if (textMode !== 'name' && textMode !== 'none') {
         const size = fitText(d.text, cellW * 0.9, cellH * (showName ? 0.7 : 0.9), 96);
-        box.append(h('div', { class: 'stat-value', text: d.text, style: { fontSize: `${size}px`, color: colorMode === 'value' ? c : 'inherit' } }));
+        box.append(h('div', { class: 'stat-value', text: d.text, style: { fontSize: `${size}px`, color: colorMode === 'value' ? readableColor(c, cssVar('--bg-panel')) : 'inherit' } }));
       }
       if (graphMode === 'area' && item.points.length > 1 && cellH > 50) {
         const spark = sparkline(item.points, colorMode.startsWith('background') ? 'rgba(255,255,255,.75)' : c);
@@ -101,7 +101,7 @@ export function renderBarGauge(container, frames, panel) {
     const bar = h('div', { class: 'bg-bar' }, fill);
     if (opts.showUnfilled === false) bar.style.background = 'transparent';
     list.append(h('div', { class: 'bargauge-row', title: `${item.name}: ${d.text}` }, h('div', { class: 'bg-name', text: item.name }), bar,
-      h('div', { class: 'bg-value', text: d.text, style: { color: c } })));
+      h('div', { class: 'bg-value', text: d.text, style: { color: readableColor(c, cssVar('--bg-panel')) } })));
   }
   container.replaceChildren(list);
   return nothing;

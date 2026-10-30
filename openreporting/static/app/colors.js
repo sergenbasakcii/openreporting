@@ -95,6 +95,31 @@ export function applyMappings(value, mappings) {
 
 export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
+// Adjust only text at render time; saved series/threshold colours stay unchanged.
+export function readableColor(value, background, minimum = 4.5) {
+  const rgb = (v) => {
+    const hex = /^#([0-9a-f]{6})$/i.exec(v || '');
+    if (hex) return [0, 2, 4].map(i => parseInt(hex[1].slice(i, i + 2), 16));
+    const short = /^#([0-9a-f]{3})$/i.exec(v || '');
+    if (short) return [...short[1]].map(c => parseInt(c + c, 16));
+    const parts = /^rgba?\(([^)]+)\)$/i.exec(v || '');
+    return parts ? parts[1].split(',').slice(0, 3).map(Number) : null;
+  };
+  const fg = rgb(value); const bg = rgb(background);
+  if (!fg || !bg || [...fg, ...bg].some(v => !Number.isFinite(v))) return value;
+  const luminance = channels => channels.map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4)
+    .reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+  const bgL = luminance(bg);
+  const ratio = channels => (Math.max(luminance(channels), bgL) + .05) / (Math.min(luminance(channels), bgL) + .05);
+  if (ratio(fg) >= minimum) return value;
+  const end = bgL > .179 ? 0 : 255;
+  for (let step = 1; step <= 100; step += 1) {
+    const next = fg.map(v => Math.round(v + (end - v) * step / 100));
+    if (ratio(next) >= minimum) return `rgb(${next.join(',')})`;
+  }
+  return end ? '#fff' : '#000';
+}
+
 export function contrastText(hex) {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex || '');
   if (!m) return '#fff';

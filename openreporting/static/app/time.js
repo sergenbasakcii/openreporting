@@ -96,7 +96,7 @@ function toInputText(value, tz) {
 export function timePicker({ range, timezone, onChange, getResolved, compact = false }) {
   const wrap = h('div', { class: 'timepicker' });
   const label = h('span', { class: 'tp-label' });
-  const update = (r) => { label.textContent = rangeLabel(r, timezone); };
+  const update = (r) => { label.textContent = rangeLabel(r, timezone); trigger.setAttribute('aria-label', `${label.textContent} · Zaman aralığı`); };
   const shift = async (direction) => {
     const resolved = getResolved ? await getResolved() : null;
     if (!resolved) return;

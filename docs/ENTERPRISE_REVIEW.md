@@ -13,17 +13,21 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Temel doğrulama: `60f58d1` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40949407856),
-yerelde 163 Python + 8 Node testi başarılı. Yeni sağlık düzeltmesi 9 yerel testten geçti; son CI sonucu PROGRESS.md'de izlenir.
+Son backend doğrulaması: `d79d1cf` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40989996711).
+Yerelde **216 Python testi başarılı, 12 ortam bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
+Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
+Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
+bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son arayüz commitinin CI sonucu PROGRESS.md'de izlenir.
 Test dosyası referansları o başlığın kanıt alanını gösterir; her satır için ayrı bir yeni test yazıldığı iddia edilmez.
 
-Gövde sınırı, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.
-Öncelikli kalanlar: Host/Origin matrisi, ölçülmüş yük/erişilebilirlik kanıtı ve gerçek kurum kabulü. MFA/SSO, tenant ACL, deneysel PostgreSQL işletimi ve gerçek kurum kabulü
-kurumsal kabul kararında ayrıca değerlendirilmelidir. Kullanıcı adına lisans/üretim kabul kararı verilmez.
+Gövde sınırı, Host/Origin izolasyonu, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.
+Öncelikli kalanlar: ölçülmüş yük/uzun çalışma kanıtı ve gerçek kurum kabulü. MFA/SSO, tenant ACL,
+deneysel PostgreSQL işletimi ve anahtar döndürme kurumsal kabul kararında ayrıca değerlendirilmelidir.
+Kullanıcı adına lisans/üretim kabul kararı verilmez.
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 74, R: 25, P: 6, O: 9, E: 6.
+Durum dağılımı: V: 75, R: 24, P: 7, O: 8, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -155,8 +159,8 @@ Durum dağılımı: V: 74, R: 25, P: 6, O: 9, E: 6.
 | I04 | Tema değişiminde sorgusuz yeniden çizim | V | P2 | [tests/browser/theme-surfaces.cjs](../tests/browser/theme-surfaces.cjs) — Canvas disposal ve cached redraw |
 | I05 | Panel inceleme ve PDF bekleme yüzeyi | V | P2 | [tests/browser/theme-surfaces.cjs](../tests/browser/theme-surfaces.cjs) — Beyaz ekran regresyonu giderildi |
 | I06 | DOM/Markdown güvenli metin oluşturma | R | P1 | [openreporting/static/app/markdown.js](../openreporting/static/app/markdown.js) — innerHTML yok; link scheme kontrolü |
-| I07 | Modal odak tuzağı ve klavye menüsü | R | P2 | [openreporting/static/app/dom.js](../openreporting/static/app/dom.js) — Uygulama var; tam erişilebilirlik test paketi yok |
-| I08 | WCAG/ekran okuyucu ve kontrast denetimi | O | P2 | [openreporting/static/app/app.css](../openreporting/static/app/app.css) — Bağımsız a11y kabulü tamamlanmadı |
+| I07 | Modal odak tuzağı ve klavye menüsü | V | P2 | [tests/browser/accessibility-surfaces.cjs](../tests/browser/accessibility-surfaces.cjs) — Gerçek Chromium: modal Tab/Shift+Tab, Escape/odak dönüşü, menü okları ve bölüm Space/Enter kabulü; tam ekran okuyucu kabulü değil |
+| I08 | WCAG/ekran okuyucu ve kontrast denetimi | P | P2 | [tests/browser/accessibility-surfaces.cjs](../tests/browser/accessibility-surfaces.cjs) — axe-core 4.14: giriş + 8 rota, koyu/açık 17 taramada bulgu yok; gerçek ekran okuyucu/bağımsız WCAG kabulü açık |
 | I09 | Mobil/yoğun veri ve uzun metin yerleşimi | P | P2 | [openreporting/static/app/app.css](../openreporting/static/app/app.css) — Önceki smoke var; bütün 30 tür mobil matrisi yok |
 | I10 | Kaydetme çakışması ve sürüm geçmişi | V | P1 | [tests/test_datasources_engine.py](../tests/test_datasources_engine.py) — Optimistic locking ve sürümler testli |
 

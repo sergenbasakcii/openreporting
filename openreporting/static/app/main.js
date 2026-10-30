@@ -40,7 +40,7 @@ function loginPage(root) {
     }
   } }, h('div', { class: 'brand-logo', text: 'O' }), h('h1', { text: 'OpenReporting' }), h('p', { text: 'Gözlem, dashboard ve raporlama platformu' }),
   error, field('Kullanıcı adı', user), field('Parola', pass), submit);
-  root.replaceChildren(h('div', { class: 'login-page' }, form));
+  root.replaceChildren(h('main', { class: 'login-page' }, form));
   setTimeout(() => user.focus(), 20);
 }
 
