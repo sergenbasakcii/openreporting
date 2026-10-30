@@ -137,6 +137,21 @@ veya erişilemeyen DB başarılı readiness sayılmaz. Bu kontroller harici veri
 
 Geri yükleme:
 
+Önce yedeği canlı verinin üzerine yazmadan doğrulayın. Bu komut yalnız yeni geçici dizinde çalışır;
+SHA256SUMS, DB bütünlüğü/şeması, audit zinciri, rapor manifesti/dosyaları, logolar ve şifreli
+kaynakların ayrı anahtarla açılmasını kontrol eder. Canlı ayarları yüklemez, migrasyon/worker/SMTP çalıştırmaz.
+Çıkış kodu 0 ve `ok:true` başarılı doğrulamadır. GPG yedeğini önce güvenli ayrı bir dizine çözün.
+Varsayılan açılmış boyut bütçesi 2048 MB; büyük arşivlerde `--max-unpacked-mb` ile bilinçli artırın.
+
+```bash
+sudo /opt/openreporting/venv/bin/openreporting verify-backup /var/backups/openreporting/YYYYMMDD-HHMMSS \
+  --key-file /etc/openreporting/secret.key
+```
+
+SHA256SUMS ve audit zinciri tutarlılık kanıtıdır; tam yetkili bir saldırganın yedeği yeniden
+üretmesine karşı bağımsız dijital imza yerine geçmez. Yedeğin kaynağını ve ayrı anahtarın emanetini doğrulayın.
+Canlıya geri yükleme işlemi bakım penceresinde, eşleşen uygulama sürümü ve doğrulanmış yedekle yapılmalıdır.
+
 ```bash
 sudo systemctl stop openreporting-worker openreporting-web
 cd /var/backups/openreporting/20261024-023000 && sha256sum -c SHA256SUMS

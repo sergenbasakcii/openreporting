@@ -11,6 +11,7 @@ from .config import Settings
 from .db import connect, init_db, transaction, verify_audit
 from .domain import DomainError
 from .healthchecks import database_ready
+from .request_limits import RequestBodyLimitMiddleware
 from .security import authenticate, digest, login, logout, require_csrf, require_role
 
 log = logging.getLogger(__name__)
@@ -39,13 +40,10 @@ def create_app(settings: Settings | None = None):
     app.mount("/static", StaticFiles(directory=static), name="static")
     for module in (datasources_api, dashboards_api, users_api, reports_api, system_api):
         app.include_router(module.router)
+    app.add_middleware(RequestBodyLimitMiddleware)
 
     @app.middleware("http")
     async def headers(request, call_next):
-        if request.method in ("POST", "PUT", "PATCH"):
-            length = request.headers.get("content-length")
-            if length is not None and (not length.isdecimal() or int(length) > 2_000_000):
-                return JSONResponse({"detail": "Request too large"}, status_code=413)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"

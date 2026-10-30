@@ -69,10 +69,10 @@
       "id": "A08",
       "area": "Mimari ve kapsam",
       "control": "Resmi veri akışı ve tehdit modeli",
-      "status": "P",
+      "status": "R",
       "priority": "P1",
-      "evidence": "docs/ARCHITECTURE.md",
-      "note": "Güven sınırları ve kötüye kullanım senaryoları ayrı kayda dönüştürülecek"
+      "evidence": "docs/THREAT_MODEL.md",
+      "note": "Varlıklar, aktörler, güven sınırları ve kötüye kullanım senaryoları kaydedildi; bağımsız denetim değil"
     },
     {
       "id": "A09",
@@ -402,10 +402,10 @@
       "id": "E05",
       "area": "HTTP ve API savunmaları",
       "control": "Gövde sınırının akış üzerinde uygulanması",
-      "status": "P",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/web.py",
-      "note": "Content-Length kontrolü var; eksik/yanlış başlık ve chunked sınırı gözden geçirilecek"
+      "evidence": "tests/test_request_limits.py",
+      "note": "11 test: eksik/yanlış Content-Length, chunked, gerçek boyut, framing, endpoint mutasyon izolasyonu"
     },
     {
       "id": "E06",
@@ -942,19 +942,19 @@
       "id": "K05",
       "area": "Yedek kurtarma ve dağıtım",
       "control": "Logo gibi ek varlıkların yedeği",
-      "status": "P",
+      "status": "V",
       "priority": "P1",
-      "evidence": "deploy/backup.sh",
-      "note": "logos yedeğe eklendi; gerçek Ubuntu CI asset kontrolü bekleniyor"
+      "evidence": ".github/workflows/ci.yml",
+      "note": "b51232f Ubuntu CI logo varlığını yedek tar içinde doğruladı"
     },
     {
       "id": "K06",
       "area": "Yedek kurtarma ve dağıtım",
       "control": "Tam geri yükleme kabul tatbikatı",
-      "status": "P",
+      "status": "V",
       "priority": "P1",
-      "evidence": "tests/test_database_backup.py",
-      "note": "DB bütünlüğü testli; arşiv/anahtar/logo ile tam tatbikat eksik"
+      "evidence": "tests/test_backup_verification.py",
+      "note": "9 izole kurtarma testi: DB/audit/arşiv/logo/anahtar, tamper/link/yol/bütçe; yeni Ubuntu kabulü CI bekliyor"
     },
     {
       "id": "K07",
@@ -1032,19 +1032,19 @@
       "id": "L05",
       "area": "Tedarik zinciri ve teslim yönetişimi",
       "control": "Bağımlılık zafiyet taraması",
-      "status": "O",
+      "status": "V",
       "priority": "P1",
-      "evidence": "pyproject.toml",
-      "note": "Tekrarlanabilir CVE taraması henüz kayıtlı değil"
+      "evidence": ".github/workflows/ci.yml",
+      "note": "30 Ekim 2026: 28 yerel runtime paketi pip-audit ile tarandı; cryptography 50.0.2 sonrası bilinen açık yok; yeni CI bekliyor"
     },
     {
       "id": "L06",
       "area": "Tedarik zinciri ve teslim yönetişimi",
       "control": "SBOM ve bileşen envanteri",
-      "status": "O",
+      "status": "V",
       "priority": "P2",
-      "evidence": "pyproject.toml",
-      "note": "Makine okunur bağımlılık dökümü hazırlanacak"
+      "evidence": "tools/runtime_requirements.py",
+      "note": "CycloneDX runtime SBOM üretildi; özel paket/yol aktarılmaz, test/audit closure dışında"
     },
     {
       "id": "L07",
@@ -1059,10 +1059,10 @@
       "id": "L08",
       "area": "Tedarik zinciri ve teslim yönetişimi",
       "control": "Güvenlik bildirim ve güncelleme politikası",
-      "status": "O",
+      "status": "P",
       "priority": "P1",
-      "evidence": "README.md",
-      "note": "SECURITY.md ve triyaj runbooku eksik"
+      "evidence": "SECURITY.md",
+      "note": "Bildirim/güncelleme ve olay ilk adımları yazıldı; kalıcı özel iletişim kanalı ve SLA sahibi kurum/maintainer tarafından tanımlanmalı"
     },
     {
       "id": "L09",

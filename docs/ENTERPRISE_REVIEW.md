@@ -17,13 +17,13 @@ Temel doğrulama: `60f58d1` için [CI tümü başarılı](https://github.com/ser
 yerelde 163 Python + 8 Node testi başarılı. Yeni sağlık düzeltmesi 9 yerel testten geçti; son CI sonucu PROGRESS.md'de izlenir.
 Test dosyası referansları o başlığın kanıt alanını gösterir; her satır için ayrı bir yeni test yazıldığı iddia edilmez.
 
-Öncelikli kalanlar: akış gövde limiti, yedeklerde ek varlıklar ve geri yükleme tatbikatı, zafiyet taraması,
-tehdit modeli, yük/erişilebilirlik kanıtı. MFA/SSO, tenant ACL, deneysel PostgreSQL işletimi ve gerçek kurum kabulü
+Gövde sınırı, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.
+Öncelikli kalanlar: Host/Origin matrisi, ölçülmüş yük/erişilebilirlik kanıtı ve gerçek kurum kabulü. MFA/SSO, tenant ACL, deneysel PostgreSQL işletimi ve gerçek kurum kabulü
 kurumsal kabul kararında ayrıca değerlendirilmelidir. Kullanıcı adına lisans/üretim kabul kararı verilmez.
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 68, R: 24, P: 10, O: 12, E: 6.
+Durum dağılımı: V: 73, R: 25, P: 7, O: 9, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -36,7 +36,7 @@ Durum dağılımı: V: 68, R: 24, P: 10, O: 12, E: 6.
 | A05 | PostgreSQL üretim işletim paketi | O | P1 | [docs/adr/0001-application-database-migration.md](../docs/adr/0001-application-database-migration.md) — pg_dump/restore ve taşıma eksik |
 | A06 | Yapılandırma tür ve sınır doğrulaması | V | P1 | [tests/test_enterprise_settings.py](../tests/test_enterprise_settings.py) — Güvensiz entegrasyon ayarları reddediliyor |
 | A07 | API/driver/rapor modül sınırları | R | P2 | [openreporting/api/deps.py](../openreporting/api/deps.py) — Kaynak sorguları uygulama DB adapterine yönlendirilmiyor |
-| A08 | Resmi veri akışı ve tehdit modeli | P | P1 | [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) — Güven sınırları ve kötüye kullanım senaryoları ayrı kayda dönüştürülecek |
+| A08 | Resmi veri akışı ve tehdit modeli | R | P1 | [docs/THREAT_MODEL.md](../docs/THREAT_MODEL.md) — Varlıklar, aktörler, güven sınırları ve kötüye kullanım senaryoları kaydedildi; bağımsız denetim değil |
 | A09 | Kapasite ve kullanıcı yükü ölçümü | O | P1 | [docs/LINUX_DEPLOYMENT.md](../docs/LINUX_DEPLOYMENT.md) — Kapasite önerisi var, ölçülmüş yük testi yok |
 | A10 | Eksik veri ve bağımlılık hatasında kapalı davranış | V | P1 | [tests/test_reporting.py](../tests/test_reporting.py) — Kısmi raporda e-posta engeli testli |
 
@@ -93,7 +93,7 @@ Durum dağılımı: V: 68, R: 24, P: 10, O: 12, E: 6.
 | E02 | DB arızasında sağlık HTTP 503 | V | P1 | [tests/test_healthchecks.py](../tests/test_healthchecks.py) — SELECT 1 ve şema kontrolü; yerel yeni test |
 | E03 | Bozuk audit zincirinde readiness 503 | V | P1 | [tests/test_healthchecks.py](../tests/test_healthchecks.py) — Yeni regresyon testi; CI sonucu son kayıtta |
 | E04 | Kimlik deposu arızasında redakte 503 | V | P1 | [tests/test_healthchecks.py](../tests/test_healthchecks.py) — SQLite/PostgreSQL/OSError detayları gösterilmiyor |
-| E05 | Gövde sınırının akış üzerinde uygulanması | P | P1 | [openreporting/web.py](../openreporting/web.py) — Content-Length kontrolü var; eksik/yanlış başlık ve chunked sınırı gözden geçirilecek |
+| E05 | Gövde sınırının akış üzerinde uygulanması | V | P1 | [tests/test_request_limits.py](../tests/test_request_limits.py) — 11 test: eksik/yanlış Content-Length, chunked, gerçek boyut, framing, endpoint mutasyon izolasyonu |
 | E06 | CSP ve frame/object kısıtları | R | P1 | [openreporting/web.py](../openreporting/web.py) — self script, DENY frame ve no-sniff; inline style açık |
 | E07 | Giriş/API/ağır işlem rate limit | R | P1 | [deploy/nginx/openreporting.conf](../deploy/nginx/openreporting.conf) — nginx IP limitleri var; doğrudan API global limit yok |
 | E08 | Proxy başlıklarına sınırlı güven | R | P1 | [openreporting/cli.py](../openreporting/cli.py) — Yalnız loopback forwarded_allow_ips |
@@ -183,8 +183,8 @@ Durum dağılımı: V: 68, R: 24, P: 10, O: 12, E: 6.
 | K02 | Yedek hedefinin yanlışlıkla ezilmesini reddetme | V | P1 | [tests/test_database_backup.py](../tests/test_database_backup.py) — Mevcut dosya ve aktif veri dizini korunuyor |
 | K03 | Eksik/bozuk kaynaktan sahte yedek üretmeme | V | P1 | [tests/test_database_backup.py](../tests/test_database_backup.py) — CLI testli; deploy backup kaynak açma modu ayrıca gözden geçirilecek |
 | K04 | Arşiv ve config yedeği | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Gerçek Ubuntu yedek ve SHA doğrulaması |
-| K05 | Logo gibi ek varlıkların yedeği | P | P1 | [deploy/backup.sh](../deploy/backup.sh) — logos yedeğe eklendi; gerçek Ubuntu CI asset kontrolü bekleniyor |
-| K06 | Tam geri yükleme kabul tatbikatı | P | P1 | [tests/test_database_backup.py](../tests/test_database_backup.py) — DB bütünlüğü testli; arşiv/anahtar/logo ile tam tatbikat eksik |
+| K05 | Logo gibi ek varlıkların yedeği | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — b51232f Ubuntu CI logo varlığını yedek tar içinde doğruladı |
+| K06 | Tam geri yükleme kabul tatbikatı | V | P1 | [tests/test_backup_verification.py](../tests/test_backup_verification.py) — 9 izole kurtarma testi: DB/audit/arşiv/logo/anahtar, tamper/link/yol/bütçe; yeni Ubuntu kabulü CI bekliyor |
 | K07 | nginx TLS ve systemd kısıtları | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Gerçek Ubuntu izin/HTTPS kabulü |
 | K08 | Yükseltme ve veri koruyan kaldırma | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Gerçek Ubuntu E2E yeşil |
 | K09 | Başarısız schema yükseltmesinde geri dönüş | P | P1 | [deploy/upgrade.sh](../deploy/upgrade.sh) — Eski kod korunuyor; eşleşen DB/anahtar geri dönüşü manuel |
@@ -198,10 +198,10 @@ Durum dağılımı: V: 68, R: 24, P: 10, O: 12, E: 6.
 | L02 | Tarayıcı ES modüllerinin açık parse kontrolü | V | P1 | [tests/check_app_syntax.cjs](../tests/check_app_syntax.cjs) — Otomatik js mod seçimi hatası kapatıldı |
 | L03 | Gerçek LDAP/PG ve Ubuntu CI kanıtı | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — 60f58d1 CI tüm işler başarılı |
 | L04 | Bağımlılıkların tekrarlanabilir kilitlenmesi | P | P1 | [pyproject.toml](../pyproject.toml) — Aralık sınırları var; hashli lock yok |
-| L05 | Bağımlılık zafiyet taraması | O | P1 | [pyproject.toml](../pyproject.toml) — Tekrarlanabilir CVE taraması henüz kayıtlı değil |
-| L06 | SBOM ve bileşen envanteri | O | P2 | [pyproject.toml](../pyproject.toml) — Makine okunur bağımlılık dökümü hazırlanacak |
+| L05 | Bağımlılık zafiyet taraması | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — 30 Ekim 2026: 28 yerel runtime paketi pip-audit ile tarandı; cryptography 50.0.2 sonrası bilinen açık yok; yeni CI bekliyor |
+| L06 | SBOM ve bileşen envanteri | V | P2 | [tools/runtime_requirements.py](../tools/runtime_requirements.py) — CycloneDX runtime SBOM üretildi; özel paket/yol aktarılmaz, test/audit closure dışında |
 | L07 | İmzalı sürüm/provenance | O | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Taslak PR var; imzalı release/supply-chain attest yok |
-| L08 | Güvenlik bildirim ve güncelleme politikası | O | P1 | [README.md](../README.md) — SECURITY.md ve triyaj runbooku eksik |
+| L08 | Güvenlik bildirim ve güncelleme politikası | P | P1 | [SECURITY.md](../SECURITY.md) — Bildirim/güncelleme ve olay ilk adımları yazıldı; kalıcı özel iletişim kanalı ve SLA sahibi kurum/maintainer tarafından tanımlanmalı |
 | L09 | Uygulama lisansı ve hak sahipliği | E | P1 | [README.md](../README.md) — Karar kullanıcıda; lisans seçilmedi ve repo private |
 | L10 | Gerçek kurum kabulü ve bağımsız güvenlik incelemesi | E | P1 | [docs/ENTERPRISE_DEPLOYMENT.md](../docs/ENTERPRISE_DEPLOYMENT.md) — İzole testler Google onayı veya bağımsız sertifika değildir |
 

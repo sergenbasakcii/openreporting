@@ -3,6 +3,12 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- İstek gövdeleri başlık eksik/yanlış olsa ve chunked gelse de 2 MB akış sınırından geçer;
+  reddedilen gövde endpoint mutasyonuna ulaşmaz.
+- Cryptography 46 sürümünde taranan güvenlik duyuruları nedeniyle bağımlılık 50.0.2+ olarak güncellendi;
+  eski Fernet verilerinin açılması doğrulandı. Runtime CVE taraması ve CycloneDX SBOM CI'a eklendi.
+- `verify-backup`, yedeği canlı veriyi değiştirmeyen geçici dizinde açarak DB/audit/rapor/logo/anahtar
+  bütünlüğünü doğrular; yol kaçışı, link, cihaz girdileri ve boyut aşımı reddedilir.
 - 120 maddelik kanıt/açık risk kaydı eklendi (docs/ENTERPRISE_REVIEW.md).
 - Veritabanı/şema arızası sağlık uçlarında, bozuk audit zinciri readiness kontrolünde HTTP 503 döndürür.
   Kimlik deposu hataları ayrıntı/sır sızdırmadan 503 verir; süreç canlılığı ayrı kalır.

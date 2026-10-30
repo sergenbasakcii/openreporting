@@ -165,10 +165,25 @@ def main(argv=None):
     commands.add_parser("verify-audit", help="Verify audit hash chain")
     p_backup = commands.add_parser("backup", help="Consistent SQLite backup")
     p_backup.add_argument("target")
+    p_verify = commands.add_parser("verify-backup", help="Verify backup DB, audit, report files, logos and key in disposable storage")
+    p_verify.add_argument("directory")
+    p_verify.add_argument("--key-file", help="Separately held encryption key (never printed or copied into the backup)")
+    p_verify.add_argument("--max-unpacked-mb", type=int, default=2048)
+    p_verify.add_argument("--require-logos", action="store_true")
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    if args.action == "verify-backup":
+        import json
+        from .backup_verify import BackupVerificationError, verify_backup
+        try:
+            result = verify_backup(args.directory,key_file=args.key_file,max_unpacked_bytes=args.max_unpacked_mb * 1024**2,
+                                   require_logos=args.require_logos)
+        except BackupVerificationError as exc:
+            raise SystemExit(str(exc)) from None
+        print(json.dumps(result))
+        return  # Never initialize, migrate, replace or connect to the live application state.
     settings = Settings.from_env()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     init_db(settings)
