@@ -49,7 +49,10 @@ function loginPage(root) {
   error, field('Kullanıcı adı', user), field('Parola', pass), codeField, submit);
   user.addEventListener('input', () => { codeField.hidden = true; code.value = ''; });
   root.replaceChildren(h('main', { class: 'login-page' }, form));
-  setTimeout(() => user.focus(), 20);
+  setTimeout(() => {
+    // Do not steal focus if typing already started in a different field.
+    if (form.isConnected && document.activeElement === document.body) user.focus();
+  }, 20);
 }
 
 function navItem(path, label, iconName, match) {

@@ -13,9 +13,10 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Önceki doğrulanmış temel: `e805577` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/41001681852).
-Hashli build/runtime QA ortamında yerelde **269 Python testi başarılı, 14 ortam/Windows yetkisi bağımlı test atlandı**; önceki temelin gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kontrolleri başarılı.
-Yeni MFA sürümünün bütün CI sonucu ayrıca doğrulanacak; yerel test sayısı kurum kabulü değildir.
+MFA temel değişikliği `f7ba845` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/41036010496).
+Hashli build/runtime QA ortamında yerelde **269 Python testi başarılı, 14 ortam/Windows yetkisi bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kontrolleri başarılı.
+Yeni Ubuntu kurulumu zorunlu admin MFA kurulumundan rapor üretimine, MFA seed anahtar
+değişimine ve yedek doğrulamaya kadar geçti; yerel/CI sonucu gerçek kurum kabulü değildir.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
 Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
 bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son commitlerin CI sonucu PROGRESS.md'de izlenir.

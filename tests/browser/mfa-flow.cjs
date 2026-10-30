@@ -40,9 +40,16 @@ function totp(secret) {
       await page.goto(base + '/profile');
       await page.getByLabel('Kullanıcı adı', { exact: true }).fill(name);
       await page.getByLabel('Parola', { exact: true }).fill(password);
+      // Initial autofocus must not move typing back into the username field.
+      await page.waitForTimeout(40);
+      assert.ok(await page.getByLabel('Parola', { exact: true }).evaluate(el => el === document.activeElement), 'Password keeps keyboard focus');
+      assert.ok(await page.getByLabel('Parola', { exact: true }).inputValue() === password, 'Password fill completed');
       const first = page.waitForResponse(response => response.url().endsWith('/api/login'));
       await page.getByRole('button', { name: 'Giriş yap', exact: true }).click();
       const response = await first;
+      const sent = response.request().postDataJSON();
+      assert.ok(sent.username === name, 'Fixture username must reach the current login form');
+      assert.ok(sent.password === password, `Fixture password must reach the current login form (length ${sent.password?.length}, expected ${password.length})`);
       const data = await response.json();
       console.log(`MFA UI sign-in response: ${response.status()}, challenge ${data.detail?.code || 'none'}`);
       if (code) {
@@ -88,6 +95,7 @@ function totp(secret) {
     const renewed = (await page.locator('.mfa-codes').innerText()).split('\n');
     assert.notDeepEqual(renewed, codes);
     await page.getByRole('button', { name: 'Giriş ekranına dön', exact: true }).click();
+    await page.locator('.login-page form').waitFor();
     await login('optionaluser', renewed[0]);
     await page.getByRole('button', { name: 'Kapat', exact: true }).click();
     dialog = page.getByRole('dialog');
@@ -97,6 +105,7 @@ function totp(secret) {
     await page.getByRole('heading', { name: 'İki adımlı giriş kapatıldı' }).waitFor();
     await scan('disabled');
     await page.getByRole('button', { name: 'Giriş ekranına dön', exact: true }).click();
+    await page.locator('.login-page form').waitFor();
     await login('optionaluser');
     await page.getByRole('heading', { name: 'İki adımlı giriş', exact: true }).waitFor();
     // Old server fallback: a missing endpoint must not break the existing profile.
