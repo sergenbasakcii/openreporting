@@ -8,6 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=deploy/lib.sh
 . "$SCRIPT_DIR/lib.sh"
+# shellcheck source=deploy/platform.sh
+. "$SCRIPT_DIR/platform.sh"
 WHEELHOUSE=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -16,7 +18,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 require_root
-[ -x "$OPENREPORTING_VENV/bin/openreporting" ] || die "Mevcut kurulum bulunamadı; önce install-ubuntu.sh çalıştırın"
+load_platform
+[ -x "$OPENREPORTING_VENV/bin/openreporting" ] || die "Mevcut kurulum bulunamadı; önce dağıtımın install betiğini çalıştırın"
 [ "$SRC" != "$OPENREPORTING_APP" ] || die "Yeni sürümü ayrı bir dizinden çalıştırın (ör. /tmp/openreporting-1.x/deploy/upgrade.sh)"
 
 OLD="$("$OPENREPORTING_VENV/bin/python" -c 'import openreporting; print(openreporting.__version__)')"
@@ -41,7 +44,7 @@ trap rollback ERR
 sync_code "$SRC"
 install_package "$WHEELHOUSE"
 as_openreporting "$OPENREPORTING_VENV/bin/openreporting" init
-install -m 0644 "$OPENREPORTING_APP"/deploy/systemd/openreporting-*.service "$OPENREPORTING_APP"/deploy/systemd/openreporting-*.timer /etc/systemd/system/
+install_service_units
 systemctl daemon-reload
 systemctl start openreporting-web.service
 health_check || false

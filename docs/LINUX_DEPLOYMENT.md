@@ -2,6 +2,9 @@
 
 CI ile doğrulanan üretim tabanı: **Ubuntu 24.04 LTS**, systemd, Python 3.11–3.13 ve yerel SQLite.
 Ubuntu 22.04/Debian 12 bu kabul matrisinde doğrulanmadı; ayrı ortam kabulü gerekir.
+Oracle Linux 8.10/9/10 kurulum yolu ve container/tam host kabul ayrımı
+[Oracle Linux yönergesinde](ORACLE_LINUX.md) açıklanır. `install-ubuntu.sh` uyumlu giriş
+olarak ortak `install-linux.sh` akışını çağırır.
 
 ## 1. Kapasite
 

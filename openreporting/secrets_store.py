@@ -121,3 +121,13 @@ def decrypt(settings, token: str) -> dict:
 def reset_cache():
     with _lock:
         _cache.clear()
+
+
+def installation_key_path(settings) -> Path:
+    """Installer preflight only: never replace a lost key beside existing state."""
+    path=key_path(settings)
+    if path.exists():
+        read_keys(path)
+    elif settings.database_url or settings.db_path.exists() or path.is_symlink():
+        raise SecretError('Existing state requires its original encryption key; restore it before installation')
+    return path.resolve()

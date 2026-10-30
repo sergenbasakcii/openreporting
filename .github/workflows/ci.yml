@@ -226,6 +226,32 @@ jobs:
           path: build/mfa-browser-evidence.json
           retention-days: 14
 
+  oracle-userspace:
+    name: Oracle Linux ${{ matrix.oracle }} userspace contract
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        oracle: ['8', '9', '10']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Official Oracle Linux container acceptance
+        run: |
+          mkdir -p build/oracle-${{ matrix.oracle }}
+          docker pull oraclelinux:${{ matrix.oracle }}
+          docker image inspect oraclelinux:${{ matrix.oracle }} --format '{{json .RepoDigests}}' > build/oracle-${{ matrix.oracle }}/image-digests.json
+          docker run --rm --init -e OPENREPORTING_ORACLE_CI=1 \
+            -v "$GITHUB_WORKSPACE:/src:ro" -v "$GITHUB_WORKSPACE/build/oracle-${{ matrix.oracle }}:/evidence" \
+            oraclelinux:${{ matrix.oracle }} bash /src/deploy/ci-oracle-linux.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: oracle-linux-${{ matrix.oracle }}-evidence
+          path: build/oracle-${{ matrix.oracle }}
+          retention-days: 14
+
   ubuntu-install:
     name: End-to-end Ubuntu install
     runs-on: ubuntu-24.04

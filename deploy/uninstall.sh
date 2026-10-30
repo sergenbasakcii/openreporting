@@ -4,7 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=deploy/lib.sh
 . "$SCRIPT_DIR/lib.sh"
+# shellcheck source=deploy/platform.sh
+. "$SCRIPT_DIR/platform.sh"
 require_root
+load_platform
 PURGE=0
 [ "${1:-}" = "--purge" ] && PURGE=1
 systemctl disable --now openreporting-worker.service openreporting-web.service openreporting-backup.timer 2>/dev/null || true
@@ -15,6 +18,11 @@ if [ -L /etc/nginx/sites-enabled/openreporting.conf ]; then
   rm -f /etc/nginx/sites-enabled/openreporting.conf /etc/nginx/sites-available/openreporting.conf
   if nginx -t >/dev/null 2>&1; then systemctl reload nginx || true; fi
 fi
+if [ "$PLATFORM_FAMILY" = oracle ] && [ -f "$NGINX_SITE" ] && grep -q '^# OpenReporting — nginx' "$NGINX_SITE"; then
+  rm -f "$NGINX_SITE"
+  if nginx -t >/dev/null 2>&1; then systemctl reload nginx || true; fi
+fi
+# Shared SELinux labels/booleans and firewall services are deliberately not reverted.
 rm -rf "$OPENREPORTING_HOME"
 if [ "$PURGE" -eq 1 ]; then
   rm -rf "$OPENREPORTING_DATA" "$OPENREPORTING_ETC"
