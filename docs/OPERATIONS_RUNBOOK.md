@@ -68,7 +68,8 @@ Histogramda route/ID/kullanıcı/veri kaynağı etiketi bulunmaz; istekle seri s
 
 Pahalı scrypt/LDAP giriş işi her web sürecinde en fazla dört eşzamanlı çağrıya alınır;
 sınırda DB/hash/dizin çağrısına girmeden HTTP 429 ve `Retry-After: 1` döner. Hata dahil
-her tamamlanmada slot bırakılır. Bu kaynak kabul sınırı, nginx IP limitinin veya dağıtık
+her tamamlanmada slot bırakılır. Girişte SQLite/PostgreSQL/OS depo hatası ayrıntı
+sızdırmadan 503 verir ve kapasiteyi bırakır. Bu kaynak kabul sınırı, nginx IP limitinin veya dağıtık
 kullanıcı/cihaz risk değerlendirmesinin yerine geçmez; web süreç sayısıyla toplam artar.
 
 Alarm eşikleri ve hata bütçesi kurumla kabul edilmedi. En azından DB/şema sağlığı,

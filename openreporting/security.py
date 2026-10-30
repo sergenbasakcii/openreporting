@@ -68,6 +68,8 @@ def login(settings, username: str, password: str):
         raise HTTPException(429,'Authentication busy; retry shortly',headers={'Retry-After':'1'})
     try:
         return _login(settings,username,password)
+    except (sqlite3.Error,PostgresError,OSError):
+        raise HTTPException(503,'Authentication storage unavailable') from None
     finally:
         _auth_slots.release()
 

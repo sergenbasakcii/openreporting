@@ -1,8 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import threading
+import sqlite3
 
 from fastapi import HTTPException
+from psycopg import OperationalError as PostgresUnavailable
 import pytest
 
 from openreporting import db,security
@@ -53,12 +55,14 @@ def test_expensive_login_is_bounded_and_overflow_has_no_state_mutation(settings,
     assert security.login(settings,'admin1','isolated-auth-capacity-password')[0]
 
 
-def test_auth_admission_slots_are_released_on_backend_failure(settings,monkeypatch):
-    def unavailable(*args):raise HTTPException(503,'Authentication storage unavailable')
+@pytest.mark.parametrize('failure',[sqlite3.OperationalError,PostgresUnavailable,OSError])
+def test_auth_admission_slots_are_released_on_backend_failure(settings,monkeypatch,failure):
+    def unavailable(*args):raise failure('isolated-private-database-credential')
     with monkeypatch.context() as patch:
         patch.setattr(security,'_login',unavailable)
         for _ in range(security.AUTH_CONCURRENCY+2):
             with pytest.raises(HTTPException) as error:
                 security.login(settings,'admin1','isolated-auth-capacity-password')
             assert error.value.status_code==503
+            assert 'private' not in error.value.detail
     assert security.login(settings,'admin1','isolated-auth-capacity-password')[0]

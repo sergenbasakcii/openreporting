@@ -13,7 +13,7 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Son yayımlanmamış temel: `f6ab120` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40996873488).
+Son yayımlanmamış temel: `c1bd8bb` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40997832784).
 Giriş kaynak sınırı ve güvenlik kabulüyle yerelde **245 Python testi başarılı, 13 ortam/Windows yetkisi bağımlı test atlandı**; ek CLI reset kabulü ve 13/14 parola sınırı ayrıca altı testte yeniden doğrulandı; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
 Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
