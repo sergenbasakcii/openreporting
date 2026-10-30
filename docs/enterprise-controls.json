@@ -96,19 +96,19 @@
       "id": "B01",
       "area": "Yerel kimlik ve hesaplar",
       "control": "scrypt parola türetme",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/security.py",
-      "note": "Rastgele salt ve sabit maliyet parametreleri"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek scrypt roundtrip, ayrı salt, yanlış parola ve maliyet parametresi reddi testli; bağımsız KDF/maliyet sertifikasyonu değil"
     },
     {
       "id": "B02",
       "area": "Yerel kimlik ve hesaplar",
       "control": "Üretimde en az 14 karakter parola",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/security.py",
-      "note": "Kullanıcının yerel önizleme istisnası ürün politikasını değiştirmedi"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "13/14 karakter sınırı ve zayıf API resetinin oturumlara dokunmaması testli; önizleme istisnası üretim politikasını değiştirmez"
     },
     {
       "id": "B03",
@@ -168,10 +168,10 @@
       "id": "B09",
       "area": "Yerel kimlik ve hesaplar",
       "control": "Parola sıfırlamada oturum iptali",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/api/users.py",
-      "note": "API ve CLI tüm eski oturumları siliyor"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "API ve CLI resetinde iki eski oturumun iptali, eski/yeni parola ve sır içermeyen CLI çıktı kabulü testli"
     },
     {
       "id": "B10",
@@ -276,19 +276,19 @@
       "id": "D01",
       "area": "Oturum ve yetkilendirme",
       "control": "Rastgele yüksek entropili oturum belirteci",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/security.py",
-      "note": "48 byte token_urlsafe ve DBde yalnız hash"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek API oturumları, token uzunluğu ve DBde yalnız digest saklama kabulü; CSPRNG secrets modülü"
     },
     {
       "id": "D02",
       "area": "Oturum ve yetkilendirme",
       "control": "CSRF tokeninin hashli saklanması",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/security.py",
-      "note": "Sabit süreli karşılaştırma kullanılıyor"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek CSRF digest saklama ve rotasyon sonrası eski token reddi testli"
     },
     {
       "id": "D03",
@@ -330,10 +330,10 @@
       "id": "D07",
       "area": "Oturum ve yetkilendirme",
       "control": "HttpOnly Secure SameSite çerez",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/web.py",
-      "note": "Secure varsayılan; yerel HTTP önizleme ayrı"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "HTTPS cookie HttpOnly/Secure/SameSite=Strict/Path ve HTTPde gönderilmeme kabulü; browser SameSite matrisi değil"
     },
     {
       "id": "D08",
@@ -348,10 +348,10 @@
       "id": "D09",
       "area": "Oturum ve yetkilendirme",
       "control": "Çıkış ve CSRF yenileme akışı",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/web.py",
-      "note": "Oturum sonlandırma ve rotasyon mevcut"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Same-origin CSRF refresh ve eski token reddi, logout sonrası session401 kabulü"
     },
     {
       "id": "D10",
@@ -411,10 +411,10 @@
       "id": "E06",
       "area": "HTTP ve API savunmaları",
       "control": "CSP ve frame/object kısıtları",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/web.py",
-      "note": "self script, DENY frame ve no-sniff; inline style açık"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek HTTP yanıtlarında CSP/frame/object/no-sniff/referrer/HSTS kabulü; inline style istisnası korunuyor"
     },
     {
       "id": "E07",
@@ -423,7 +423,7 @@
       "status": "R",
       "priority": "P1",
       "evidence": "deploy/nginx/openreporting.conf",
-      "note": "nginx IP limitleri var; doğrudan API global limit yok"
+      "note": "nginx IP limitleri + dört pahalı login işi/süreç admission sınırı ve Retry-After; dağıtık/global rate limit kabulü değil"
     },
     {
       "id": "E08",
@@ -546,10 +546,10 @@
       "id": "G01",
       "area": "Depolama kripto ve geçişler",
       "control": "Şifreli kaynak sırları ve ayrı Fernet anahtarı",
-      "status": "R",
+      "status": "V",
       "priority": "P1",
-      "evidence": "openreporting/secrets_store.py",
-      "note": "API yalnız sırın varlığını gösterir"
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek kaynak API kaydı/okuma/listede sır redaksiyonu, SQLite ciphertext ve ayrı anahtarla decrypt kabulü"
     },
     {
       "id": "G02",

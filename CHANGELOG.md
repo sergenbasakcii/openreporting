@@ -3,6 +3,8 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- Pahalı giriş doğrulaması süreç başına dört işle sınırlandı; taşan girişler DB/parola/dizin
+  işine girmeden kısa Retry-After ile 429 alır. Başarısızlıkta kapasite geri bırakılır.
 - Eski raw anahtarla uyumlu sürümlü keyring ve SQLite için ayrı hazırlık, atomik offline
   kaynak sırrı rekey ve doğrulanan primary-only retirement komutları eklendi. Aktif anahtar
   otomatik değiştirilmez; hata tam rollback olur, kullanıcı parolaları/oturumları korunur.

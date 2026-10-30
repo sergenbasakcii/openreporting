@@ -4,6 +4,7 @@ import hmac
 import os
 import secrets
 import sqlite3
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -11,6 +12,11 @@ from fastapi import HTTPException, Request
 from psycopg import Error as PostgresError
 
 from .db import connect, transaction, utcnow, audit
+
+# Bound expensive unauthenticated scrypt/LDAP work before opening the state store.
+# Per-process admission supplements the reverse proxy's IP rate limits.
+AUTH_CONCURRENCY = 4
+_auth_slots = threading.BoundedSemaphore(AUTH_CONCURRENCY)
 
 
 def digest(value: str) -> str:
@@ -58,6 +64,15 @@ def _login_gate(db, username):
 
 
 def login(settings, username: str, password: str):
+    if not _auth_slots.acquire(blocking=False):
+        raise HTTPException(429,'Authentication busy; retry shortly',headers={'Retry-After':'1'})
+    try:
+        return _login(settings,username,password)
+    finally:
+        _auth_slots.release()
+
+
+def _login(settings, username: str, password: str):
     from . import directory_auth
     username = username.strip().lower()
     # Do not hold the application write lock during directory/network operations.

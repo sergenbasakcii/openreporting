@@ -66,6 +66,11 @@ için kurum log toplayıcısı veya her worker'ı kapsayan ayrı scrape topoloji
 mevcut uç çok süreçli toplam trafik ölçümü diye sunulmaz. Yeniden başlatmada süreç sayaçları sıfırlanır.
 Histogramda route/ID/kullanıcı/veri kaynağı etiketi bulunmaz; istekle seri sayısı büyütülemez.
 
+Pahalı scrypt/LDAP giriş işi her web sürecinde en fazla dört eşzamanlı çağrıya alınır;
+sınırda DB/hash/dizin çağrısına girmeden HTTP 429 ve `Retry-After: 1` döner. Hata dahil
+her tamamlanmada slot bırakılır. Bu kaynak kabul sınırı, nginx IP limitinin veya dağıtık
+kullanıcı/cihaz risk değerlendirmesinin yerine geçmez; web süreç sayısıyla toplam artar.
+
 Alarm eşikleri ve hata bütçesi kurumla kabul edilmedi. En azından DB/şema sağlığı,
 worker yaşlanması, disk, 5xx, kesilen yanıtlar ve yedek doğrulama hatası izlenmelidir.
 Olay kapanışı: normal akışın küçük kabulü, veri bütünlüğü, yinelenen posta kontrolü,

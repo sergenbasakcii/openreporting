@@ -13,8 +13,8 @@ Durumlar: **V** = mevcut test kanıtı var; **R** = kaynak/doküman incelendi, b
 V, tüm saldırı/yük/dağıtım koşullarının doğrulandığı anlamına gelmez. P1 önce ele alınacak risktir; P2 sonraki iyileştirmedir.
 Önizleme hesabı yalnız kullanıcının yerel deneme istisnasıdır; üretim parola politikası korunur.
 
-Son yayımlanmamış temel: `1a97cad` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40995372593).
-Yeni anahtar rotasyonuyla yerelde **238 Python testi başarılı, 13 ortam/Windows yetkisi bağımlı test atlandı**; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
+Son yayımlanmamış temel: `f6ab120` için [CI tümü başarılı](https://github.com/sergenbasakcii/openreporting/actions/runs/40996873488).
+Giriş kaynak sınırı ve güvenlik kabulüyle yerelde **245 Python testi başarılı, 13 ortam/Windows yetkisi bağımlı test atlandı**; ek CLI reset kabulü ve 13/14 parola sınırı ayrıca altı testte yeniden doğrulandı; gerçek LDAP/SMTP/PostgreSQL ve Ubuntu kurulum/yedek kontrolleri CI'da başarılı.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
 Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
 bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son commitlerin CI sonucu PROGRESS.md'de izlenir.
@@ -29,7 +29,7 @@ Kullanıcı adına lisans/üretim kabul kararı verilmez.
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 77, R: 25, P: 8, O: 4, E: 6.
+Durum dağılımı: V: 86, R: 16, P: 8, O: 4, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -50,15 +50,15 @@ Durum dağılımı: V: 77, R: 25, P: 8, O: 4, E: 6.
 
 | Kimlik | Kontrol | Durum | Öncelik | Kanıt / kalan iş |
 | --- | --- | --- | --- | --- |
-| B01 | scrypt parola türetme | R | P1 | [openreporting/security.py](../openreporting/security.py) — Rastgele salt ve sabit maliyet parametreleri |
-| B02 | Üretimde en az 14 karakter parola | R | P1 | [openreporting/security.py](../openreporting/security.py) — Kullanıcının yerel önizleme istisnası ürün politikasını değiştirmedi |
+| B01 | scrypt parola türetme | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Gerçek scrypt roundtrip, ayrı salt, yanlış parola ve maliyet parametresi reddi testli; bağımsız KDF/maliyet sertifikasyonu değil |
+| B02 | Üretimde en az 14 karakter parola | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — 13/14 karakter sınırı ve zayıf API resetinin oturumlara dokunmaması testli; önizleme istisnası üretim politikasını değiştirmez |
 | B03 | Parola karşılaştırmasında sabit süreli karşılaştırma | R | P1 | [openreporting/security.py](../openreporting/security.py) — hmac.compare_digest kullanılıyor |
 | B04 | Bilinmeyen yerel hesap için dummy hash | R | P2 | [openreporting/security.py](../openreporting/security.py) — Hesap keşfi yan kanalını azaltır; dizin gecikmesi eşitlenmez |
 | B05 | Başarısız giriş sayacının kalıcılığı | V | P1 | [tests/test_platform_core.py](../tests/test_platform_core.py) — DB kaydı regresyonu var |
 | B06 | Beş denemede 15 dakika kilit | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — 429 davranışı doğrulandı |
 | B07 | Son yerel kurtarma yöneticisi korunması | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — LDAP yöneticisi varken de yerel yönetici korunuyor |
 | B08 | Pasif kullanıcının erişiminin reddi | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — Dizin girişi yerel pasifliği geri alamaz |
-| B09 | Parola sıfırlamada oturum iptali | R | P1 | [openreporting/api/users.py](../openreporting/api/users.py) — API ve CLI tüm eski oturumları siliyor |
+| B09 | Parola sıfırlamada oturum iptali | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — API ve CLI resetinde iki eski oturumun iptali, eski/yeni parola ve sır içermeyen CLI çıktı kabulü testli |
 | B10 | Çok faktörlü kimlik doğrulama | O | P1 | [docs/ENTERPRISE_DEPLOYMENT.md](../docs/ENTERPRISE_DEPLOYMENT.md) — MFA/SSO desteği yok; yüksek güvence kurum kabul engeli |
 
 ## C — LDAP ve dizin güveni
@@ -80,15 +80,15 @@ Durum dağılımı: V: 77, R: 25, P: 8, O: 4, E: 6.
 
 | Kimlik | Kontrol | Durum | Öncelik | Kanıt / kalan iş |
 | --- | --- | --- | --- | --- |
-| D01 | Rastgele yüksek entropili oturum belirteci | R | P1 | [openreporting/security.py](../openreporting/security.py) — 48 byte token_urlsafe ve DBde yalnız hash |
-| D02 | CSRF tokeninin hashli saklanması | R | P1 | [openreporting/security.py](../openreporting/security.py) — Sabit süreli karşılaştırma kullanılıyor |
+| D01 | Rastgele yüksek entropili oturum belirteci | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Gerçek API oturumları, token uzunluğu ve DBde yalnız digest saklama kabulü; CSPRNG secrets modülü |
+| D02 | CSRF tokeninin hashli saklanması | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Gerçek CSRF digest saklama ve rotasyon sonrası eski token reddi testli |
 | D03 | Mutasyonlarda CSRF zorunluluğu | V | P1 | [tests/test_platform_core.py](../tests/test_platform_core.py) — Başlıksız mutasyon 403 |
 | D04 | Yönetici/editör/izleyici rol sınırları | V | P1 | [tests/test_reporting.py](../tests/test_reporting.py) — API izinleri ve rapor erişimi testli |
 | D05 | İzleyici serbest sorgu ve metric-find reddi | V | P1 | [tests/test_review_fixes.py](../tests/test_review_fixes.py) — Ad hoc sorgu ve değişken tanımı enjeksiyonu reddediliyor |
 | D06 | İzleyicinin kayıtlı paneli çalıştırması | V | P1 | [tests/test_review_fixes.py](../tests/test_review_fixes.py) — Gönderilen target ve dönüşümler güven kaynağı değil |
-| D07 | HttpOnly Secure SameSite çerez | R | P1 | [openreporting/web.py](../openreporting/web.py) — Secure varsayılan; yerel HTTP önizleme ayrı |
+| D07 | HttpOnly Secure SameSite çerez | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — HTTPS cookie HttpOnly/Secure/SameSite=Strict/Path ve HTTPde gönderilmeme kabulü; browser SameSite matrisi değil |
 | D08 | Oturum süresi ve LDAP üst sınırı | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — LDAP varsayılan en çok 60 dakika |
-| D09 | Çıkış ve CSRF yenileme akışı | R | P1 | [openreporting/web.py](../openreporting/web.py) — Oturum sonlandırma ve rotasyon mevcut |
+| D09 | Çıkış ve CSRF yenileme akışı | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Same-origin CSRF refresh ve eski token reddi, logout sonrası session401 kabulü |
 | D10 | Çok kiracılı ve klasör bazlı ayrıntılı ACL | O | P1 | [openreporting/dashboards.py](../openreporting/dashboards.py) — Ürün şu anda tek kurum ve genel roller; tenant/klasör ACL yok |
 
 ## E — HTTP ve API savunmaları
@@ -100,8 +100,8 @@ Durum dağılımı: V: 77, R: 25, P: 8, O: 4, E: 6.
 | E03 | Bozuk audit zincirinde readiness 503 | V | P1 | [tests/test_healthchecks.py](../tests/test_healthchecks.py) — Yeni regresyon testi; CI sonucu son kayıtta |
 | E04 | Kimlik deposu arızasında redakte 503 | V | P1 | [tests/test_healthchecks.py](../tests/test_healthchecks.py) — SQLite/PostgreSQL/OSError detayları gösterilmiyor |
 | E05 | Gövde sınırının akış üzerinde uygulanması | V | P1 | [tests/test_request_limits.py](../tests/test_request_limits.py) — 11 test: eksik/yanlış Content-Length, chunked, gerçek boyut, framing, endpoint mutasyon izolasyonu |
-| E06 | CSP ve frame/object kısıtları | R | P1 | [openreporting/web.py](../openreporting/web.py) — self script, DENY frame ve no-sniff; inline style açık |
-| E07 | Giriş/API/ağır işlem rate limit | R | P1 | [deploy/nginx/openreporting.conf](../deploy/nginx/openreporting.conf) — nginx IP limitleri var; doğrudan API global limit yok |
+| E06 | CSP ve frame/object kısıtları | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Gerçek HTTP yanıtlarında CSP/frame/object/no-sniff/referrer/HSTS kabulü; inline style istisnası korunuyor |
+| E07 | Giriş/API/ağır işlem rate limit | R | P1 | [deploy/nginx/openreporting.conf](../deploy/nginx/openreporting.conf) — nginx IP limitleri + dört pahalı login işi/süreç admission sınırı ve Retry-After; dağıtık/global rate limit kabulü değil |
 | E08 | Proxy başlıklarına sınırlı güven | R | P1 | [openreporting/cli.py](../openreporting/cli.py) — Yalnız loopback forwarded_allow_ips |
 | E09 | Bilinmeyen API yollarında SPA fallback reddi | V | P2 | [tests/test_platform_core.py](../tests/test_platform_core.py) — 404 davranışı testli |
 | E10 | URL/Host ve origin sınırları | V | P1 | [tests/test_http_security.py](../tests/test_http_security.py) — 24 Host/Origin yapılandırma ve HTTP senaryosu; rebinding/alias/IPv6/CSRF destekleyen same-origin sınırı, yeni CI bekliyor |
@@ -125,7 +125,7 @@ Durum dağılımı: V: 77, R: 25, P: 8, O: 4, E: 6.
 
 | Kimlik | Kontrol | Durum | Öncelik | Kanıt / kalan iş |
 | --- | --- | --- | --- | --- |
-| G01 | Şifreli kaynak sırları ve ayrı Fernet anahtarı | R | P1 | [openreporting/secrets_store.py](../openreporting/secrets_store.py) — API yalnız sırın varlığını gösterir |
+| G01 | Şifreli kaynak sırları ve ayrı Fernet anahtarı | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Gerçek kaynak API kaydı/okuma/listede sır redaksiyonu, SQLite ciphertext ve ayrı anahtarla decrypt kabulü |
 | G02 | Eksik anahtarda yeni anahtar üretmeme | V | P1 | [tests/test_secret_key_recovery.py](../tests/test_secret_key_recovery.py) — Şifreli veri varken anahtar kaybı kapalı hata |
 | G03 | Bilinmeyen/okunamayan DBde anahtar koruması | V | P1 | [tests/test_secret_key_recovery.py](../tests/test_secret_key_recovery.py) — İnceleme hatası yeni anahtar yetkisi sayılmıyor |
 | G04 | Atomik numaralı schema geçişleri | V | P1 | [tests/test_db_migrations.py](../tests/test_db_migrations.py) — Başarısız adım veriyi ve sürümü koruyor |
