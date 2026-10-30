@@ -141,3 +141,19 @@ def test_api_user_deactivation_revokes_session_and_blocks_queued_work(state,monk
         monkeypatch.setattr(service,'build_outputs',lambda *a,**k:pytest.fail('Revoked API account must not render'))
         service.execute(settings,queued.json()['run_id'])
         assert service.list_runs(settings,rid)[0]['status']=='blocked'
+
+
+def test_schedule_apis_redact_recipient_lists_for_viewer_but_keep_editor_access(state):
+    settings,app,admin,_,rid=state
+    recipient='reader@example.com'
+    service.save_schedule(settings,admin,rid,{'cadence':'daily','enabled':False,'recipients':[recipient]})
+    security.create_user(settings,'viewer','isolated-viewer-password','viewer')
+    with TestClient(app,base_url='http://localhost') as viewer,TestClient(app,base_url='http://localhost') as editor:
+        assert viewer.post('/api/login',json={'username':'viewer','password':'isolated-viewer-password'}).status_code==200
+        assert editor.post('/api/login',json={'username':'editor','password':'isolated-editor-password'}).status_code==200
+        for path in ('/api/report-schedules',f'/api/dash-reports/{rid}/schedules'):
+            hidden=viewer.get(path)
+            assert hidden.status_code==200 and recipient not in hidden.text
+            assert hidden.json()[0]['recipients']==[] and hidden.json()[0]['recipients_json']=='[]'
+            allowed=editor.get(path)
+            assert allowed.status_code==200 and allowed.json()[0]['recipients']==[recipient]

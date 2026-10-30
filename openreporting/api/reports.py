@@ -218,7 +218,7 @@ def run_report(report_id: str, body: RunIn, request: Request, user=Depends(edito
         _fail(exc)
 
 
-def _visible_runs(runs, user):
+def _visible_deliveries(runs, user):
     """Recipient lists are personal data; only report editors see them."""
     if user["role"] in ("admin", "editor"):
         return runs
@@ -227,12 +227,12 @@ def _visible_runs(runs, user):
 
 @router.get("/api/dash-reports/{report_id}/runs")
 def report_runs(report_id: str, request: Request, user=Depends(authenticate)):
-    return _visible_runs(service.list_runs(settings_of(request), report_id), user)
+    return _visible_deliveries(service.list_runs(settings_of(request), report_id), user)
 
 
 @router.get("/api/report-runs")
 def all_runs(request: Request, limit: int = 200, user=Depends(authenticate)):
-    return _visible_runs(service.list_runs(settings_of(request), None, limit), user)
+    return _visible_deliveries(service.list_runs(settings_of(request), None, limit), user)
 
 
 @router.get("/api/report-runs/{run_id}/files/{kind}")
@@ -248,12 +248,12 @@ def download(run_id: str, kind: str, request: Request, user=Depends(authenticate
 
 @router.get("/api/dash-reports/{report_id}/schedules")
 def schedules(report_id: str, request: Request, user=Depends(authenticate)):
-    return service.list_schedules(settings_of(request), report_id)
+    return _visible_deliveries(service.list_schedules(settings_of(request), report_id), user)
 
 
 @router.get("/api/report-schedules")
 def all_schedules(request: Request, user=Depends(authenticate)):
-    return service.list_schedules(settings_of(request))
+    return _visible_deliveries(service.list_schedules(settings_of(request)), user)
 
 
 @router.post("/api/dash-reports/{report_id}/schedules", status_code=201)
