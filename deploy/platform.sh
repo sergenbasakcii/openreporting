@@ -8,17 +8,21 @@ detect_platform() {
   case "$id" in
     ubuntu|debian)
       PLATFORM_FAMILY=debian
+      PLATFORM_PYTHON=''
       NGINX_SITE=/etc/nginx/sites-available/openreporting.conf
       TLS_CERT_DEFAULT=/etc/ssl/certs/openreporting.crt
       TLS_KEY_DEFAULT=/etc/ssl/private/openreporting.key
       ;;
     ol)
       case "$version" in
-        8.*) minor="${version#8.}"; [[ "$minor" =~ ^[0-9]+$ ]] && [ "$minor" -ge 10 ] || die 'Oracle Linux 8.10 veya sonrası gerekli' ;;
-        9.*|10.*|9|10) ;;
+        8.*) minor="${version#8.}"; if ! [[ "$minor" =~ ^[0-9]+$ ]] || [ "$minor" -lt 10 ]; then die 'Oracle Linux 8.10 veya sonrası gerekli'; fi ;;
+        9.*) minor="${version#9.}"; if ! [[ "$minor" =~ ^[0-9]+$ ]] || [ "$minor" -lt 4 ]; then die 'Oracle Linux 9.4 veya sonrası gerekli'; fi ;;
+        10.*|10) ;;
         *) die 'Oracle Linux hedefleri: 8.10, 9 ve 10; eski sürümler doğrulanmadı' ;;
       esac
       PLATFORM_FAMILY=oracle
+      PLATFORM_PYTHON=python3.12
+      [ "$major" != 10 ] || PLATFORM_PYTHON=python3
       NGINX_SITE=/etc/nginx/conf.d/openreporting.conf
       TLS_CERT_DEFAULT=/etc/pki/tls/certs/openreporting.crt
       TLS_KEY_DEFAULT=/etc/pki/tls/private/openreporting.key
@@ -51,9 +55,13 @@ install_platform_packages() {
       pkgs+=(python3 python3-pip)
     else
       # Parallel interpreter: never replace Oracle's system Python or DNF runtime.
-      pkgs+=(python3.11 python3.11-pip)
+      pkgs+=(python3.12 python3.12-pip)
     fi
-    [ "$nginx" -eq 1 ] && pkgs+=(nginx)
+    if [ "$nginx" -eq 1 ]; then
+      # OL8's default old stream is retired. Do not reset/switch an existing stream silently.
+      [ "$PLATFORM_MAJOR" != 8 ] || dnf module enable -y nginx:1.24
+      pkgs+=(nginx)
+    fi
     dnf install -y "${pkgs[@]}"
   fi
 }
@@ -113,7 +121,7 @@ open_platform_firewall() {
 
 render_unit() {
   local file="$1" version="$2"
-  [[ "$version" =~ ^[0-9]+$ ]] && [ "$version" -ge 239 ] || die 'systemd >= 239 gerekli'
+  if ! [[ "$version" =~ ^[0-9]+$ ]] || [ "$version" -lt 239 ]; then die 'systemd >= 239 gerekli'; fi
   awk -F= -v v="$version" '
     $1=="ProtectHostname" && v<242 {next}
     $1=="ProtectKernelLogs" && v<244 {next}
@@ -124,7 +132,7 @@ render_unit() {
 install_service_units() {
   local file version
   version="$(systemctl --version | awk 'NR==1 {print $2}')"
-  [[ "$version" =~ ^[0-9]+$ ]] && [ "$version" -ge 239 ] || die 'systemd >= 239 gerekli; servis dosyaları değiştirilmedi'
+  if ! [[ "$version" =~ ^[0-9]+$ ]] || [ "$version" -lt 239 ]; then die 'systemd >= 239 gerekli; servis dosyaları değiştirilmedi'; fi
   for file in "$OPENREPORTING_APP"/deploy/systemd/openreporting-*.service "$OPENREPORTING_APP"/deploy/systemd/openreporting-*.timer; do
     render_unit "$file" "$version" > "/etc/systemd/system/$(basename "$file")"
     chmod 0644 "/etc/systemd/system/$(basename "$file")"

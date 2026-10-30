@@ -9,8 +9,8 @@ Ubuntu/Debian girişi korunur; mevcut Windows önizlemesi değiştirilmez.
 
 | Ortam | Hedef Python | Kabul kapsamı |
 | --- | --- | --- |
-| Oracle Linux 8.10, x86_64 | Resmî paralel python3.11 | Oracle container paket/API/nginx/unit kontrolü; tam VM ve SELinux Enforcing kabulü ayrıca gerekli |
-| Oracle Linux 9, x86_64 | Resmî paralel python3.11 | Aynı kapsam; güncel resmî AppStream depoları gerekli |
+| Oracle Linux 8.10, x86_64 | Resmî paralel python3.12 | Oracle container paket/API/nginx/unit kontrolü; tam VM ve SELinux Enforcing kabulü ayrıca gerekli |
+| Oracle Linux 9.4+, x86_64 | Resmî paralel python3.12 | Aynı kapsam; güncel resmî AppStream depoları gerekli |
 | Oracle Linux 10, x86_64 | Dağıtım python3, 3.12+ | Aynı kapsam; işletim sisteminin CPU gereksinimleri geçerli |
 | ARM/aarch64 | Uygun Python 3.11+ wheel'leri | Bu matris için gerçek ARM kabulü yapılmadı |
 | Oracle Linux 7 ve daha eski / 8.10 öncesi | — | Yerel kurulum betiği reddeder; uyumluluk iddia edilmez |
@@ -40,8 +40,9 @@ yalnız kontrollü deneme içindir. Mevcut nginx siteleri kaldırılmaz; 80/443 
 çakışmaları kurulum öncesi incelenmelidir. Uygulamaya ait olmayan aynı adlı site dosyası
 üzerine yazılmaz. TLS dosyalarının kurumca onaylı PKI yollarında bulunması önerilir.
 
-OL8/9'da sistem Python'u/alternatives/DNF Python'u değiştirilmez; `python3.11` yan yana
-kurulur. OL10 dağıtımın `python3` sürümünü kullanır. Paketler DNF ve mevcut resmî
+OL8/9'da sistem Python'u/alternatives/DNF Python'u değiştirilmez; `python3.12` yan yana
+kurulur; Oracle Python3.11 akışının emeklilik tarihi geçtiğinden seçilmez. OL8 nginx1.24
+akışı etkinleştirilir; farklı akış zaten etkinse otomatik reset/switch yapılmaz. OL10 dağıtımın `python3` sürümünü kullanır. Paketler DNF ve mevcut resmî
 depolardan alınır; PPA, ULN aboneliği veya yeni ücretli hizmet eklenmez. `--python`
 uygun başka bir yorumlayıcı seçebilir. Uygulama kendi venv'inde hashli runtime/build
 kilitleriyle kurulur; eksik uyumlu wheel'de sessiz kaynak derlemesi yapılmaz.
@@ -85,6 +86,7 @@ Bu işletim sistemi desteği, henüz açık olan klasör/tenant ACL ve diğer
 [kurumsal kabul eksiklerini](ENTERPRISE_REVIEW.md) kapatmış sayılmaz.
 
 Kaynaklar: [Oracle Python paketleri](https://yum.oracle.com/oracle-linux-python.html),
+[Oracle AppStream yaşam döngüsü](https://docs.oracle.com/en/operating-systems/oracle-linux/product-lifecycle/ol9_application_streams.html),
 [OL10 Python](https://docs.oracle.com/en/operating-systems/oracle-linux/10/python/python-AboutPython.html),
 [Oracle nginx ve SELinux relay](https://docs.oracle.com/en-us/iaas/oracle-linux/balancing/balancing-setting-up-load-balancing-by-using-nginx.htm),
 [systemd direktif sürümleri](https://www.freedesktop.org/software/systemd/man/256/systemd.exec.html).

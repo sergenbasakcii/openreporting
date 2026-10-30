@@ -42,7 +42,7 @@ python_ok() {
 
 find_python() {
   local candidate
-  for candidate in "${OPENREPORTING_PYTHON:-}" python3.13 python3.12 python3.11 python3; do
+  for candidate in "${OPENREPORTING_PYTHON:-${PLATFORM_PYTHON:-}}" python3.13 python3.12 python3.11 python3; do
     [ -n "$candidate" ] || continue
     if command -v "$candidate" >/dev/null 2>&1 && python_ok "$(command -v "$candidate")"; then
       command -v "$candidate"

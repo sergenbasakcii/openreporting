@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Disposable official Oracle userspace acceptance; not a full VM/SELinux boot test.
 set -euo pipefail
-[ "${OPENREPORTING_ORACLE_CI:-}" = 1 ] && [ -f /.dockerenv ] || { echo 'Disposable Oracle CI container required' >&2; exit 1; }
+if [ "${OPENREPORTING_ORACLE_CI:-}" != 1 ] || [ ! -f /.dockerenv ]; then echo 'Disposable Oracle CI container required' >&2; exit 1; fi
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=deploy/lib.sh
 . "$SOURCE_ROOT/deploy/lib.sh"
