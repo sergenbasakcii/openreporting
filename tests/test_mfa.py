@@ -309,6 +309,29 @@ def test_configuration_rejects_unknown_required_roles(monkeypatch):
     with pytest.raises(ValueError,match='MFA required role policy'):Settings.from_env()
 
 
+def test_active_factor_failures_cannot_be_reset_by_password_only_challenges(state):
+    settings,app,uid=state
+    with TestClient(app,base_url='https://localhost') as client:
+        _,codes=enroll(client)
+        for attempt in range(5):
+            # A valid password without a factor must not clear previous failed proofs.
+            challenge=signin(client)
+            assert challenge.status_code==401 and challenge.json()['detail']['code']=='mfa_required'
+            assert signin(client,'invalid-factor-proof').status_code==401
+            with db.connect(settings) as conn:
+                assert conn.execute('SELECT count FROM login_failures').fetchone()[0]==attempt+1
+                assert conn.execute('SELECT count(*) FROM sessions WHERE user_id=?',(uid,)).fetchone()[0]==0
+        assert signin(client).status_code==429
+        assert signin(client,codes[0]).status_code==429
+        with db.connect(settings) as conn,db.transaction(conn):
+            assert len(mfa.recovery_hashes(mfa.factor(conn,uid)))==10  # locked request cannot consume recovery
+            conn.execute('UPDATE login_failures SET last_at=?',((datetime.now(timezone.utc)-timedelta(minutes=16)).isoformat(),))
+        assert signin(client,codes[0]).status_code==200
+        with db.connect(settings) as conn:
+            assert conn.execute('SELECT count(*) FROM login_failures').fetchone()[0]==0
+            assert len(mfa.recovery_hashes(mfa.factor(conn,uid)))==9
+
+
 def test_operator_reset_never_bootstraps_a_missing_or_migrates_an_old_store(tmp_path,monkeypatch):
     settings=replace(Settings.from_env(),data_dir=tmp_path,database_url='',mfa_required_roles=())
     with pytest.raises(ValueError,match='Existing application database'):
