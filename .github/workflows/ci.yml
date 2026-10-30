@@ -161,8 +161,19 @@ jobs:
         run: sudo /opt/openreporting/app/deploy/openreporting-admin.sh doctor
       - name: Backup
         run: |
+          sudo systemd-run --quiet --wait --pipe --collect -p User=openreporting -p Group=openreporting \
+            -p EnvironmentFile=/etc/openreporting/openreporting.env /opt/openreporting/venv/bin/python - <<'EOF'
+          import base64, io
+          from PIL import Image
+          from openreporting.config import Settings
+          from openreporting.reporting import logos
+          image = Image.new("RGB", (20, 20), "blue")
+          png = io.BytesIO(); image.save(png, format="PNG")
+          logos.save(Settings.from_env(), base64.b64encode(png.getvalue()).decode())
+          EOF
           sudo systemctl start openreporting-backup.service
           sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1) && ls -la "$latest" && cd "$latest" && sha256sum -c SHA256SUMS && test ! -e secret.key'
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1); tar -tzf "$latest/archive.tar.gz" | grep -q "^logos/.*\.png$"'
       - name: Upgrade from a fresh copy
         run: |
           cp -a "$GITHUB_WORKSPACE" /tmp/openreporting-next

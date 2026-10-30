@@ -3,10 +3,12 @@ import hashlib
 import hmac
 import os
 import secrets
+import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request
+from psycopg import Error as PostgresError
 
 from .db import connect, transaction, utcnow, audit
 
@@ -127,9 +129,12 @@ def authenticate(request: Request):
     if not token:
         raise HTTPException(401, "Login required")
     settings = request.app.state.settings
-    with connect(settings) as db:
-        row = db.execute("""SELECT u.id,u.username,u.role,u.active,s.csrf_hash,s.expires_at,e.provider
-            FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN external_identities e ON e.user_id=u.id WHERE s.token_hash=?""", (digest(token),)).fetchone()
+    try:
+        with connect(settings) as db:
+            row = db.execute("""SELECT u.id,u.username,u.role,u.active,s.csrf_hash,s.expires_at,e.provider
+                FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN external_identities e ON e.user_id=u.id WHERE s.token_hash=?""", (digest(token),)).fetchone()
+    except (sqlite3.Error, PostgresError, OSError):
+        raise HTTPException(503, "Authentication storage unavailable") from None
     if not row or not row["active"] or (row["provider"] == "ldap" and not settings.ldap_enabled) or datetime.fromisoformat(row["expires_at"]) <= datetime.now(timezone.utc):
         raise HTTPException(401, "Session expired")
     return dict(row)

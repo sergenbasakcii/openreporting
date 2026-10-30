@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from .config import Settings
 from .db import connect, init_db, transaction, verify_audit
 from .domain import DomainError
+from .healthchecks import database_ready
 from .security import authenticate, digest, login, logout, require_csrf, require_role
 
 log = logging.getLogger(__name__)
@@ -74,10 +75,17 @@ def create_app(settings: Settings | None = None):
 
     @app.get("/readyz")
     def ready(user=Depends(authenticate)):
-        with connect(settings) as db:
-            audit_ok, broken_id = verify_audit(db)
-        return {"state_database": "ready", "audit_chain_valid": audit_ok, "audit_broken_id": broken_id,
-                "mail_enabled": settings.mail_enabled}
+        database_ok, audit_ok, broken_id = False, None, None
+        try:
+            with connect(settings) as db:
+                database_ok = database_ready(db)
+                if database_ok:
+                    audit_ok, broken_id = verify_audit(db)
+        except Exception:  # A readiness probe must not expose storage exception details.
+            database_ok = False
+        return JSONResponse({"state_database": "ready" if database_ok else "unavailable", "audit_chain_valid": audit_ok,
+                             "audit_broken_id": broken_id, "mail_enabled": settings.mail_enabled},
+                            status_code=200 if database_ok and audit_ok else 503)
 
     @app.post("/api/login")
     def sign_in(body: Credentials, response: Response):

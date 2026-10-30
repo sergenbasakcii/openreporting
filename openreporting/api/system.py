@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from shutil import disk_usage
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from .. import __version__
 from ..db import audit, connect, transaction, verify_audit
 from ..domain import parse_utc
+from ..healthchecks import database_ready
 from ..security import authenticate
 from .deps import admin, admin_read, settings_of
 
@@ -42,11 +43,10 @@ def health(request: Request):
     settings = settings_of(request)
     try:
         with connect(settings) as db:
-            db.execute("SELECT 1").fetchone()
-        database = "ok"
+            database = "ok" if database_ready(db) else "failing"
     except Exception:  # noqa: BLE001 - health must never raise
         database = "failing"
-    return {"database": database, "version": __version__}
+    return JSONResponse({"database": database, "version": __version__}, status_code=200 if database == "ok" else 503)
 
 
 def _worker_state(settings):

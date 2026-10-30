@@ -122,6 +122,12 @@ sudo /opt/openreporting/app/deploy/openreporting-admin.sh import-dashboards /var
 
 Gece yedeği `/var/backups/openreporting/YYYYMMDD-HHMMSS/` içine `state.sqlite3`, `archive.tar.gz`, `openreporting.env`
 ve `SHA256SUMS` yazar. Elle: `sudo systemctl start openreporting-backup`. Yedekleri sunucu dışına kopyalayın.
+`archive.tar.gz` rapor arşiviyle birlikte varsa `logos/` dizinini de içerir. LDAP/SMTP parola
+dosyalarını ve kurum CA dosyalarını ayrıca kontrollü kurtarma planına dahil edin.
+
+Sağlık izleme: `/healthz` süreç canlılığını, `/api/health` yerel DB/şema erişimini gösterir
+(arıza: HTTP 503). Oturum gerektiren `/readyz` ayrıca audit zincirini doğrular; bozuk zincir
+veya erişilemeyen DB başarılı readiness sayılmaz. Bu kontroller harici veri kaynağına sorgu veya e-posta göndermez.
 
 > **Şifreleme anahtarı (`/etc/openreporting/secret.key`) varsayılan olarak yedeğe konmaz** — veritabanı yedeği çalınsa bile
 > veri kaynağı parolaları çözülemesin diye. Kurulumdan hemen sonra anahtarı ayrı ve güvenli bir yerde (parola kasası,
@@ -136,7 +142,9 @@ sudo systemctl stop openreporting-worker openreporting-web
 cd /var/backups/openreporting/20261024-023000 && sha256sum -c SHA256SUMS
 sudo install -o openreporting -g openreporting -m 0640 state.sqlite3 /var/lib/openreporting/state.sqlite3
 sudo rm -f /var/lib/openreporting/state.sqlite3-wal /var/lib/openreporting/state.sqlite3-shm
-sudo tar -C /var/lib/openreporting -xzf archive.tar.gz && sudo chown -R openreporting:openreporting /var/lib/openreporting/archive
+sudo tar -C /var/lib/openreporting -xzf archive.tar.gz
+sudo chown -R openreporting:openreporting /var/lib/openreporting/archive
+if [ -d /var/lib/openreporting/logos ]; then sudo chown -R openreporting:openreporting /var/lib/openreporting/logos; fi
 # Anahtar ayrı saklandıysa oradan, yedeğe dahil edildiyse buradan geri koyun:
 sudo install -o root -g openreporting -m 0640 secret.key /etc/openreporting/secret.key
 sudo systemctl start openreporting-web openreporting-worker

@@ -30,10 +30,11 @@ install -d -m 0700 "$DEST"
 #    private temporary file, integrity-checked, then streamed to stdout.
 as_openreporting "$OPENREPORTING_VENV/bin/python" -c '
 import os, shutil, sqlite3, sys, tempfile
+from pathlib import Path
 source = sys.argv[1]
 with tempfile.TemporaryDirectory(dir=os.path.dirname(source), prefix=".backup-") as tmp:
     target = os.path.join(tmp, "state.sqlite3")
-    src = sqlite3.connect(source, timeout=60)
+    src = sqlite3.connect(Path(source).resolve().as_uri() + "?mode=ro", uri=True, timeout=60)
     dst = sqlite3.connect(target)
     src.backup(dst)
     check = dst.execute("PRAGMA integrity_check").fetchone()[0]
@@ -44,9 +45,13 @@ with tempfile.TemporaryDirectory(dir=os.path.dirname(source), prefix=".backup-")
         shutil.copyfileobj(handle, sys.stdout.buffer)' "$DATA/state.sqlite3" > "$DEST/state.sqlite3"
 [ -s "$DEST/state.sqlite3" ] || die "Veritabanı yedeği boş"
 
-# 2) Report archive, packed by the service user (tar does not follow symlinks).
-if [ -d "$DATA/archive" ]; then
-  as_openreporting tar -C "$DATA" -czf - archive > "$DEST/archive.tar.gz"
+# 2) Immutable report files and uploaded logos (tar does not follow symlinks).
+assets=()
+for asset in archive logos; do
+  if [ -d "$DATA/$asset" ]; then assets+=("$asset"); fi
+done
+if [ "${#assets[@]}" -gt 0 ]; then
+  as_openreporting tar -C "$DATA" -czf - "${assets[@]}" > "$DEST/archive.tar.gz"
 fi
 
 # 3) Configuration (root-owned files only).

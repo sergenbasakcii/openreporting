@@ -2,6 +2,12 @@
 
 ## Yayınlanmamış
 
+### Kurumsal değerlendirme ve işletim
+- 120 maddelik kanıt/açık risk kaydı eklendi (docs/ENTERPRISE_REVIEW.md).
+- Veritabanı/şema arızası sağlık uçlarında, bozuk audit zinciri readiness kontrolünde HTTP 503 döndürür.
+  Kimlik deposu hataları ayrıntı/sır sızdırmadan 503 verir; süreç canlılığı ayrı kalır.
+- Gece yedeği rapor logolarını da içerir; eksik SQLite kaynağı salt okunur açılarak sahte boş yedek önlenir.
+
 ### Kurumsal kimlik ve posta bağlantıları
 - LDAP/Active Directory: doğrulanan LDAPS veya zorunlu StartTLS, salt okunur servis hesabı,
   güvenli kullanıcı araması, kalıcı dizin kimliği ve doğrudan grup üyeliğinden rol eşleme.
