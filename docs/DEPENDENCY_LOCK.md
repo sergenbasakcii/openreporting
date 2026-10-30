@@ -15,6 +15,27 @@ CI Python 3.11/3.12/3.13'te ve LDAP/PostgreSQL/audit işlerinde aynı runtime sn
 pyproject değişip kilit unutulursa veya test/audit araçları runtime sürümünü değiştirirse kontrol başarısız olur.
 Ubuntu uçtan uca kurulum/yükseltme kabulü de üretim betiğinin hash yolunu kullanır.
 
+## Build ve test araçları
+
+`requirements-build.lock` pip 26.2.2, setuptools 84.2.1, wheel 0.48.0 ve packaging 26.3
+kapanışını; `requirements-test.lock` 13 Windows / 12 Linux QA paketini sabitler. Ubuntu,
+Windows ve CI gerekli araçları hash kontrolüyle kurar. Uygulama `--no-build-isolation`
+ile bu hazırlanmış backend'i kullanır; build sırasında farklı bir setuptools/wheel indirilmez.
+Bu seçenek araçların önceden kurulmasını gerektirir; [pip build arayüzü](https://pip.pypa.io/en/stable/reference/build-system/#disabling-build-isolation)
+kuralları uygulanır. Docker build aşaması da kilitli backend'i kullanır; runtime imajına
+build araçları ayrıca kopyalanmaz.
+
+`check_runtime_lock.py --scope build` ve `--scope test` kurulu gerçek kapanışları denetler.
+CI üç ayrı kapsam için CVE taraması ve CycloneDX SBOM üretir. Yerelde dört build ve 13 QA
+paketinin taramasında bilinen zafiyet bulunmadı; bu sıfır gün veya kaynak kod onayı değildir.
+
+`tools/check_wheel_repro.py` aynı checkout/interpreter ve kilitli build araçlarıyla iki kez
+`--no-index --no-deps --no-build-isolation` wheel üretir. Git commit zamanı veya açık
+`--source-date-epoch` ZIP zamanını sabitler. İki wheel SHA'sı eşleşmelidir; CI Python3.13
+bu kanıtı JSON artefakt olarak saklar. Bu yalnız **aynı ortamdaki** tekrar üretim kanıtıdır;
+Windows/Linux eşdeğerliği, bütün hostun hermetikliği veya imzalı provenance değildir.
+Git metadata'sı olmayan kaynak paketinde epoch açıkça verilmelidir.
+
 ## Güncelleme süreci
 
 1. Ayrı Windows QA ortamında aday runtime sürümlerini kurun; ana uygulama/kurum verisine dokunmayın.
@@ -23,7 +44,9 @@ Ubuntu uçtan uca kurulum/yükseltme kabulü de üretim betiğinin hash yolunu k
    Bu araç çözücü değildir ve aday sürüm seçmez; mevcut kurulu sürümleri sabitler.
    Windows-only kökü kaybetmemek için `tzdata` bulunmayan üretim/Linux ortamında üretimi reddeder.
 4. Değişen paket ve hash listesini gözden geçirin. Kilit dosyasını otomatik ve incelemesiz yeniden üretmeyin.
-5. `python tools/check_runtime_lock.py`, bütün Python/Ubuntu testleri ve kurulum kabulünü çalıştırın.
+5. Build/test kökleri değişirse uygun QA ortamında `lock_runtime.py --scope build --output requirements-build.lock`
+   veya `--scope test --output requirements-test.lock` ile aday kilitleri üretin. Üç kapsamın
+   `check_runtime_lock.py` kontrolü, CVE taraması, wheel tekrarı ve bütün Python/Ubuntu kabulü geçsin.
    Yeni platforma özgü bağımlılık varsa generator/marker desteği ve kabul matrisi birlikte güncellenmelidir.
 6. Onaylı kaynak ağacı ve kilidi birlikte dağıtın. Release/merge ve imza kararı ayrı yetkidir.
 
@@ -32,9 +55,12 @@ Ubuntu uçtan uca kurulum/yükseltme kabulü de üretim betiğinin hash yolunu k
 Hedefle aynı işletim sistemi, mimari ve Python sürümünde, internet erişimli QA makinesinde:
 
 ```text
+python -m pip install --require-hashes --only-binary=:all: -r requirements-build.lock
+python -m pip download --require-hashes --only-binary=:all: -r requirements-build.lock -d wheels
 python -m pip download --require-hashes --only-binary=:all: -r requirements-runtime.lock -d wheels
-python -m pip wheel --no-deps -w wheels .
-python -m pip wheel -w wheels pip setuptools wheel
+python -m pip wheel --no-deps --no-build-isolation -w wheels .
+# Windows test/QA akışı da taşınacaksa:
+python -m pip download --require-hashes --only-binary=:all: -r requirements-test.lock -d wheels
 ```
 
 Kaynak ağacı/kilit ve wheelhouse birlikte taşınır; Ubuntu betiğine `--wheelhouse /yol/wheels`
@@ -48,10 +74,10 @@ Yerel Windows/Python 3.13 QA'da 28 paket kilitten indirildi ve yeni sanal ortama
 eşleşmesi geçti. Bilerek yanlış SHA-256 verilen gerçek wheel'i pip kurulum öncesinde reddetti.
 Linux/Python matrisi ve Ubuntu üretim betiğinin sonucu ilgili commitin CI kaydındadır.
 
-Bu kilit yalnız **uygulamanın runtime kapanışıdır**. pip/setuptools/wheel build ortamı,
-pytest/httpx/pip-audit QA araçları, Python/OS/apt paketleri, Docker temel imajı ve uygulamanın
-kendi release wheel'i hashli hermetik build kapsamına alınmadı. Bunlar için imzalı
-artefakt/provenance ve ayrı build-tool kilidi açık iştir; L04 bu yüzden kısmi kalır.
+Üç kilit runtime, build backend ve test kapanışını kapsar. İlk Python/pip bootstrap'ı,
+CI action/runner, pip-audit tarayıcısının bütün transitif ortamı, Python/OS/apt paketleri,
+Docker temel imajı ve uygulamanın release imzası bu kapsamın dışındadır. Bunlar için
+imzalı artefakt/provenance ve host/build güven kökü kabulü açık iştir; L04 kısmi kalır.
 Docker örneğinin güncellenmesi tek başına Docker imaj kabulü değildir.
 
 İncelenmiş yerel hash, ondan sonraki farklı dosyayı reddeder; ilk güvenilen PyPI upload'ının

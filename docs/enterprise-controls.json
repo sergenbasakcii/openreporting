@@ -1026,7 +1026,7 @@
       "status": "P",
       "priority": "P1",
       "evidence": "docs/DEPENDENCY_LOCK.md",
-      "note": "28 runtime sürümü ve wheel SHA kilidi; offline temiz Windows kurulumu/hash reddi; Python/Ubuntu CI hash yolu. Build/test/OS/container base ve release provenance ayrıca açık"
+      "note": "Runtime/build/test wheel SHA kilitleri; temiz offline kurulum, drift/CVE/SBOM ve aynı ortamda iki wheel SHA eşliği; host bootstrap/OS/runner/audit ortamı ve signed provenance açık"
     },
     {
       "id": "L05",

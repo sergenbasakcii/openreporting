@@ -3,6 +3,9 @@
 ## Yayınlanmamış
 
 ### Kurumsal değerlendirme ve işletim
+- Build backend ve test araçları da ayrı wheel SHA kilitlerine alındı; hazırlanan backend ile
+  ağsız uygulama wheel'i iki kez üretilip aynı dosya hash'i doğrulanır. CI build/test CVE
+  taramaları ve SBOM'ları ekler; OS/runner ve imzalı provenance kapsamı ayrıca açıktır.
 - Pahalı giriş doğrulaması süreç başına dört işle sınırlandı; taşan girişler DB/parola/dizin
   işine girmeden kısa Retry-After ile 429 alır. Başarısızlıkta kapasite geri bırakılır.
 - Eski raw anahtarla uyumlu sürümlü keyring ve SQLite için ayrı hazırlık, atomik offline

@@ -12,9 +12,14 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 
-def inventory(project):
+def inventory(project, scope='runtime'):
     with project.open('rb') as handle:
-        roots = tomllib.load(handle)['project']['dependencies']
+        manifest = tomllib.load(handle)
+    if scope not in {'runtime','build','test'}:
+        raise ValueError('Unknown dependency scope')
+    roots = (manifest['project']['dependencies'] if scope=='runtime' else
+             ['pip',*manifest['build-system']['requires']] if scope=='build' else
+             manifest['project']['optional-dependencies']['test'])
     queue = [Requirement(raw) for raw in roots]
     result, visited = {}, set()
     while queue:

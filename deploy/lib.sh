@@ -82,8 +82,8 @@ sync_code() {
 
 install_package() {
   local wheelhouse="${1:-}"
-  "$OPENREPORTING_VENV/bin/python" -m pip install --quiet --upgrade pip wheel setuptools ${wheelhouse:+--no-index --find-links "$wheelhouse"}
+  "$OPENREPORTING_VENV/bin/python" -m pip install --quiet --require-hashes --only-binary=:all: ${wheelhouse:+--no-index --find-links "$wheelhouse"} -r "$OPENREPORTING_APP/requirements-build.lock"
   "$OPENREPORTING_VENV/bin/python" -m pip install --quiet --require-hashes --only-binary=:all: ${wheelhouse:+--no-index --find-links "$wheelhouse"} -r "$OPENREPORTING_APP/requirements-runtime.lock"
-  "$OPENREPORTING_VENV/bin/python" -m pip install --quiet --upgrade --no-deps ${wheelhouse:+--no-index --find-links "$wheelhouse"} "$OPENREPORTING_APP"
+  "$OPENREPORTING_VENV/bin/python" -m pip install --quiet --upgrade --no-deps --no-build-isolation ${wheelhouse:+--no-index --find-links "$wheelhouse"} "$OPENREPORTING_APP"
   "$OPENREPORTING_VENV/bin/python" -m pip check
 }

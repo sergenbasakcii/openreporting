@@ -1,10 +1,11 @@
 # OpenReporting container image (alternative to the systemd install). Put TLS (nginx/traefik) in front of it.
 FROM python:3.12-slim-bookworm AS build
 WORKDIR /src
-COPY pyproject.toml README.md requirements-runtime.lock ./
+COPY pyproject.toml README.md requirements-runtime.lock requirements-build.lock ./
 COPY openreporting ./openreporting
-RUN pip download --no-cache-dir --require-hashes --only-binary=:all: --dest /wheels -r requirements-runtime.lock \
-    && pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
+RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements-build.lock \
+    && pip download --no-cache-dir --require-hashes --only-binary=:all: --dest /wheels -r requirements-runtime.lock \
+    && pip wheel --no-cache-dir --no-deps --no-build-isolation --wheel-dir /wheels .
 
 FROM python:3.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
