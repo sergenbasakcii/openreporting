@@ -188,7 +188,7 @@ Durum dağılımı: V: 75, R: 24, P: 7, O: 8, E: 6.
 | K03 | Eksik/bozuk kaynaktan sahte yedek üretmeme | V | P1 | [tests/test_database_backup.py](../tests/test_database_backup.py) — CLI testli; deploy backup kaynak açma modu ayrıca gözden geçirilecek |
 | K04 | Arşiv ve config yedeği | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Gerçek Ubuntu yedek ve SHA doğrulaması |
 | K05 | Logo gibi ek varlıkların yedeği | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — b51232f Ubuntu CI logo varlığını yedek tar içinde doğruladı |
-| K06 | Tam geri yükleme kabul tatbikatı | V | P1 | [tests/test_backup_verification.py](../tests/test_backup_verification.py) — 9 izole kurtarma testi: DB/audit/arşiv/logo/anahtar, tamper/link/yol/bütçe; yeni Ubuntu kabulü CI bekliyor |
+| K06 | Tam geri yükleme kabul tatbikatı | V | P1 | [tests/test_backup_verification.py](../tests/test_backup_verification.py) — 10 izole kurtarma testi: DB/audit/arşiv/logo/anahtar ve geri açılan uygulamada API giriş/readiness, eski rapor indirme, logo ve yeni worker raporu; gerçek kurum RPO/RTO kabulü ayrıca açık |
 | K07 | nginx TLS ve systemd kısıtları | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Gerçek Ubuntu izin/HTTPS kabulü |
 | K08 | Yükseltme ve veri koruyan kaldırma | V | P1 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) — Gerçek Ubuntu E2E yeşil |
 | K09 | Başarısız schema yükseltmesinde geri dönüş | P | P1 | [deploy/upgrade.sh](../deploy/upgrade.sh) — Eski kod korunuyor; eşleşen DB/anahtar geri dönüşü manuel |

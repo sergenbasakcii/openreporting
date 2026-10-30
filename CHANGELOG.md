@@ -11,6 +11,7 @@
   eski Fernet verilerinin açılması doğrulandı. Runtime CVE taraması ve CycloneDX SBOM CI'a eklendi.
 - `verify-backup`, yedeği canlı veriyi değiştirmeyen geçici dizinde açarak DB/audit/rapor/logo/anahtar
   bütünlüğünü doğrular; yol kaçışı, link, cihaz girdileri ve boyut aşımı reddedilir.
+  Ayrı kabul testinde geri açılan uygulama oturum açar, eski arşiv/logo sunar ve yeni rapor üretir.
 - 120 maddelik kanıt/açık risk kaydı eklendi (docs/ENTERPRISE_REVIEW.md).
 - Veritabanı/şema arızası sağlık uçlarında, bozuk audit zinciri readiness kontrolünde HTTP 503 döndürür.
   Kimlik deposu hataları ayrıntı/sır sızdırmadan 503 verir; süreç canlılığı ayrı kalır.

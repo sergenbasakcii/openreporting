@@ -5,17 +5,20 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import shutil
 import tarfile
 
 from cryptography.fernet import Fernet
+from fastapi.testclient import TestClient
 from PIL import Image
 import pytest
 
 from openreporting import dashboards, datasources, db, security
-from openreporting.backup_verify import BackupVerificationError, verify_backup
+from openreporting.backup_verify import BackupVerificationError, verify_backup, _unpack
 from openreporting.config import Settings
 from openreporting.reporting import logos, service
 from openreporting.secrets_store import encrypt
+from openreporting.web import create_app
 
 
 def checksum(directory):
@@ -62,6 +65,45 @@ def test_full_restore_check_preserves_live_and_backup_files(bundle):
     with db.connect(settings) as connection:
         assert db.verify_audit(connection)==(True,None)
         assert security.check_password('isolated-restore-password',connection.execute("SELECT password_hash FROM users WHERE username='admin1'").fetchone()[0])
+
+
+def test_restored_application_login_archive_logo_and_new_worker_run(bundle,tmp_path):
+    """A verified copy must also work through normal APIs and the report worker."""
+    settings,backup = bundle
+    verify_backup(backup,key_file=settings.data_dir / 'secret.key',require_logos=True)
+    before = {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in backup.iterdir()}
+    target = tmp_path / 'restored-application';target.mkdir()
+    shutil.copyfile(backup / 'state.sqlite3',target / 'state.sqlite3')
+    shutil.copyfile(settings.data_dir / 'secret.key',target / 'secret.key')
+    _unpack(backup / 'archive.tar.gz',target,10_000_000)
+    restored = replace(settings,data_dir=target,secret_key_file=str(target / 'secret.key'),
+                       secure_cookie=False,provision_testdata=False)
+    with TestClient(create_app(restored),base_url='http://localhost') as client:
+        assert client.get('/api/health').status_code==200
+        login = client.post('/api/login',json={'username':'admin1','password':'isolated-restore-password'})
+        assert login.status_code==200
+        headers = {'X-CSRF-Token':login.json()['csrf']}
+        assert client.get('/readyz').status_code==200
+        assert client.get('/api/dashboards/uid/recovery').status_code==200
+        report = client.get('/api/dash-reports').json()[0]
+        config = client.get('/api/dash-reports/'+report['id']).json()
+        logo_id = config['config']['logo_id']
+        image = client.get('/api/dash-reports/logos/'+logo_id)
+        assert image.status_code==200 and image.content.startswith(b'\x89PNG')
+        old_run = service.list_runs(restored,report['id'])[0]
+        old_csv = client.get('/api/report-runs/'+old_run['id']+'/files/csv')
+        assert old_csv.status_code==200 and old_csv.content
+        response = client.post('/api/dash-reports/'+report['id']+'/runs',json={},headers=headers)
+        assert response.status_code==200
+        new_id = response.json()['run_id']
+        assert service.claim(restored)==new_id
+        service.execute(restored,new_id)
+        new_run = service.list_runs(restored,report['id'])[0]
+        assert new_run['status']=='completed'
+        assert client.get('/api/report-runs/'+new_id+'/files/csv').status_code==200
+        assert client.get('/readyz').status_code==200
+    assert {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in backup.iterdir()}==before
+    assert len(service.list_runs(settings,report['id']))==1
 
 
 def test_missing_or_wrong_key_is_not_replaced(bundle,tmp_path):
