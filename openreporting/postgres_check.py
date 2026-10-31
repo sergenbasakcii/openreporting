@@ -23,7 +23,10 @@ def _inspect(db):
         'primary_writable_default': bool(db.execute("""SELECT NOT pg_is_in_recovery()
             AND current_setting('default_transaction_read_only')='off'""").fetchone()[0]),
         'least_privilege_role': bool(db.execute("""SELECT bool_and(NOT rolsuper AND NOT rolcreaterole
-            AND NOT rolcreatedb AND NOT rolreplication AND NOT rolbypassrls) FROM pg_roles
+            AND NOT rolcreatedb AND NOT rolreplication AND NOT rolbypassrls
+            AND rolname NOT IN ('pg_read_all_data','pg_write_all_data','pg_read_server_files',
+                'pg_write_server_files','pg_execute_server_program','pg_signal_backend',
+                'pg_checkpoint','pg_create_subscription','pg_maintain')) FROM pg_roles
             WHERE rolname IN (current_user,session_user) OR pg_has_role(session_user,oid,'MEMBER')""").fetchone()[0]),
     }
     transport = _transport(db)

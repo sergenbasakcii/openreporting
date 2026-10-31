@@ -20,7 +20,8 @@ JSON `checks` alanı şunları bildirir:
   Bu, migration/DDL hakkı talep etmez ve gerçek INSERT/UPDATE/DELETE denemesi yapmaz.
 - Denetim zinciri ve etkin yerel kurtarma yöneticisinin varlığı.
 - Hem oturum hem etkin rol ve üyeliklerinde superuser, CREATEDB, CREATEROLE,
-  REPLICATION veya BYPASSRLS yetkilerinin olmaması. Üyelik kontrolü muhafazakârdır;
+  REPLICATION veya BYPASSRLS yetkilerinin olmaması; bütün verileri okuma/yazma,
+  sunucu dosyası/programı ve bakım/sinyal/subscription rollerine üyeliğin reddi. Üyelik kontrolü muhafazakârdır;
   SET/INHERIT ayrıntısı nedeniyle kullanılamayan bir üyeliği de işaretleyebilir.
 - TCP'de etkin TLS ile `sslmode=verify-full`; Unix socket yerel OS sınırı olarak
   ayrı bildirilir. Socket dizini/peer erişimi ayrıca işletmeci tarafından doğrulanır.
@@ -29,7 +30,8 @@ TLS olması tek başına sunucu kimliğinin doğrulandığını göstermez; `req
 `prefer` ve `verify-ca` bu kontrolü geçmez. CA ve sunucu adı kontrolünün farkı
 [resmî libpq SSL belgesinde](https://www.postgresql.org/docs/current/libpq-ssl.html),
 rol/nesne yetki sorguları ise [PostgreSQL bilgi fonksiyonlarında](https://www.postgresql.org/docs/current/functions-info.html)
-tanımlıdır. Yeni bir TLS kapatma seçeneği eklenmedi ve mevcut bağlantı ayarları
+tanımlıdır. Sunucu dosyası/programı ve genel veri rollerinin kapsamı
+[resmî ön tanımlı rol belgesinde](https://www.postgresql.org/docs/current/predefined-roles.html) açıklanır. Yeni bir TLS kapatma seçeneği eklenmedi ve mevcut bağlantı ayarları
 bu komut tarafından değiştirilmez. TLS/rol hatalı olsa da uygulamanın mevcut
 başlatma yolu otomatik değiştirilmez; bu araç bir ön kontrol raporudur.
 

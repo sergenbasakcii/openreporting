@@ -409,6 +409,7 @@ def test_postgres_preflight_really_rejects_writes_and_never_upgrades(postgres_sc
     assert not result['checks']['application_tables_readable']
     with application_db.connect(settings) as conn:
         assert application_db.schema_version(conn) == 4
+
     def attempted_write(conn):
         conn.execute("INSERT INTO login_failures(username,count,last_at) VALUES('must-not-exist',1,'test')")
         pytest.fail('PostgreSQL must enforce READ ONLY even for the schema owner')
@@ -417,3 +418,34 @@ def test_postgres_preflight_really_rejects_writes_and_never_upgrades(postgres_sc
     with application_db.connect(settings) as conn:
         assert conn.execute("SELECT count(*) FROM login_failures WHERE username='must-not-exist'").fetchone()[0] == 0
         assert application_db.schema_version(conn) == 4
+
+
+def test_postgres_preflight_detects_privileged_membership_in_a_limited_login(postgres_schema, tmp_path):
+    from dataclasses import replace
+    from openreporting import postgres_check
+    from openreporting.config import Settings
+    settings = replace(Settings.from_env(), data_dir=tmp_path, database_url=postgres_schema.dsn, secret_key_file='')
+    application_db.init_db(settings)
+    role = 'pgcheck_' + uuid4().hex
+    with application_db.connect(settings) as conn:
+        if not conn.execute('SELECT rolsuper FROM pg_roles WHERE rolname=current_user').fetchone()[0]:
+            pytest.skip('Isolated role contract needs its own privileged CI server')
+        schema = conn.execute('SELECT current_schema()').fetchone()[0]
+        conn.raw.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD 'isolated-preflight-role-password'").format(sql.Identifier(role)))
+        try:
+            for grant in ('GRANT USAGE ON SCHEMA {} TO {}', 'GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA {} TO {}',
+                          'GRANT USAGE ON ALL SEQUENCES IN SCHEMA {} TO {}'):
+                conn.raw.execute(sql.SQL(grant).format(sql.Identifier(schema), sql.Identifier(role)))
+            limited = replace(settings, database_url=psycopg.conninfo.make_conninfo(
+                postgres_schema.dsn, user=role, password='isolated-preflight-role-password'))
+            result = postgres_check.check(limited)
+            assert result['checks']['least_privilege_role'], result
+            assert result['checks']['runtime_data_privileges'], result
+            conn.raw.execute(sql.SQL('GRANT pg_read_all_data TO {}').format(sql.Identifier(role)))
+            assert not postgres_check.check(limited)['checks']['least_privilege_role']
+        finally:
+            # This freshly generated role owns no objects: revoke only its fixture grants.
+            for revoke in ('REVOKE ALL ON ALL SEQUENCES IN SCHEMA {} FROM {}', 'REVOKE ALL ON ALL TABLES IN SCHEMA {} FROM {}',
+                           'REVOKE ALL ON SCHEMA {} FROM {}'):
+                conn.raw.execute(sql.SQL(revoke).format(sql.Identifier(schema), sql.Identifier(role)))
+            conn.raw.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
