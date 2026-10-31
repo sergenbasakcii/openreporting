@@ -14,6 +14,7 @@ from PIL import Image
 import pytest
 
 from openreporting import dashboards, datasources, db, security
+from openreporting import folder_access
 from openreporting.backup_verify import BackupVerificationError, verify_backup, _unpack
 from openreporting.config import Settings
 from openreporting.reporting import logos, service
@@ -65,6 +66,50 @@ def test_full_restore_check_preserves_live_and_backup_files(bundle):
     with db.connect(settings) as connection:
         assert db.verify_audit(connection)==(True,None)
         assert security.check_password('isolated-restore-password',connection.execute("SELECT password_hash FROM users WHERE username='admin1'").fetchone()[0])
+
+
+@pytest.mark.parametrize('table', ['folder_policy', 'folder_user_grants'])
+def test_missing_authorization_table_is_not_a_valid_current_schema_backup(bundle, table):
+    import sqlite3
+    settings, backup = bundle
+    # A recomputed file checksum cannot make an incomplete application schema valid.
+    with sqlite3.connect(backup / 'state.sqlite3') as connection:
+        connection.execute('DROP TABLE ' + table)  # fixed parameterized test inventory only
+    checksum(backup)
+    with pytest.raises(BackupVerificationError):
+        verify_backup(backup, key_file=settings.data_dir / 'secret.key')
+
+
+def test_private_folder_grants_and_archive_boundary_survive_verified_restore(bundle, tmp_path):
+    settings, original = bundle
+    with db.connect(settings) as connection:
+        owner = dict(connection.execute("SELECT id,role FROM users WHERE username='admin1'").fetchone())
+    viewer = {'id': security.create_user(settings, 'restoredviewer', 'isolated-folder-restore-password', 'viewer'), 'role': 'viewer'}
+    folder = dashboards.save_folder(settings, owner, 'Recovery restricted')['uid']
+    current = dashboards.get(settings, 'recovery', owner)['dashboard']
+    dashboards.save(settings, owner, current, folder_uid=folder)
+    folder_access.replace_policy(settings, owner, folder, {'restricted': True, 'revision': 0,
+        'grants': [{'user_id': viewer['id'], 'permission': 'view'}]})
+    backup = tmp_path / 'private-backup'; backup.mkdir()
+    db.backup_database(settings, backup / 'state.sqlite3')
+    shutil.copyfile(original / 'archive.tar.gz', backup / 'archive.tar.gz')
+    shutil.copyfile(original / 'openreporting.env', backup / 'openreporting.env')
+    checksum(backup)
+    assert verify_backup(backup, key_file=settings.data_dir / 'secret.key')['ok']
+    target = tmp_path / 'private-restored'; target.mkdir()
+    shutil.copyfile(backup / 'state.sqlite3', target / 'state.sqlite3')
+    shutil.copyfile(settings.data_dir / 'secret.key', target / 'secret.key')
+    _unpack(backup / 'archive.tar.gz', target, 10_000_000)
+    restored = replace(settings, data_dir=target, secret_key_file=str(target / 'secret.key'))
+    assert folder_access.policy(restored, owner, folder)['restricted']
+    assert folder_access.policy(restored, owner, folder)['grants'][0]['user_id'] == viewer['id']
+    assert not dashboards.get(restored, 'recovery', viewer)['meta']['canEdit']
+    report = service.list_reports(restored, viewer)[0]
+    run = service.list_runs(restored, report['id'], user=viewer)[0]
+    assert service.verified_file(restored, run['id'], 'csv', viewer)[0].is_file()
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException):
+        service.verified_file(restored, run['id'], 'csv')
 
 
 def test_restored_application_login_archive_logo_and_new_worker_run(bundle,tmp_path):

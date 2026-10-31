@@ -74,5 +74,7 @@ döndürmüyorsa yeni statik arayüz izin menüsünü göstermez.
 Kanıtlar: `tests/test_folder_access.py`, gerçek PostgreSQL sözleşmesindeki
 klasör/revizyon/worker testi ve yalnız geçici veride çalışan
 `tools/folder_browser_acceptance.py` / `tests/browser/folder-flow.cjs`.
+Klasör politikası/grant ve arşiv sınırının doğrulanmış yedekten geri dönüşü de testlidir;
+şema sürümü doğru olsa bile yetki tabloları eksik yedek reddedilir.
 Yerel genel test ve CI sonuçları teslim kaydında ayrı belirtilir; gerçek kurum
 kabulü, kaynak bazlı haklar ve tenant izolasyonu halen açık değerlendirmelerdir.

@@ -11,6 +11,7 @@ import tempfile
 
 from .config import Settings
 from .db import CURRENT_VERSION, schema_version, verify_audit
+from .healthchecks import database_ready
 from .reporting import logos
 from .secrets_store import decrypt
 from PIL import Image
@@ -97,6 +98,8 @@ def _verify_copy(target,key,require_logos):
             raise BackupVerificationError('Backup database integrity check failed')
         if schema_version(db) != CURRENT_VERSION:
             raise BackupVerificationError('Use the application version matching the backup schema')
+        if not database_ready(db):
+            raise BackupVerificationError('Backup application tables are incomplete')
         if not verify_audit(db)[0]:
             raise BackupVerificationError('Backup audit chain is invalid')
         anchors = {row['object_id']:json.loads(row['details']).get('manifest_sha256') for row in db.execute(
