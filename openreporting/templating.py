@@ -83,16 +83,24 @@ SAFE_FORMATS = {"sqlstring": {"sqlstring"}, "zabbix": {"zabbix", "regex", "csv",
 def validate_promql_variables(text, variables, builtins):
     # User variables are only allowed inside double-quoted label strings.
     # Escaping a value is not sufficient if the author places it as syntax.
-    quoted, escaped, inside = False, False, set()
+    # Single-quoted and backtick (raw) strings are tracked too, so a '"' inside them
+    # cannot flip the state and make a later bare $var look quoted.
+    state, escaped, inside = None, False, set()
     for i, char in enumerate(text):
-        if quoted:
+        if state is None:
+            if char in "\"'`":
+                state = char
+            continue
+        if state == '"':
             inside.add(i)
         if escaped:
             escaped = False
-        elif char == "\\" and quoted:
+        elif char == "\\" and state != "`":
             escaped = True
-        elif char == '"':
-            quoted = not quoted
+        elif char == state:
+            state = None
+    if state is not None and _PATTERN.search(text):
+        raise ValueError("PromQL/LogQL sorgusunda kapanmamış tırnak var")
     for match in _PATTERN.finditer(text):
         name = match.group(1) or match.group(2) or match.group(4)
         if name in variables and name not in builtins and match.start() not in inside:

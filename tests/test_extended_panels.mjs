@@ -37,3 +37,14 @@ test('unrelated missing columns do not discard valid XY pairs', () => {
   const frame={type:'table',columns:[{name:'x',type:'number'},{name:'y',type:'number'},{name:'other',type:'number'}],rows:[[1,2,null]]};
   assert.equal(extendedOption([frame],panel('scatter')).series[0].data.length,1);
 });
+
+test('review fixes: integer bins, zone-aware calendar days, heatmap fallback', () => {
+  const series = [{ type: 'timeseries', name: 'cpu', points: [[1_000, 1], [2_000, 2], [3_000, 9]] }];
+  assert.equal(extendedOption(series, { ...panel('histogram'), options: { bins: 10.5 } }).series[0].data.length, 10);
+  // 2026-10-27T22:30Z is already 28 October in Istanbul (UTC+3)
+  const late = [{ type: 'timeseries', name: 'x', points: [[Date.UTC(2026, 9, 27, 22, 30), 5]] }];
+  assert.equal(extendedOption(late, panel('calendarheatmap'), 'Europe/Istanbul').series[0].data[0][0], '2026-10-28');
+  assert.equal(extendedOption(late, panel('calendarheatmap'), 'utc').series[0].data[0][0], '2026-10-27');
+  const table = { type: 'table', columns: [{ name: 'a', type: 'number' }], rows: [[1]] };
+  assert.equal(extendedOption([table], panel('heatmap')).fallback, 'timeseries');
+});

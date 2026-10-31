@@ -45,7 +45,7 @@ function factorDialog(action) {
         completed(result);
       }
     } catch (err) {
-      if (alive) { error.textContent = err.message; error.hidden = false; }
+      if (alive) { error.textContent = mfaErrorText(err); error.hidden = false; }
     } finally { if (alive) submit.disabled = false; }
   } },
     h('p', { text: setup ? 'Girişte parolanıza ek bir doğrulayıcı kodu istenir. Önce mevcut parolanızı doğrulayın.' : 'Bu işlem tüm oturumları kapatır. Mevcut parolanız ve yeni bir doğrulayıcı kodu veya kullanılmamış kurtarma kodu gerekir.' }),
@@ -54,6 +54,14 @@ function factorDialog(action) {
   const dialog = modal({ title: 'İki adımlı giriş', body: form, closeOnBackdrop: false,
     onClose: () => { alive = false; pending = null; password.value = ''; code.value = ''; stage.replaceChildren(); } });
   return dialog;
+}
+
+// Turkish messages for the second-factor API (its error texts are English).
+export function mfaErrorText(err) {
+  return ({ 400: 'İki adımlı giriş işlemleri yalnızca HTTPS üzerinden yapılabilir.',
+    403: 'Parola veya doğrulama kodu hatalı. Yeni bir kodla tekrar deneyin.',
+    409: 'Kurulum süresi doldu veya değişti; baştan başlayın.',
+    429: 'Çok fazla deneme yapıldı; 15 dakika sonra tekrar deneyin.' })[err.status] || err.message;
 }
 
 export async function mfaCard() {

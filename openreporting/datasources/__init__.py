@@ -63,6 +63,13 @@ def _pem(text):
     return text.strip() + "\n"
 
 
+def _int(data, key, default):
+    try:
+        return int(data.get(key, default))
+    except (TypeError, ValueError):
+        raise DataSourceError(f"{key} bir tam sayı olmalı") from None
+
+
 def validate(kind, url, json_data, settings):
     if kind not in TYPES:
         raise DataSourceError("Unsupported datasource type")
@@ -77,9 +84,9 @@ def validate(kind, url, json_data, settings):
         for key, default in (("trends_from", "7d"), ("trends_range", "4d")):
             clean[key] = str(data.get(key) or default)
             parse_duration(clean[key])
-        clean["cache_ttl"] = max(0, min(int(data.get("cache_ttl", 60)), 3600))
-        clean["timeout"] = max(3, min(int(data.get("timeout", 30)), 300))
-        clean["max_items"] = max(1, min(int(data.get("max_items", 500)), 20000))
+        clean["cache_ttl"] = max(0, min(_int(data, "cache_ttl", 60), 3600))
+        clean["timeout"] = max(3, min(_int(data, "timeout", 30), 300))
+        clean["max_items"] = max(1, min(_int(data, "max_items", 500), 20000))
         clean["ca_pem"] = _pem(data.get("ca_pem", ""))
         clean["history_source"] = "sql" if data.get("history_source") == "sql" else "api"
         if clean["history_source"] == "sql":
@@ -94,7 +101,7 @@ def validate(kind, url, json_data, settings):
                 clean[key] = value
     elif kind in ("prometheus", "loki", "httpjson", "csv"):
         url = validate_http_url(url, settings.allow_http_datasources)
-        clean["timeout"] = max(3, min(int(data.get("timeout", 30)), 60))
+        clean["timeout"] = max(3, min(_int(data, "timeout", 30), 60))
         clean["ca_pem"] = _pem(data.get("ca_pem", ""))
         clean["root"] = str(data.get("root") or "")[:200]
     elif kind == "postgres":
@@ -108,8 +115,8 @@ def validate(kind, url, json_data, settings):
         if clean["sslmode"] not in SSL_MODES:
             raise DataSourceError("Geçersiz sslmode")
         clean["ca_pem"] = _pem(data.get("ca_pem", ""))
-        clean["timeout_ms"] = max(1000, min(int(data.get("timeout_ms", 30000)), 300000))
-        clean["max_rows"] = max(1, min(int(data.get("max_rows", 200000)), 1_000_000))
+        clean["timeout_ms"] = max(1000, min(_int(data, "timeout_ms", 30000), 300000))
+        clean["max_rows"] = max(1, min(_int(data, "max_rows", 200000), 1_000_000))
         url = f"{clean['host']}:{clean['port']}/{clean['database']}"
     else:
         url = ""

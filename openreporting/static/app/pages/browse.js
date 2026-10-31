@@ -123,7 +123,7 @@ async function permissionsDialog(folder, refresh) {
     for (const user of eligible) {
       list.append(field(`${user.display_name || user.username} (${user.role})`, select([
         { value: '', label: 'İzin yok' }, { value: 'view', label: 'Görüntüleme' },
-        ...(user.role === 'editor' || choices.get(user.id) === 'edit' ? [{ value: 'edit', label: user.role === 'viewer' ? 'Görüntüleme (rol sınırı)' : 'Düzenleme' }] : [])
+        ...(user.role === 'editor' || choices.get(user.id) === 'edit' ? [{ value: 'edit', label: user.role === 'viewer' ? 'Düzenleme (izleyici rolü nedeniyle etkisiz)' : 'Düzenleme' }] : [])
       ], choices.get(user.id) || '', v => { if (v) choices.set(user.id, v); else choices.delete(user.id); })));
     }
     const show = () => { list.hidden = !restricted; };

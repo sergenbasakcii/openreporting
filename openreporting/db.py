@@ -146,14 +146,14 @@ POSTGRES_MIGRATIONS = {1: postgres_store.bootstrap_statements(MIGRATIONS[1]), 2:
 MIGRATIONS[3] = ("""CREATE TABLE external_identities(
  user_id TEXT PRIMARY KEY REFERENCES users(id), provider TEXT NOT NULL CHECK(provider='ldap'),
  subject TEXT NOT NULL, UNIQUE(provider,subject))""",)
-POSTGRES_MIGRATIONS[3] = MIGRATIONS[3]
+POSTGRES_MIGRATIONS[3] = postgres_store.widen_integers(MIGRATIONS[3])
 MIGRATIONS[4] = ("""CREATE TABLE user_mfa(
  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  secret_json TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
  pending_expires_at TEXT NOT NULL DEFAULT '', setup_hash TEXT NOT NULL DEFAULT '', last_counter INTEGER NOT NULL DEFAULT -1,
  recovery_hashes TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)""",
  """CREATE TABLE mfa_sessions(token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE)""")
-POSTGRES_MIGRATIONS[4] = MIGRATIONS[4]
+POSTGRES_MIGRATIONS[4] = postgres_store.widen_integers(MIGRATIONS[4])
 MIGRATIONS[5] = ("""CREATE TABLE folder_policy(
  folder_id TEXT PRIMARY KEY REFERENCES folders(id) ON DELETE CASCADE,
  restricted INTEGER NOT NULL DEFAULT 0 CHECK(restricted IN (0,1)), revision INTEGER NOT NULL DEFAULT 0)""",
@@ -161,7 +161,7 @@ MIGRATIONS[5] = ("""CREATE TABLE folder_policy(
  folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(folder_id,user_id))""")
-POSTGRES_MIGRATIONS[5] = MIGRATIONS[5]
+POSTGRES_MIGRATIONS[5] = postgres_store.widen_integers(MIGRATIONS[5])
 
 
 

@@ -158,7 +158,10 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
                                                       (body.home_dashboard_uid,)).fetchone():
             raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı")
         if body.home_dashboard_uid:
-            folder_access.require_dashboard(db, user, body.home_dashboard_uid)
+            try:
+                folder_access.require_dashboard(db, user, body.home_dashboard_uid)
+            except HTTPException:
+                raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı") from None
         db.execute("""INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,updated_at) VALUES(?,?,?,?,?)
                       ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
                       home_dashboard_uid=excluded.home_dashboard_uid,updated_at=excluded.updated_at""",

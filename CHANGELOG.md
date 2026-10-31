@@ -2,6 +2,24 @@
 
 ## Yayınlanmamış
 
+### İnceleme düzeltmeleri (birleştirme öncesi)
+- E-posta gönderimi yarıda kalan **tamamlanmış** rapor artık indirilebilir kalır; yalnız teslim durumu
+  "bilinmiyor" olur ve e-posta yeniden gönderilmez. Yarıda kalan üretimler incelemeye düşer.
+- Yükseltme: eski kurulumlarda boş `OPENREPORTING_PUBLIC_URL` nginx `server_name`'den,
+  boş `OPENREPORTING_ALLOWED_HOSTS` sunucu adı/IP'lerinden doldurulur (yeni Host kontrolü erişimi kesmesin);
+  yükseltme sonrası genel adla sağlık kontrolü yapılır; geri dönüşte şema değiştiyse veritabanı ön yedekten
+  otomatik geri yüklenir; anahtar dahil yedek eski sürümle de çalışır.
+- HTTP kaynakları: sunucunun kendi localhost servisleri varsayılan kapalı
+  (`OPENREPORTING_ALLOW_LOOPBACK_DATASOURCES`), bulut metadata adresleri ve IPv6 içine gömülü IPv4
+  (NAT64/6to4/Teredo) engellenir; yanıt okumaya toplam süre sınırı eklendi; "007" gibi kimlikler metin kalır.
+- PromQL/LogQL değişken denetimi tek tırnak ve ters tırnaklı dizgileri doğru izler.
+- Giriş: eşzamanlılık sınırı dolunca hemen 429 yerine kısa süre beklenir; pasif hesaplarda da aynı parola
+  maliyeti ödenir (zamanlama sızıntısı yok); eski başarısız giriş kayıtları budanır; gizli dashboard ana sayfa
+  isteğinde var olmayanla aynı yanıtı alır; MFA'da localhost istisnası yalnız yerel HTTP kurulumunda geçerli.
+- Yeni grafikler dashboard saat dilimini, birim/ondalık ayarlarını kullanır; kesirli histogram aralığı çökmez;
+  tablo veren eski ısı haritası panelleri zaman serisi görünümüne döner. MFA ve giriş hataları Türkçe.
+- PostgreSQL geçişlerinde tüm tamsayılar BIGINT.
+
 ### Kurumsal değerlendirme ve işletim
 - CI uzak action'ları resmî upstream tag→commit kaydıyla SHA'ya sabitlendi; checkout Git
   credential persistence kapatıldı ve sabitleme kontrolü eklendi. Release imzası değildir.

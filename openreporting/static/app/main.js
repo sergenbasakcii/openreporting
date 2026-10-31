@@ -40,7 +40,9 @@ function loginPage(root) {
     } catch (err) {
       const needsCode = err.detail?.detail?.code === 'mfa_required';
       if (needsCode) codeField.hidden = false;
-      error.textContent = needsCode ? 'Devam etmek için doğrulayıcı veya kurtarma kodunuzu girin.' : err.status === 401 ? 'Giriş bilgileri veya doğrulama kodu hatalı.' : err.message;
+      error.textContent = needsCode ? 'Devam etmek için doğrulayıcı veya kurtarma kodunuzu girin.' : err.status === 401 ? 'Giriş bilgileri veya doğrulama kodu hatalı.'
+        : err.status === 429 ? 'Çok fazla deneme yapıldı; biraz sonra tekrar deneyin.'
+        : err.status === 503 ? 'Giriş hizmeti şu anda yanıt veremiyor; biraz sonra tekrar deneyin.' : err.message;
       error.hidden = false;
       submit.disabled = false;
       if (!codeField.hidden) code.focus(); else pass.select();

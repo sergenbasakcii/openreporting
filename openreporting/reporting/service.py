@@ -455,9 +455,14 @@ def mark_interrupted(settings, force=False):
         rows = db.execute("SELECT id FROM dash_report_runs WHERE (status='running' OR delivery_status='sending')" + ("" if force else " AND lease_until<?"),
                           () if force else (utcnow(),)).fetchall()
         for row in rows:
-            db.execute("""UPDATE dash_report_runs SET status='needs_review',
+            # Unfinished renders need review. A finished run (completed/partial) whose e-mail was in
+            # flight keeps its status and files; only the delivery becomes 'unknown' (never resent).
+            db.execute("""UPDATE dash_report_runs SET
+                          status=CASE WHEN status='running' THEN 'needs_review' ELSE status END,
                           delivery_status=CASE WHEN delivery_status='sending' THEN 'unknown' ELSE delivery_status END,
-                          error='Çalıştırma yarıda kaldı; manuel inceleme gerekli' WHERE id=?""", (row["id"],))
+                          error=CASE WHEN status='running' THEN 'Çalıştırma yarıda kaldı; manuel inceleme gerekli'
+                                     ELSE 'E-posta gönderimi yarıda kaldı; teslim durumu bilinmiyor' END
+                          WHERE id=?""", (row["id"],))
             audit(db, "worker", "report_run.interrupted", "dash_report_run", row["id"])
 
 

@@ -51,6 +51,7 @@ class Settings:
     max_series_points: int = 2_000_000
     report_retention_days: int = 365
     allow_http_datasources: bool = False
+    allow_loopback_datasources: bool = False
     database_url: str = field(default="", repr=False)
     smtp_security: str = ""
     smtp_ca_file: str = ""
@@ -102,6 +103,7 @@ class Settings:
             max_series_points=int(os.getenv("OPENREPORTING_MAX_SERIES_POINTS", "2000000")),
             report_retention_days=int(os.getenv("OPENREPORTING_REPORT_RETENTION_DAYS", "365")),
             allow_http_datasources=_flag("OPENREPORTING_ALLOW_HTTP_DATASOURCES", False),
+            allow_loopback_datasources=_flag("OPENREPORTING_ALLOW_LOOPBACK_DATASOURCES", False),
             database_url=os.getenv("OPENREPORTING_DATABASE_URL", "").strip(),
             smtp_security=os.getenv("OPENREPORTING_SMTP_SECURITY", "").strip().lower(),
             smtp_ca_file=os.getenv("OPENREPORTING_SMTP_CA_FILE", "").strip(),

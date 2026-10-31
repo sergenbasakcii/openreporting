@@ -262,5 +262,5 @@ def test_restart_marks_completed_but_sending_delivery_unknown_and_never_requeues
         db.execute("UPDATE dash_report_runs SET status='completed',delivery_status='sending' WHERE id=?", (run_id,))
     service.mark_interrupted(settings, force=True)
     run = service.list_runs(settings, created["id"])[0]
-    assert (run["status"], run["delivery_status"]) == ("needs_review", "unknown")
+    assert (run["status"], run["delivery_status"]) == ("completed", "unknown")
     assert service.claim(settings) is None

@@ -1,7 +1,19 @@
 // Additional ECharts visualizations; use query frames without synthetic values.
-import { chartTheme, initChart, noData, reducedValues, reduce, minOf, maxOf } from './common.js';
+import { chartTheme, initChart, noData, reducedValues, reduce, minOf, maxOf, timeAxisLabel } from './common.js';
+import { formatValue, resolveUnit } from '../units.js';
+import { render as renderTimeSeries } from './timeseries.js';
 
 const finite = v => typeof v === 'number' && Number.isFinite(v);
+// Dates follow the dashboard time zone like the other panels ('browser' = local).
+const zoneOf = tz => (!tz || tz === 'browser' ? undefined : tz === 'utc' ? 'UTC' : tz);
+function dayKey(ms, tz) {
+ try { return new Intl.DateTimeFormat('en-CA', { timeZone: zoneOf(tz), year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); }
+ catch { return new Date(ms).toISOString().slice(0, 10); }
+}
+function stamp(ms, tz) {
+ try { return new Intl.DateTimeFormat('tr-TR', { timeZone: zoneOf(tz), dateStyle: 'short', timeStyle: 'short' }).format(new Date(ms)); }
+ catch { return new Date(ms).toISOString(); }
+}
 export const EXTRA_NAMES = {
  heatmap:'Isı haritası', histogram:'Histogram', scatter:'XY dağılım', bubble:'Balon grafik', boxplot:'Kutu grafiği',
  candlestick:'Mum grafiği', radar:'Radar', funnel:'Huni', treemap:'Ağaç haritası', sunburst:'Hiyerarşi halkası',
@@ -9,7 +21,7 @@ export const EXTRA_NAMES = {
  polarbar:'Kutupsal çubuk', parallel:'Paralel koordinatlar', donut:'Halka grafik', rosepie:'Gül grafiği',
  stackedarea:'Yığılmış alan', stepchart:'Basamak grafiği',
 };
-export function extendedOption(frames, panel) {
+export function extendedOption(frames, panel, tz) {
  const pointCount=frames.reduce((n,f)=>n+(f.type==='table'?f.rows.length:f.points?.length||0),0);
  if(pointCount>100000)return {message:'Bu grafik için en fazla 100.000 satır/nokta kullanın; sorguyu daraltın.'};
  const type=panel.type, table=frames.find(f=>f.type==='table'), series=frames.filter(f=>f.type==='timeseries');
@@ -34,10 +46,11 @@ export function extendedOption(frames, panel) {
  }
  if(['stackedarea','stepchart'].includes(type)) {
   if(!series.length)return null;
-  return {xAxis:{type:'time'},yAxis:{type:'value'},series:series.map(f=>({name:f.name,type:'line',showSymbol:false,connectNulls:false,stack:type==='stackedarea'?'total':undefined,areaStyle:type==='stackedarea'?{}:undefined,step:type==='stepchart'?'end':undefined,data:f.points}))};
+  const span=Math.max(1,maxOf(series.flatMap(f=>f.points.map(p=>p[0])),0)-minOf(series.flatMap(f=>f.points.map(p=>p[0])),0));
+  return {xAxis:{type:'time',axisLabel:{hideOverlap:true,formatter:v=>timeAxisLabel(v,span,tz)}},yAxis:{type:'value'},series:series.map(f=>({name:f.name,type:'line',showSymbol:false,connectNulls:false,stack:type==='stackedarea'?'total':undefined,areaStyle:type==='stackedarea'?{}:undefined,step:type==='stepchart'?'end':undefined,data:f.points}))};
  }
  if(type==='histogram') {
-  if(!all.length)return null; const lo=minOf(all),hi=maxOf(all); const n=Math.max(1,Math.min(50,Number(panel.options?.bins)||10)); const width=(hi-lo)/n||1, counts=Array(n).fill(0);
+  if(!all.length)return null; const lo=minOf(all),hi=maxOf(all); const n=Math.max(1,Math.min(50,Math.floor(Number(panel.options?.bins))||10)); const width=(hi-lo)/n||1, counts=Array(n).fill(0);
   all.forEach(v=>counts[Math.min(n-1,Math.floor((v-lo)/width))]++);
   return {xAxis:{type:'category',data:counts.map((_,i)=>`${(lo+i*width).toPrecision(4)}–${(lo+(i+1)*width).toPrecision(4)}`)},yAxis:{type:'value',name:'Örnek sayısı'},series:[{type:'bar',barCategoryGap:0,data:counts}]};
  }
@@ -67,13 +80,13 @@ export function extendedOption(frames, panel) {
   return {series:[{type:type==='sankey'?'sankey':'graph',layout:type==='nodegraph'?'circular':undefined,roam:false,symbolSize:25,label:{show:true},data,links}]};
  }
  if(type==='heatmap') {
-  if(!series.length)return {message:'Isı haritası için zaman serisi seçin.'};
+  if(!series.length)return {fallback:'timeseries'};
   const times=[...new Set(series.flatMap(f=>f.points.map(p=>p[0])))].sort((a,b)=>a-b), lookup=new Map(times.map((t,i)=>[t,i]));
   const data=series.flatMap((f,i)=>f.points.filter(p=>finite(p[1])).map(p=>[lookup.get(p[0]),i,p[1]])); if(!data.length)return null;
-  return {xAxis:{type:'category',data:times.map(t=>new Date(t).toLocaleString())},yAxis:{type:'category',data:series.map(f=>f.name)},visualMap:{min:minOf(data.map(d=>d[2])),max:maxOf(data.map(d=>d[2])),calculable:true,orient:'horizontal',bottom:0},series:[{type:'heatmap',data}],grid:{bottom:70}};
+  return {xAxis:{type:'category',data:times.map(t=>stamp(t,tz))},yAxis:{type:'category',data:series.map(f=>f.name)},visualMap:{min:minOf(data.map(d=>d[2])),max:maxOf(data.map(d=>d[2])),calculable:true,orient:'horizontal',bottom:0},series:[{type:'heatmap',data}],grid:{bottom:70}};
  }
  if(type==='calendarheatmap') {
-  const days=new Map();series.forEach(f=>f.points.filter(p=>finite(p[1])).forEach(p=>{const day=new Date(p[0]).toISOString().slice(0,10);if(!days.has(day))days.set(day,[]);days.get(day).push(p[1]);}));
+  const days=new Map();series.forEach(f=>f.points.filter(p=>finite(p[1])).forEach(p=>{const day=dayKey(p[0],tz);if(!days.has(day))days.set(day,[]);days.get(day).push(p[1]);}));
   const data=[...days].sort(([a],[b])=>a.localeCompare(b)).map(([day,values])=>[day,reduce(values,'mean')]);if(!data.length)return null;
   return {calendar:{range:[data[0][0],data[data.length-1][0]],cellSize:['auto',18],top:45,left:45,right:15},visualMap:{min:minOf(data.map(d=>d[1])),max:maxOf(data.map(d=>d[1])),orient:'horizontal',bottom:0},series:[{type:'heatmap',coordinateSystem:'calendar',data}]};
  }
@@ -91,14 +104,23 @@ function hasCycle(links) {
  for(let i=0;i<queue.length;i++){visited++;for(const next of edges.get(queue[i])||[]){degree.set(next,degree.get(next)-1);if(degree.get(next)===0)queue.push(next);}}
  return visited!==degree.size;
 }
-export function renderExtended(container,frames,panel){
- const option=extendedOption(frames,panel);if(!option||option.message){noData(container,option?.message||'Veri yok');return{resize(){},destroy(){}};}
+// Value formatting (unit/decimals) shared by tooltips and value axes.
+function valueFormat(frames,panel){
+ const d=panel.fieldConfig?.defaults||{};const first=frames.find(f=>f.unit||f.columns?.some(c=>c.unit));
+ const unit=resolveUnit(d.unit,first?.unit||first?.columns?.find(c=>c.unit)?.unit);
+ return v=>(finite(v)?formatValue(v,unit,d.decimals):String(v??''));
+}
+export function renderExtended(container,frames,panel,ctx={}){
+ const option=extendedOption(frames,panel,ctx.timezone);
+ if(option?.fallback==='timeseries')return renderTimeSeries(container,frames,{...panel,type:'timeseries'},ctx);if(!option||option.message){noData(container,option?.message||'Veri yok');return{resize(){},destroy(){}};}
  const theme=chartTheme();
+ const fmt=valueFormat(frames,panel);
+ if(option.yAxis&&!Array.isArray(option.yAxis)&&option.yAxis.type==='value')option.yAxis={...option.yAxis,axisLabel:{...option.yAxis.axisLabel,formatter:fmt}};
  if(option.legend)option.legend={textStyle:{color:theme.text},...option.legend};
  if(option.visualMap)option.visualMap={textStyle:{color:theme.text},...option.visualMap};
  if(option.calendar)option.calendar={...option.calendar,dayLabel:{color:theme.text},monthLabel:{color:theme.text},yearLabel:{color:theme.text}};
  option.series=option.series.map(s=>({...s,label:{...s.label,color:theme.text}}));
  const box=document.createElement('div');box.className='viz-chart';box.style.height='100%';container.replaceChildren(box);const chart=initChart(box);
- chart.setOption({animation:false,color:['#5794f2','#73bf69','#ff9830','#b877d9','#f2495c'],textStyle:{color:theme.text},grid:{left:50,right:25,top:30,bottom:50,containLabel:true},tooltip:{trigger:'item',confine:true,renderMode:'richText',backgroundColor:theme.tooltipBg,borderColor:theme.border,textStyle:{color:theme.text}},...option},true);
+ chart.setOption({animation:false,color:['#5794f2','#73bf69','#ff9830','#b877d9','#f2495c'],textStyle:{color:theme.text},grid:{left:50,right:25,top:30,bottom:50,containLabel:true},tooltip:{trigger:'item',confine:true,renderMode:'richText',backgroundColor:theme.tooltipBg,borderColor:theme.border,textStyle:{color:theme.text},valueFormatter:fmt},...option},true);
  return{chart,resize(){chart.resize();},destroy(){chart.dispose();},png(){return chart.getDataURL({type:'png',pixelRatio:2,backgroundColor:theme.bg});}};
 }

@@ -45,7 +45,10 @@ export async function datasourceEditPage(root, { uid }) {
   const page = h('div', { class: 'page' });
   const form = h('div');
   const jd = (key, label, opts = {}) => field(label, input({ value: model.jsonData[key] ?? '', type: opts.type, placeholder: opts.placeholder,
-    onChange: (e) => { model.jsonData[key] = opts.type === 'number' ? Number(e.target.value) : e.target.value; } }), opts.hint);
+    onChange: (e) => {
+      if (opts.type === 'number' && e.target.value === '') delete model.jsonData[key];
+      else model.jsonData[key] = opts.type === 'number' ? Number(e.target.value) : e.target.value;
+    } }), opts.hint);
   const secret = (key, label, hint) => {
     if (configured[key] && !model.secureJsonReset.includes(key)) {
       return field(label, h('div', { class: 'toolbar' }, h('span', { class: 'badge ok', text: 'yapılandırıldı' }), button('Sıfırla', { size: 'sm', onClick: () => { model.secureJsonReset.push(key); draw(); } })), hint);

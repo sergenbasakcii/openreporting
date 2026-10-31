@@ -103,11 +103,13 @@ def test_uid_tampering_mutations_queries_and_old_new_destinations(state):
             ('put', f'/api/dash-reports/{rid}/schedules/{sid}', {}),
             ('post', '/api/dash-reports/preview', {'name': 'Denied preview', 'dashboard_uid': 'private'}),
             ('post', '/api/dashboards/export', {'dashboard_uid': 'private', 'format': 'csv'}),
-            ('put', '/api/user/preferences', {'home_dashboard_uid': 'private'}),
         ]
         for method, url, body in requests:
             response = getattr(client, method)(url, json=body)
             assert response.status_code == 404, (url, response.status_code, response.text)
+        hidden = client.put('/api/user/preferences', json={'home_dashboard_uid': 'private'})
+        missing = client.put('/api/user/preferences', json={'home_dashboard_uid': 'no-such-dashboard'})
+        assert (hidden.status_code, hidden.json()) == (missing.status_code, missing.json()) == (422, missing.json())
         for url in ('/api/dashboards/uid/private', f'/api/folders/{folder}',
                     '/api/annotations/private-note', f'/api/dash-reports/{rid}', f'/api/report-schedules/{sid}'):
             assert client.delete(url).status_code == 404, url

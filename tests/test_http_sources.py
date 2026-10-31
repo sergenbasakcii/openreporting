@@ -38,7 +38,7 @@ def fixture_source(tmp_path):
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    settings = replace(Settings.from_env(), data_dir=tmp_path, allow_http_datasources=True, secret_key_file="")
+    settings = replace(Settings.from_env(), data_dir=tmp_path, allow_http_datasources=True, allow_loopback_datasources=True, secret_key_file="")
     db.init_db(settings)
     base = f"http://127.0.0.1:{server.server_port}"
     try:
@@ -118,7 +118,7 @@ def test_promql_variables_remain_quoted_and_cannot_be_inserted_as_syntax():
 
 
 def test_v1_to_v2_preserves_datasources_and_accepts_new_types(tmp_path):
-    settings = replace(Settings.from_env(), data_dir=tmp_path)
+    settings = replace(Settings.from_env(), data_dir=tmp_path, allow_loopback_datasources=True)
     with db.sqlite_store.connect(settings) as connection, db.transaction(connection):
         for statement in db.MIGRATIONS[1]:
             connection.execute(statement)

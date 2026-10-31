@@ -14,7 +14,10 @@ router = APIRouter()
 
 
 def ensure_transport(request):
-    if request.scope['scheme']!='https' and (not request.client or request.client.host not in {'127.0.0.1','::1'}):
+    # Behind the bundled nginx the scheme comes from X-Forwarded-Proto. A loopback client is only
+    # exempt on local HTTP setups; otherwise a proxy that drops the header would look like localhost.
+    local_http = not settings_of(request).secure_cookie and request.client and request.client.host in {'127.0.0.1','::1'}
+    if request.scope['scheme']!='https' and not local_http:
         raise HTTPException(400,'HTTPS is required for second-factor operations')
 
 

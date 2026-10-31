@@ -59,17 +59,26 @@ cp -p "$OPENREPORTING_ENV" "$DEST/openreporting.env"
 if [ "$INCLUDE_KEY" = "true" ]; then
   # Resolve the active raw key/keyring from service settings. Reading as the service
   # identity prevents a writable configured path/symlink from escalating root reads.
+  # Written to a temporary name first so a failure never leaves an empty secret.key behind.
+  # Older installed versions (pre-upgrade backups) have no read_keys(); their raw key is copied as is.
   as_openreporting "$OPENREPORTING_VENV/bin/python" -c '
 from openreporting.config import Settings
-from openreporting.secrets_store import key_path, read_keys
+from openreporting.secrets_store import key_path
 import sys
+try:
+    from openreporting.secrets_store import read_keys
+except ImportError:
+    read_keys = None
 path = key_path(Settings.from_env())
-read_keys(path)
+if read_keys is not None:
+    read_keys(path)
 with path.open("rb") as handle:
     content = handle.read(16385)
 if len(content) > 16384:
     raise SystemExit("Invalid active key size")
-sys.stdout.buffer.write(content)' > "$DEST/secret.key"
+sys.stdout.buffer.write(content)' > "$DEST/secret.key.partial"
+  [ -s "$DEST/secret.key.partial" ] || die "Şifreleme anahtarı yedeği boş"
+  mv "$DEST/secret.key.partial" "$DEST/secret.key"
 fi
 
 # 4) Optional encryption at rest.

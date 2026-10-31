@@ -2,15 +2,27 @@
 import csv
 import io
 import json
+import re
 import ssl
 import http.client
 import ipaddress
+import time
 from urllib.parse import urlsplit, urlencode
 
 from .base import DataSource, DataSourceError, QueryResult
 from ..frames import ts_frame, table_frame, finite
 
 MAX_BYTES = 8_000_000
+# Plain decimal without leading zeros (identifiers like "007", "0532..." and "1e3" stay text).
+DECIMAL = re.compile(r"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$")
+
+
+def _numeric(value):
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return finite(value) is not None
+    return isinstance(value, str) and bool(DECIMAL.match(value.strip()))
 
 def validate_http_url(url, allow_http=False):
     try:
@@ -22,21 +34,53 @@ def validate_http_url(url, allow_http=False):
         raise DataSourceError("Geçerli HTTPS adresi gerekli; URL içinde parola, sorgu veya fragment kullanmayın") from None
     return url
 
-def safe_peer(address):
+# Cloud metadata / host agent endpoints outside the link-local range.
+METADATA_ADDRESSES = {ipaddress.ip_address(a) for a in ("100.100.100.200", "168.63.129.16", "fd00:ec2::254")}
+NAT64 = ipaddress.ip_network("64:ff9b::/96")
+
+
+def _embedded_ipv4(ip):
+    """IPv4 address carried inside an IPv6 address (mapped, NAT64, 6to4, Teredo), if any."""
+    if ip.version != 6:
+        return None
+    if ip.ipv4_mapped:
+        return ip.ipv4_mapped
+    if ip in NAT64:
+        return ipaddress.ip_address(int(ip) & 0xFFFFFFFF)
+    if ip.sixtofour:
+        return ip.sixtofour
+    if ip.teredo:
+        return ip.teredo[1]
+    return None
+
+
+def safe_peer(address, allow_loopback=False):
     ip = ipaddress.ip_address(address.split("%")[0])
-    if ip.is_link_local or ip.is_multicast or ip.is_unspecified or str(ip) == "fd00:ec2::254" or (getattr(ip, "ipv4_mapped", None) and not safe_peer(str(ip.ipv4_mapped))):
+    inner = _embedded_ipv4(ip)
+    if inner is not None:
+        return safe_peer(str(inner), allow_loopback)
+    if ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip in METADATA_ADDRESSES:
         raise DataSourceError("Metadata/link-local adreslerine erişim engellendi")
+    if ip.is_loopback and not allow_loopback:
+        # The server's own services (this API, its database, /metrics) are not data sources by default.
+        raise DataSourceError("Sunucunun kendi adresine (localhost) erişim kapalı; gerekiyorsa OPENREPORTING_ALLOW_LOOPBACK_DATASOURCES=true")
     return True
 
+
 class SafeHTTPS(http.client.HTTPSConnection):
+    allow_loopback = False
+
     def connect(self):
         super().connect()
-        safe_peer(self.sock.getpeername()[0])
+        safe_peer(self.sock.getpeername()[0], self.allow_loopback)
+
 
 class SafeHTTP(http.client.HTTPConnection):
+    allow_loopback = False
+
     def connect(self):
         super().connect()
-        safe_peer(self.sock.getpeername()[0])
+        safe_peer(self.sock.getpeername()[0], self.allow_loopback)
 
 class HTTPSource(DataSource):
     def fetch(self, suffix="", params=None):
@@ -59,15 +103,26 @@ class HTTPSource(DataSource):
                 ctx.load_verify_locations(cadata=self.options["ca_pem"])
             kwargs["context"] = ctx
         conn = cls(base.hostname, base.port, **kwargs)
+        conn.allow_loopback = bool(getattr(self.settings, "allow_loopback_datasources", False))
+        # The socket timeout is per operation; a slow-drip server is bounded by a total deadline too.
+        deadline = time.monotonic() + float(kwargs["timeout"]) * 2
         try:
             conn.request("GET", path or "/", headers=headers)
             response = conn.getresponse()
             if response.status != 200:
                 raise DataSourceError(f"Veri kaynağı HTTP {response.status}; yönlendirme izlenmez")
-            body = response.read(MAX_BYTES + 1)
-            if len(body) > MAX_BYTES:
-                raise DataSourceError("HTTP yanıtı 8 MB sınırını aştı")
-            return body.decode("utf-8-sig")
+            chunks, size = [], 0
+            while True:
+                if time.monotonic() > deadline:
+                    raise DataSourceError("Veri kaynağı yanıtı zaman aşımına uğradı")
+                chunk = response.read(65536)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_BYTES:
+                    raise DataSourceError("HTTP yanıtı 8 MB sınırını aştı")
+                chunks.append(chunk)
+            return b"".join(chunks).decode("utf-8-sig")
         except DataSourceError:
             raise
         except (OSError, ValueError, http.client.HTTPException, UnicodeError):
@@ -109,7 +164,7 @@ class HTTPSource(DataSource):
         columns, rows = [], []
         for k in keys:
             present = [r[k] for r in records if r.get(k) not in (None, "")]
-            numeric = bool(present) and all(not isinstance(v, (dict, list, bool)) and finite(v) is not None for v in present)
+            numeric = bool(present) and all(_numeric(v) for v in present)
             columns.append({"name": str(k), "type": "number" if numeric else "string"})
         for record in records:
             rows.append([finite(record.get(k)) if c["type"] == "number" else (None if record.get(k) is None else str(record[k])) for k, c in zip(keys, columns)])

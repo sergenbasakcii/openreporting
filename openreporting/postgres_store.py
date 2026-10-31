@@ -188,6 +188,11 @@ def schema_version(db):
     return versions[-1] if versions else 0
 
 
+def widen_integers(statements):
+    """SQLite INTEGER is 64-bit; use BIGINT so PostgreSQL columns keep the same range."""
+    return tuple(re.sub(r"\bINTEGER\b", "BIGINT", statement) for statement in statements)
+
+
 def bootstrap_statements(sqlite_initial_statements):
     """Adapt only the known v1 bootstrap; future PostgreSQL migrations are explicit.
 

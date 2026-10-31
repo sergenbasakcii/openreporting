@@ -17,6 +17,7 @@ from .db import connect, transaction, utcnow, audit
 # Per-process admission supplements the reverse proxy's IP rate limits.
 AUTH_CONCURRENCY = 4
 _auth_slots = threading.BoundedSemaphore(AUTH_CONCURRENCY)
+AUTH_SLOT_WAIT_S = 3
 
 
 def digest(value: str) -> str:
@@ -64,6 +65,8 @@ def _login_gate(db, username):
 
 
 def record_failure(db,username):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    db.execute("DELETE FROM login_failures WHERE last_at < ?", (cutoff,))
     db.execute("INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at", (username, utcnow()))
     audit(db, "anonymous", "auth.failed", "login", "redacted")
 
@@ -71,7 +74,7 @@ def record_failure(db,username):
 def reauthenticate(settings,user,password):
     """Step-up primary credential check; never issue a session or clear OTP failures."""
     from . import directory_auth
-    if not _auth_slots.acquire(blocking=False):
+    if not _auth_slots.acquire(timeout=AUTH_SLOT_WAIT_S):
         raise HTTPException(429,'Authentication busy; retry shortly',headers={'Retry-After':'1'})
     try:
         with connect(settings) as db,transaction(db):
@@ -101,7 +104,7 @@ def reauthenticate(settings,user,password):
 
 
 def login(settings, username: str, password: str, otp: str | None = None):
-    if not _auth_slots.acquire(blocking=False):
+    if not _auth_slots.acquire(timeout=AUTH_SLOT_WAIT_S):
         raise HTTPException(429,'Authentication busy; retry shortly',headers={'Retry-After':'1'})
     try:
         return _login(settings,username,password,otp)
@@ -122,8 +125,10 @@ def _login(settings, username: str, password: str, otp: str | None = None):
     identity = None
     is_local = existing and existing["subject"] is None
     if is_local:
-        valid = bool(existing["active"]) and check_password(password, existing["password_hash"])
+        password_ok = check_password(password, existing["password_hash"])  # always pay the hash cost
+        valid = bool(existing["active"]) and password_ok
     elif existing and not existing["active"]:
+        check_password(password, DUMMY_HASH)
         valid = False
     else:
         try:

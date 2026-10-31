@@ -71,8 +71,7 @@ export async function serverPage(root) {
   const page = h('div', { class: 'page' }, loading());
   root.append(page);
   const draw = async () => {
-    const s = await get('/api/admin/stats');
-    const integrations = await get('/api/admin/integrations');
+    const [s, integrations] = await Promise.all([get('/api/admin/stats'), get('/api/admin/integrations').catch(() => null)]);
     clear(page);
     const worker = s.worker || {};
     const used = s.disk.total_bytes - s.disk.free_bytes;
@@ -94,7 +93,8 @@ export async function serverPage(root) {
         h('p', {}, 'E-posta gönderimi: ', s.mailEnabled ? h('span', { class: 'badge ok', text: 'etkin' }) : h('span', { class: 'badge', text: 'kapalı (OPENREPORTING_MAIL_ENABLED)' })))),
       h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Kurumsal bağlantılar' }),
         h('p', { class: 'hint', text: 'Bağlantı testleri e-posta göndermez. Ayarlar sunucuda güvenli yapılandırma dosyasıyla yönetilir.' }),
-        ...[['ldap', 'LDAP / Active Directory'], ['smtp', 'SMTP']].map(([kind, label]) => h('div', { class: 'toolbar', style: { marginBottom: '8px' } },
+        integrations ? null : h('p', { class: 'muted', text: 'Bağlantı durumu alınamadı.' }),
+        ...(integrations ? [['ldap', 'LDAP / Active Directory'], ['smtp', 'SMTP']] : []).map(([kind, label]) => h('div', { class: 'toolbar', style: { marginBottom: '8px' } },
           h('span', { text: label }), h('span', { class: 'badge', text: integrations[kind].enabled ? 'etkin' : 'kapalı' }),
           button('Bağlantıyı kontrol et', { size: 'sm', disabled: !integrations[kind].enabled, onClick: async (e) => {
             const control = e.currentTarget;
