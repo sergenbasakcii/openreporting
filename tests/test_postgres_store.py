@@ -249,7 +249,9 @@ def test_postgres_worker_generates_verified_report_without_replaying_uncertain_m
         db.execute("UPDATE dash_report_runs SET delivery_status='sending' WHERE id=?", (run_id,))
     run_forever(settings, once=True)
     run = service.list_runs(settings, report["id"])[0]
-    assert (run["status"], run["delivery_status"]) == ("needs_review", "unknown")
+    # The finished report stays downloadable; only the uncertain e-mail becomes unknown (never resent).
+    assert (run["status"], run["delivery_status"]) == ("completed", "unknown")
+    assert service.verified_file(settings, run_id, "csv")[0].is_file()
     assert service.claim(settings) is None
     assert not (tmp_path / "worker.lock").exists()
 
