@@ -163,6 +163,7 @@ def main(argv=None):
     p_import = commands.add_parser("import-dashboards", help="Import/overwrite dashboards from *.json files (provisioning)")
     p_import.add_argument("directory")
     commands.add_parser("verify-audit", help="Verify audit hash chain")
+    commands.add_parser('check-postgres', help='Read-only PostgreSQL schema, role and transport preflight; never initializes or migrates')
     p_backup = commands.add_parser("backup", help="Consistent SQLite backup")
     p_backup.add_argument("target")
     p_verify = commands.add_parser("verify-backup", help="Verify backup DB, audit, report files, logos and key in disposable storage")
@@ -195,6 +196,12 @@ def main(argv=None):
         print(json.dumps(result))
         return  # Never initialize, migrate, replace or connect to the live application state.
     settings = Settings.from_env()
+    if args.action == 'check-postgres':
+        import json
+        from .postgres_check import check
+        result = check(settings)
+        print(json.dumps(result))
+        raise SystemExit(0 if result['ok'] else 2)
     if args.action=='reset-mfa':
         import json
         import sqlite3

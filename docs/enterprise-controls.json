@@ -45,7 +45,7 @@
       "status": "O",
       "priority": "P1",
       "evidence": "docs/adr/0001-application-database-migration.md",
-      "note": "pg_dump/restore ve taşıma eksik"
+      "note": "Salt okunur check-postgres ön kontrolü şema/rol/transport/audit ve gerekli veri haklarını inceler; pg_dump/restore, SQLite taşıma ve üretim işletim/geri dönüş paketi halen eksik. docs/POSTGRES_PREFLIGHT.md kapsamı üretim kabulü değildir."
     },
     {
       "id": "A06",

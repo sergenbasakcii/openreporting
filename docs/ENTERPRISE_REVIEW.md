@@ -49,7 +49,7 @@ Durum dağılımı: V: 86, R: 16, P: 10, O: 2, E: 6.
 | A02 | Ekran ve rapor için ortak sorgu hattı | V | P2 | [tests/test_datasources_engine.py](../tests/test_datasources_engine.py) — Aynı motor sözleşmesi testli |
 | A03 | Tek host SQLite ve yerel disk sınırı | R | P1 | [docs/LINUX_DEPLOYMENT.md](../docs/LINUX_DEPLOYMENT.md) — NFS/SMB desteklenmiyor |
 | A04 | Uygulama DB seçimi ve sessiz fallback reddi | V | P1 | [tests/test_database_settings.py](../tests/test_database_settings.py) — Bozuk PostgreSQL URL reddediliyor |
-| A05 | PostgreSQL üretim işletim paketi | O | P1 | [docs/adr/0001-application-database-migration.md](../docs/adr/0001-application-database-migration.md) — pg_dump/restore ve taşıma eksik |
+| A05 | PostgreSQL üretim işletim paketi | O | P1 | [docs/adr/0001-application-database-migration.md](../docs/adr/0001-application-database-migration.md) — Salt okunur check-postgres ön kontrolü şema/rol/transport/audit ve gerekli veri haklarını inceler; pg_dump/restore, SQLite taşıma ve üretim işletim/geri dönüş paketi halen eksik. docs/POSTGRES_PREFLIGHT.md kapsamı üretim kabulü değildir. |
 | A06 | Yapılandırma tür ve sınır doğrulaması | V | P1 | [tests/test_enterprise_settings.py](../tests/test_enterprise_settings.py) — Güvensiz entegrasyon ayarları reddediliyor |
 | A07 | API/driver/rapor modül sınırları | R | P2 | [openreporting/api/deps.py](../openreporting/api/deps.py) — Kaynak sorguları uygulama DB adapterine yönlendirilmiyor |
 | A08 | Resmi veri akışı ve tehdit modeli | R | P1 | [docs/THREAT_MODEL.md](../docs/THREAT_MODEL.md) — Varlıklar, aktörler, güven sınırları ve kötüye kullanım senaryoları kaydedildi; bağımsız denetim değil |

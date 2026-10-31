@@ -73,3 +73,12 @@ Bu ayar geliştirme/entegrasyon içindir, üretim desteği değildir. PostgreSQL
 Worker artık ayrı ve ömrü worker bağlamına bağlı PostgreSQL oturumunda `pg_try_advisory_lock` alır. İkinci worker farklı yerel veri dizini kullansa da aynı veritabanında başlamaz. Oturum kapanması kilidi bırakır; eski worker yeniden bağlanıp sahipliği varsaymaz. ContextVar ile taşınan guard ana iş parçacığındaki DB erişimi, worker aşamaları, çıktı yazımı ve SMTP gönderiminden önce oturumu kontrol eder. Sahiplik kaybı iş aşamalarının normal hata izolasyonundan çıkar ve worker'ı durdurur.
 
 SMTP ile veritabanı arasında atomik commit yoktur. Ağ kaybı gönderimin ortasında olabilir; bu yüzden gönderimden önce kalıcı `sending` işareti yazılır. Yeniden başlangıç hem çalışan işleri hem üretimi bitmiş fakat `sending` kalan teslimatları `needs_review/unknown` yapar. Yeni worker bunları tekrar göndermez; eski worker da sahiplik kaybından sonra DB durumunu yazamaz. PostgreSQL gerçek-sunucu testleri tekillik/serbest bırakma/bağlantı kaybı, tam CSV üretimi ve belirsiz e-posta durumunun tekrar oynatılmamasını kapsar. Pg_dump/restore, veri taşıma ve Ubuntu PostgreSQL kurulumu hâlâ ayrı teslim işleridir.
+
+
+## Salt okunur işletim ön kontrolü (31 Ekim 2026)
+
+`check-postgres`, genel CLI init akışına girmeden mevcut uygulama DB'sini
+REPEATABLE READ / READ ONLY içinde inceler; eski şemayı yükseltmez, anahtar veya
+oturum oluşturmaz. Şema/tablo/audit, kurtarma hesabı, veri hakları, rol kapsamı ve
+TCP sunucu kimliği/TLS bulguları redakte JSON döner. [Kapsam ve sınırlar](../POSTGRES_PREFLIGHT.md).
+Bu adım PG taşıma, pg_dump/restore veya üretim kabulü açığını kapatmaz.

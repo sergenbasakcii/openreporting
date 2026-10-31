@@ -369,3 +369,51 @@ def test_postgres_folder_grants_queries_worker_and_concurrent_revision(postgres_
     assert next(r for r in service.list_runs(settings, rid, user=admin) if r['id'] == pending)['status'] == 'blocked'
     with application_db.connect(settings) as conn:
         assert application_db.verify_audit(conn) == (True, None)
+
+
+def test_postgres_operator_preflight_snapshot_reports_without_mutation(postgres_schema, tmp_path):
+    from dataclasses import replace
+    from openreporting import postgres_check, security
+    from openreporting.config import Settings
+    settings = replace(Settings.from_env(), data_dir=tmp_path, database_url=postgres_schema.dsn,
+                       secret_key_file='', ldap_enabled=False, mfa_required_roles=())
+    application_db.init_db(settings)
+    security.create_user(settings, 'preflight_owner', 'isolated-preflight-password')
+    with application_db.connect(settings) as conn:
+        before = tuple(conn.execute('SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM sessions),(SELECT count(*) FROM audit)').fetchone())
+        transport = postgres_check._transport(conn)
+    result = postgres_check.check(settings)
+    assert result['mode'] == 'read_only_repeatable_read' and result['production_ready'] is False
+    assert result['transport'] == transport
+    assert result['checks']['secure_transport'] == (transport != 'unverified_tcp')
+    for key in ('schema_current', 'read_only_snapshot', 'primary_writable_default', 'application_tables_readable',
+                'audit_chain', 'local_recovery_admin', 'runtime_data_privileges'):
+        assert result['checks'][key], (key, result)
+    with application_db.connect(settings) as conn:
+        dangerous = conn.execute("SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls FROM pg_roles WHERE rolname=current_user").fetchone()[0]
+        if dangerous:
+            assert not result['checks']['least_privilege_role'] and not result['ok']
+        assert tuple(conn.execute('SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM sessions),(SELECT count(*) FROM audit)').fetchone()) == before
+
+
+def test_postgres_preflight_really_rejects_writes_and_never_upgrades(postgres_schema, tmp_path, monkeypatch):
+    from dataclasses import replace
+    from openreporting import postgres_check
+    from openreporting.config import Settings
+    settings = replace(Settings.from_env(), data_dir=tmp_path, database_url=postgres_schema.dsn, secret_key_file='')
+    with monkeypatch.context() as patch:
+        patch.setattr(application_db, 'CURRENT_VERSION', 4)
+        application_db.init_db(settings)
+    result = postgres_check.check(settings)
+    assert not result['ok'] and not result['checks']['schema_current']
+    assert not result['checks']['application_tables_readable']
+    with application_db.connect(settings) as conn:
+        assert application_db.schema_version(conn) == 4
+    def attempted_write(conn):
+        conn.execute("INSERT INTO login_failures(username,count,last_at) VALUES('must-not-exist',1,'test')")
+        pytest.fail('PostgreSQL must enforce READ ONLY even for the schema owner')
+    monkeypatch.setattr(postgres_check, '_inspect', attempted_write)
+    assert postgres_check.check(settings) == {'ok': False, 'production_ready': False, 'error': 'inspection_failed'}
+    with application_db.connect(settings) as conn:
+        assert conn.execute("SELECT count(*) FROM login_failures WHERE username='must-not-exist'").fetchone()[0] == 0
+        assert application_db.schema_version(conn) == 4
