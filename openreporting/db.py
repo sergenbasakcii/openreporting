@@ -129,7 +129,7 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 4
+CURRENT_VERSION = 5
 
 # Each migration is a tuple of complete statements, executed in one transaction.
 # Only the initial schema is split here; later migrations may contain triggers or
@@ -154,6 +154,15 @@ MIGRATIONS[4] = ("""CREATE TABLE user_mfa(
  recovery_hashes TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)""",
  """CREATE TABLE mfa_sessions(token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE)""")
 POSTGRES_MIGRATIONS[4] = MIGRATIONS[4]
+MIGRATIONS[5] = ("""CREATE TABLE folder_policy(
+ folder_id TEXT PRIMARY KEY REFERENCES folders(id) ON DELETE CASCADE,
+ restricted INTEGER NOT NULL DEFAULT 0 CHECK(restricted IN (0,1)), revision INTEGER NOT NULL DEFAULT 0)""",
+ """CREATE TABLE folder_user_grants(
+ folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+ user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(folder_id,user_id))""")
+POSTGRES_MIGRATIONS[5] = MIGRATIONS[5]
+
 
 
 

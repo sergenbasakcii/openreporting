@@ -148,7 +148,7 @@ async function versionsTab(uid, onRestore) {
 export async function openSettings({ dashboard, meta, onApply, onRestore }) {
   const dash = JSON.parse(JSON.stringify(dashboard));
   const state = { folderUid: meta.folderUid || null };
-  const folders = await get('/api/folders').catch(() => []);
+  const folders = (await get('/api/folders').catch(() => [])).filter(f => f.canEdit !== false);
   const content = h('div');
   let current = 'general';
   const show = async (id) => {

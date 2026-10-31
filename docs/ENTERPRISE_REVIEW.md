@@ -26,6 +26,7 @@ Oracle Linux 8.10/9.8/10.2 kullanıcı alanında kurulum paketleri, servis dosya
 gerçek nginx HTTPS/MFA ve PDF/XLSX/CSV worker kabulü başarılıdır;
 [ortam kanıtı](evidence/oracle-linux-userspace-2026-10-31.json) PID1/SELinux Enforcing
 ve tam VM/kurum kabulünün açık kaldığını kaydeder. Ubuntu dışındaki bu kapsam tam host kabulü değildir.
+Klasör içerik izinleri için 9 izole SQLite/API/worker testi, tarayıcıda 8 koyu/açık tema erişilebilirlik taraması geçti; [sınırlar](FOLDER_PERMISSIONS.md) ve [tarayıcı kanıtı](evidence/folder-browser-2026-10-31.json). PostgreSQL ve son commit CI kabulü ayrıca izlenir. Tenant/kaynak izolasyonu kapanmış sayılmaz.
 Test dosyası referansları o başlığın kanıt alanını gösterir; her satır için ayrı bir yeni test yazıldığı iddia edilmez.
 
 Gövde sınırı, Host/Origin izolasyonu, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.
@@ -38,7 +39,7 @@ Kullanıcı adına lisans/üretim kabul kararı verilmez.
 
 Makine okunur kaynak: [enterprise-controls.json](enterprise-controls.json).
 
-Durum dağılımı: V: 86, R: 16, P: 9, O: 3, E: 6.
+Durum dağılımı: V: 86, R: 16, P: 10, O: 2, E: 6.
 
 ## A — Mimari ve kapsam
 
@@ -92,13 +93,13 @@ Durum dağılımı: V: 86, R: 16, P: 9, O: 3, E: 6.
 | D01 | Rastgele yüksek entropili oturum belirteci | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Gerçek API oturumları, token uzunluğu ve DBde yalnız digest saklama kabulü; CSPRNG secrets modülü |
 | D02 | CSRF tokeninin hashli saklanması | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Gerçek CSRF digest saklama ve rotasyon sonrası eski token reddi testli |
 | D03 | Mutasyonlarda CSRF zorunluluğu | V | P1 | [tests/test_platform_core.py](../tests/test_platform_core.py) — Başlıksız mutasyon 403 |
-| D04 | Yönetici/editör/izleyici rol sınırları | V | P1 | [tests/test_report_authorization.py](../tests/test_report_authorization.py) — API hesap iptali ve güncel rolün kuyruk/zamanlama/render/SMTP devrinde yeniden kontrolü testli; test_reporting.py API rol sınırlarını korur. Tenant/klasör ACL D10 açık. İzleyicide zamanlama alıcılarının redaksiyonu iki APIde testli. |
+| D04 | Yönetici/editör/izleyici rol sınırları | V | P1 | [tests/test_report_authorization.py](../tests/test_report_authorization.py) — API hesap iptali ve güncel rolün kuyruk/zamanlama/render/SMTP devrinde yeniden kontrolü testli; test_reporting.py API rol sınırlarını korur. Klasör içerik ACL D10 kısmi; tenant/kaynak izolasyonu açık. İzleyicide zamanlama alıcılarının redaksiyonu iki APIde testli. |
 | D05 | İzleyici serbest sorgu ve metric-find reddi | V | P1 | [tests/test_review_fixes.py](../tests/test_review_fixes.py) — Ad hoc sorgu ve değişken tanımı enjeksiyonu reddediliyor |
 | D06 | İzleyicinin kayıtlı paneli çalıştırması | V | P1 | [tests/test_review_fixes.py](../tests/test_review_fixes.py) — Gönderilen target ve dönüşümler güven kaynağı değil |
 | D07 | HttpOnly Secure SameSite çerez | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — HTTPS cookie HttpOnly/Secure/SameSite=Strict/Path ve HTTPde gönderilmeme kabulü; browser SameSite matrisi değil |
 | D08 | Oturum süresi ve LDAP üst sınırı | V | P1 | [tests/test_directory_auth.py](../tests/test_directory_auth.py) — LDAP varsayılan en çok 60 dakika |
 | D09 | Çıkış ve CSRF yenileme akışı | V | P1 | [tests/test_security_acceptance.py](../tests/test_security_acceptance.py) — Same-origin CSRF refresh ve eski token reddi, logout sonrası session401 kabulü |
-| D10 | Çok kiracılı ve klasör bazlı ayrıntılı ACL | O | P1 | [openreporting/dashboards.py](../openreporting/dashboards.py) — Ürün şu anda tek kurum ve genel roller; tenant/klasör ACL yok |
+| D10 | Çok kiracılı ve klasör bazlı ayrıntılı ACL | P | P1 | [tests/test_folder_access.py](../tests/test_folder_access.py) — Tek kurulumda kullanıcı bazlı klasör içerik ACL: metadata, sürüm/not, kaynak-hedef taşıma, viewer sorgu, rapor/arşiv ve worker iptal testli. Tenant/veri kaynağı yetkileri ve grup ACL yok; editor serbest kaynak sorgusu global. docs/FOLDER_PERMISSIONS.md sınırları korur; bağımsız kurum kabulü değildir. |
 
 ## E — HTTP ve API savunmaları
 

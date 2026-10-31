@@ -13,7 +13,7 @@ arşiv/manifest ve yedekler. Kimlik bilgileri kaynakta salt okunur ve en az kaps
 | Sınır | Güven kararı | Kalan sınır |
 | --- | --- | --- |
 | Tarayıcı → nginx → API | HTTPS, kısıtlı proxy güveni, CSRF, sunucu rol kontrolü, gövde bütçesi | Host/Origin matrisi ve yük testi genişletilmeli |
-| Viewer → kayıtlı panel | Tarayıcı target/dönüşüm yerine kayıtlı tanım; güvenli değişken biçimi | Genel roller tüm kurum kapsamındadır; tenant/klasör ACL yok |
+| Viewer → kayıtlı panel | Tarayıcı target/dönüşüm yerine kayıtlı tanım; güvenli değişken biçimi | Klasör içerik ACL mevcut; tenant/kaynak izolasyonu yok, editor serbest kaynak sorgusu global |
 | Editör → veri kaynağı | Ad hoc okuma sorgusu izinli, kaynakta READ ONLY/get/GET | Kaynak hesabının erişebildiği kapsam editöre güven sınırıdır |
 | Yönetici → kaynak/entegrasyon | Kaynak origin ve rol eşlemesi ayrıcalıklı yapılandırmadır | Admin kötü niyeti ve hatalı kaynak hesabı yetkisi uygulama tarafından tümüyle çözülemez |
 | API/worker → LDAP | Zincir/DNS doğrulamalı TLS, salt okunur servis araması, kullanıcı bind, sabit grup eşlemesi; aynı kimlik/rol ile TOTP adım yükseltme | İç içe grup/SSO yok; TOTP kimlik avına dayanıklı değil; dizin değişimine tepki üst sınırı var |

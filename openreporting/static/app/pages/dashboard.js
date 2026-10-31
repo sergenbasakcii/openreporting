@@ -15,14 +15,15 @@ let groupSeq = 0;
 
 export async function dashboardPage(root, { uid, query, app }) {
   const params = new URLSearchParams(query || '');
-  const canEdit = ['admin', 'editor'].includes(app.user.role);
+  let canEdit = ['admin', 'editor'].includes(app.user.role);
   let dash; let meta;
   if (uid) {
     try {
       const res = await get(`/api/dashboards/uid/${encodeURIComponent(uid)}`);
       dash = res.dashboard; meta = res.meta;
+      canEdit = canEdit && meta.canEdit !== false;
     } catch (err) {
-      root.replaceChildren(h('div', { class: 'page' }, h('div', { class: 'alert error', text: err.message }), button('Dashboard listesine dön', { onClick: () => navigate('/dashboards') })));
+      root.replaceChildren(h('div', { class: 'page' }, h('h1', { text: 'Dashboard açılamadı' }), h('div', { class: 'alert error', text: err.message }), button('Dashboard listesine dön', { onClick: () => navigate('/dashboards') })));
       return () => {};
     }
     if (!root.isConnected) return () => {}; // the user already left this page
@@ -171,7 +172,7 @@ export async function dashboardPage(root, { uid, query, app }) {
     grid.style.height = mobile ? 'auto' : `${gridHeight(items) + 8}px`;
     if (!items.length) {
       grid.style.height = 'auto';
-      grid.replaceChildren(h('div', { class: 'empty-state' }, h('h3', { text: 'Bu dashboard boş' }),
+      grid.replaceChildren(h('div', { class: 'empty-state' }, h('h2', { style: { fontSize: '16px' }, text: 'Bu dashboard boş' }),
         h('p', { text: canEdit ? 'İlk paneli ekleyerek başlayın. Zabbix grup/host/item sorguları, ifadeler ve dönüşümler kullanabilirsiniz.' : 'Henüz panel eklenmemiş.' }),
         canEdit ? h('div', { class: 'toolbar' }, button('Görselleştirme ekle', { icon: 'plus', variant: 'primary', onClick: () => addPanel('timeseries') }),
           button('Satır ekle', { icon: 'row', onClick: addRow }), button('Dashboard içe aktar', { icon: 'import', onClick: () => navigate('/dashboards/import') })) : null));
@@ -424,7 +425,7 @@ export async function dashboardPage(root, { uid, query, app }) {
     if (!canEdit) return;
     const isNew = meta.isNew || saveAs;
     const titleIn = input({ value: saveAs ? `${dash.title} (kopya)` : dash.title });
-    const folders = await get('/api/folders').catch(() => []);
+    const folders = (await get('/api/folders').catch(() => [])).filter(f => f.canEdit !== false);
     const folderSel = select([{ value: '', label: 'Genel' }, ...folders.map((f) => ({ value: f.uid, label: f.title }))], meta.folderUid || '', () => {});
     const message = textarea({ rows: 2, placeholder: 'Değişiklik notu (isteğe bağlı)' });
     const saveDefaults = h('label', { class: 'switch' }, h('input', { type: 'checkbox' }), h('span', { class: 'track' }), h('span', { text: 'Geçerli zaman aralığını ve değişkenleri varsayılan yap' }));

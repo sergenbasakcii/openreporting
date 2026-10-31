@@ -106,13 +106,13 @@ def _file_response(payload, fmt, name):
 
 @router.get("/api/dash-reports")
 def list_reports(request: Request, user=Depends(authenticate)):
-    return service.list_reports(settings_of(request))
+    return service.list_reports(settings_of(request), user)
 
 
 @router.get("/api/dash-reports/{report_id}")
 def get_report(report_id: str, request: Request, user=Depends(authenticate)):
     try:
-        return service.get_report(settings_of(request), report_id)
+        return service.get_report(settings_of(request), report_id, user)
     except DomainError as exc:
         _fail(exc)
 
@@ -169,20 +169,21 @@ def preview(body: PreviewIn, request: Request, user=Depends(editor)):
     """Synchronous render (first N sections) without archiving — for the report editor."""
     settings = settings_of(request)
     try:
-        config = service.validate_config(body.model_dump(), settings)
+        config = service.validate_config(body.model_dump(), settings, user)
         start, end = resolve_range(config["time_range"]["from"], config["time_range"]["to"], config["timezone"])
         fmt = body.format if body.format in service.FORMATS else "pdf"
         from ..reporting.collect import collect
         from ..reporting.excel import render_csv, render_xlsx
         from ..reporting.pdf import render_pdf
         from .. import dashboards
-        dashboard = dashboards.get(settings, config["dashboard_uid"])["dashboard"]
+        dashboard = dashboards.get(settings, config["dashboard_uid"], user)["dashboard"]
         renderer = {"pdf": render_pdf, "xlsx": render_xlsx, "csv": render_csv}[fmt]
         with _heavy():
             collected = collect(settings, dashboard, config, start, end, user=user["username"],
                                 section_limit=body.max_sections)
             extra = {"logo": service.report_logo(settings, config)} if fmt == "pdf" else {}
             payload = renderer(config, collected, f"{config['name']} (önizleme)", **extra)
+        dashboards.get(settings, config["dashboard_uid"], user)
     except (DomainError, TimeRangeError) as exc:
         _fail(exc)
     return _file_response(payload, fmt, f"{config['name']}-onizleme")
@@ -198,12 +199,12 @@ def export_dashboard(body: DashboardExportIn, request: Request, user=Depends(vie
         config = service.validate_config({"name": dashboard["title"], "dashboard_uid": body.dashboard_uid,
                                           "time_range": body.time_range, "timezone": body.timezone,
                                           "variables": body.variables, "layout": body.layout, "orientation": body.orientation,
-                                          "formats": [body.format], "cover": False, "toc": False}, settings)
+                                          "formats": [body.format], "cover": False, "toc": False}, settings, user)
         start, end = resolve_range(config["time_range"]["from"], config["time_range"]["to"], config["timezone"])
         with _heavy():
             _, outputs, _ = service.build_outputs(settings, config, dashboard["title"], start, end,
                                                   user=user["username"], formats=[config["formats"][0]],
-                                                  trusted=user["role"] in ("admin", "editor"))
+                                                  trusted=user["role"] in ("admin", "editor"), principal=user)
     except (DomainError, TimeRangeError) as exc:
         _fail(exc)
     fmt = config["formats"][0]
@@ -227,12 +228,12 @@ def _visible_deliveries(runs, user):
 
 @router.get("/api/dash-reports/{report_id}/runs")
 def report_runs(report_id: str, request: Request, user=Depends(authenticate)):
-    return _visible_deliveries(service.list_runs(settings_of(request), report_id), user)
+    return _visible_deliveries(service.list_runs(settings_of(request), report_id, user=user), user)
 
 
 @router.get("/api/report-runs")
 def all_runs(request: Request, limit: int = 200, user=Depends(authenticate)):
-    return _visible_deliveries(service.list_runs(settings_of(request), None, limit), user)
+    return _visible_deliveries(service.list_runs(settings_of(request), None, limit, user=user), user)
 
 
 @router.get("/api/report-runs/{run_id}/files/{kind}")
@@ -240,7 +241,7 @@ def download(run_id: str, kind: str, request: Request, user=Depends(authenticate
     if kind not in MEDIA:
         raise HTTPException(404, "Not found")
     try:
-        path, filename = service.verified_file(settings_of(request), run_id, kind)
+        path, filename = service.verified_file(settings_of(request), run_id, kind, user)
     except DomainError as exc:
         _fail(exc)
     return FileResponse(path, filename=filename, media_type=MEDIA[kind])
@@ -248,12 +249,12 @@ def download(run_id: str, kind: str, request: Request, user=Depends(authenticate
 
 @router.get("/api/dash-reports/{report_id}/schedules")
 def schedules(report_id: str, request: Request, user=Depends(authenticate)):
-    return _visible_deliveries(service.list_schedules(settings_of(request), report_id), user)
+    return _visible_deliveries(service.list_schedules(settings_of(request), report_id, user), user)
 
 
 @router.get("/api/report-schedules")
 def all_schedules(request: Request, user=Depends(authenticate)):
-    return _visible_deliveries(service.list_schedules(settings_of(request)), user)
+    return _visible_deliveries(service.list_schedules(settings_of(request), user=user), user)
 
 
 @router.post("/api/dash-reports/{report_id}/schedules", status_code=201)

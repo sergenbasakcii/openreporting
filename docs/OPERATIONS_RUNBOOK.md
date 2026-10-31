@@ -97,7 +97,7 @@ Zamanlamanın bağlı rapor özeti ve dashboard sürümü de tekrar karşılaşt
 tek atomik işlem değildir; bu noktadan sonra başlamış/relay tarafından alınmış teslimat
 geri çağrılamaz. `unknown` gönderim otomatik tekrar edilmez. Engellenmiş çalışmayı
 kuyruk durumunu elle değiştirerek zorlamayın; geçerli hesap ve onayla yeni çalışma isteyin.
-Bu kontrol klasör/tenant ACL desteği veya merkezi SSO kabulü değildir; bu açıklar sürer.
+Klasör içerik izinleri ve zamanlama yeniden onayı [FOLDER_PERMISSIONS.md](FOLDER_PERMISSIONS.md) içinde tanımlıdır. Tenant/kaynak izolasyonu ve merkezi SSO açıkları sürer.
 
 Zamanlama listeleme API'lerinde alıcılar da çalışma geçmişiyle aynı sınıra tabidir:
 izleyiciye `recipients` ve `recipients_json` değerleri boş döner; yönetici/editör

@@ -4,6 +4,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from .. import folder_access
 from ..db import audit, connect, transaction, utcnow
 from ..security import authenticate, check_password, create_user, password_hash
 from ..timerange import TimeRangeError, zone
@@ -135,6 +136,10 @@ def current_user(request: Request, user=Depends(authenticate)):
                          (user["id"],)).fetchone()
         prefs = db.execute("SELECT theme,timezone,home_dashboard_uid FROM user_prefs WHERE user_id=?",
                            (user["id"],)).fetchone()
+        if prefs and prefs["home_dashboard_uid"]:
+            target = db.execute("SELECT folder_id FROM dashboards WHERE uid=?", (prefs["home_dashboard_uid"],)).fetchone()
+            if not target or not folder_access.allowed(db, user, target["folder_id"]):
+                prefs = {**dict(prefs), "home_dashboard_uid": None}
     return {**dict(row), "preferences": dict(prefs) if prefs else
             {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None}}
 
@@ -152,6 +157,8 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
         if body.home_dashboard_uid and not db.execute("SELECT 1 FROM dashboards WHERE uid=?",
                                                       (body.home_dashboard_uid,)).fetchone():
             raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı")
+        if body.home_dashboard_uid:
+            folder_access.require_dashboard(db, user, body.home_dashboard_uid)
         db.execute("""INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,updated_at) VALUES(?,?,?,?,?)
                       ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
                       home_dashboard_uid=excluded.home_dashboard_uid,updated_at=excluded.updated_at""",

@@ -10,4 +10,6 @@ def database_ready(db):
     db.execute("SELECT token_hash FROM sessions LIMIT 1").fetchone()
     db.execute('SELECT user_id FROM user_mfa LIMIT 1').fetchone()
     db.execute('SELECT token_hash FROM mfa_sessions LIMIT 1').fetchone()
+    db.execute('SELECT folder_id FROM folder_policy LIMIT 1').fetchone()
+    db.execute('SELECT folder_id FROM folder_user_grants LIMIT 1').fetchone()
     return True

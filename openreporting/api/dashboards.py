@@ -4,11 +4,11 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .. import dashboard_runtime, dashboards, datasources
+from .. import dashboard_runtime, dashboards, datasources, folder_access
 from ..db import audit, connect, transaction, utcnow
 from ..domain import DomainError, identity
 from ..security import authenticate
-from .deps import editor, settings_of, viewer_write
+from .deps import admin, admin_read, editor, settings_of, viewer_write
 
 router = APIRouter()
 
@@ -65,7 +65,7 @@ def search(request: Request, query: str = "", tag: str = "", folderUid: str | No
 
 @router.get("/api/dashboards/tags")
 def dashboard_tags(request: Request, user=Depends(authenticate)):
-    return dashboards.tags(settings_of(request))
+    return dashboards.tags(settings_of(request), user)
 
 
 @router.get("/api/dashboards/uid/{uid}")
@@ -110,7 +110,7 @@ def delete_dashboard(uid: str, request: Request, user=Depends(editor)):
 @router.get("/api/dashboards/uid/{uid}/versions")
 def dashboard_versions(uid: str, request: Request, user=Depends(authenticate)):
     try:
-        return dashboards.versions(settings_of(request), uid)
+        return dashboards.versions(settings_of(request), uid, user)
     except DomainError as exc:
         _fail(exc)
 
@@ -118,7 +118,7 @@ def dashboard_versions(uid: str, request: Request, user=Depends(authenticate)):
 @router.get("/api/dashboards/uid/{uid}/versions/{version}")
 def dashboard_version(uid: str, version: int, request: Request, user=Depends(authenticate)):
     try:
-        return dashboards.version_data(settings_of(request), uid, version)
+        return dashboards.version_data(settings_of(request), uid, version, user)
     except DomainError as exc:
         _fail(exc)
 
@@ -138,6 +138,11 @@ def resolve_variables(body: ResolveIn, request: Request, user=Depends(viewer_wri
     trusted = user["role"] in ("admin", "editor")
     try:
         if trusted:
+            uid = body.uid or body.dashboard.get("uid")
+            if uid:
+                with connect(settings) as db:
+                    if db.execute("SELECT 1 FROM dashboards WHERE uid=?", (uid,)).fetchone():
+                        folder_access.require_dashboard(db, user, uid)
             model = dashboards.normalize(body.dashboard)
         elif body.uid:
             # Viewers resolve the saved definition; a posted dashboard body is ignored.
@@ -172,7 +177,7 @@ def unstar_dashboard(uid: str, request: Request, user=Depends(viewer_write)):
 
 @router.get("/api/folders")
 def list_folders(request: Request, user=Depends(authenticate)):
-    return dashboards.folders(settings_of(request))
+    return dashboards.folders(settings_of(request), user)
 
 
 @router.post("/api/folders", status_code=201)
@@ -204,6 +209,8 @@ def remove_folder(uid: str, request: Request, user=Depends(editor)):
 def list_annotations(request: Request, dashboardUID: str = "", start: int = 0, end: int = 0,
                      user=Depends(authenticate)):
     with connect(settings_of(request)) as db:
+        if dashboardUID:
+            folder_access.require_dashboard(db, user, dashboardUID)
         rows = db.execute("""SELECT a.id,a.dashboard_uid,a.panel_id,a.time_ms,a.time_end_ms,a.text,a.tags_json,
                              a.created_at,u.username AS created_by FROM annotations a LEFT JOIN users u ON u.id=a.created_by
                              WHERE (a.dashboard_uid=? OR a.dashboard_uid IS NULL) AND a.time_ms<=? AND
@@ -218,6 +225,8 @@ def create_annotation(body: AnnotationIn, request: Request, user=Depends(editor)
         raise HTTPException(422, "Annotation end precedes start")
     annotation_id = identity()
     with connect(settings_of(request)) as db, transaction(db):
+        if body.dashboardUID:
+            folder_access.require_dashboard(db, user, body.dashboardUID, edit=True)
         db.execute("INSERT INTO annotations VALUES(?,?,?,?,?,?,?,?,?)",
                    (annotation_id, body.dashboardUID, body.panelId, body.time, body.timeEnd, body.text,
                     json.dumps([t[:50] for t in body.tags]), utcnow(), user["id"]))
@@ -228,7 +237,31 @@ def create_annotation(body: AnnotationIn, request: Request, user=Depends(editor)
 @router.delete("/api/annotations/{annotation_id}")
 def delete_annotation(annotation_id: str, request: Request, user=Depends(editor)):
     with connect(settings_of(request)) as db, transaction(db):
+        row = db.execute("SELECT dashboard_uid FROM annotations WHERE id=?", (annotation_id,)).fetchone()
+        if row and row["dashboard_uid"]:
+            folder_access.require_dashboard(db, user, row["dashboard_uid"], edit=True)
         if not db.execute("DELETE FROM annotations WHERE id=?", (annotation_id,)).rowcount:
             raise HTTPException(404, "Annotation not found")
         audit(db, user["id"], "annotation.deleted", "annotation", annotation_id)
     return {"deleted": annotation_id}
+
+
+class GrantIn(BaseModel):
+    user_id: str = Field(min_length=1, max_length=80)
+    permission: str = Field(pattern="^(view|edit)$")
+
+
+class FolderPolicyIn(BaseModel):
+    restricted: bool
+    revision: int = Field(ge=0)
+    grants: list[GrantIn] = Field(default_factory=list, max_length=500)
+
+
+@router.get("/api/folders/{uid}/permissions")
+def folder_permissions(uid: str, request: Request, user=Depends(admin_read)):
+    return folder_access.policy(settings_of(request), user, uid)
+
+
+@router.put("/api/folders/{uid}/permissions")
+def save_folder_permissions(uid: str, body: FolderPolicyIn, request: Request, user=Depends(admin)):
+    return folder_access.replace_policy(settings_of(request), user, uid, body.model_dump())

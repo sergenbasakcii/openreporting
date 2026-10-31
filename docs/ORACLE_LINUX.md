@@ -89,7 +89,7 @@ Tam kurumsal canlı kabulünden önce Oracle VM/fiziksel sunucuda:
 - PDF/XLSX/CSV, zamanlama, ayrı anahtar ile yedekten dönüş ve başarısız yükseltme geri dönüşü;
 - Firewall zone'u, erişim sınırları, kapasite ve kurum işletim sahipliği doğrulanmalıdır.
 
-Bu işletim sistemi desteği, henüz açık olan klasör/tenant ACL ve diğer
+Bu işletim sistemi desteği, kısmi klasör içerik izinleri, açık tenant/kaynak izolasyonu ve diğer
 [kurumsal kabul eksiklerini](ENTERPRISE_REVIEW.md) kapatmış sayılmaz.
 
 Kaynaklar: [Oracle Python paketleri](https://yum.oracle.com/oracle-linux-python.html),

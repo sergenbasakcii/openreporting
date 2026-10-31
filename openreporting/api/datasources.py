@@ -140,6 +140,8 @@ def metric_find(uid: str, body: MetricFindIn, request: Request, user=Depends(edi
 def run_query(body: QueryIn, request: Request, user=Depends(viewer_write)):
     settings = settings_of(request)
     trusted = user["role"] in EDIT_ROLES
+    if trusted and body.dashboardUid:
+        dashboards.get(settings, body.dashboardUid, user)
     payload = body.model_dump() if trusted else viewer_payload(settings, body, user)
     try:
         return query_engine.run(settings, payload, user=user["username"], trusted=trusted)

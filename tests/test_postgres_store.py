@@ -320,3 +320,52 @@ def test_postgres_queued_report_respects_actor_revocation(postgres_schema,tmp_pa
     assert service.list_runs(settings,report['id'])[0]['status']=='blocked'
     with application_db.connect(settings) as conn:
         assert application_db.verify_audit(conn)==(True,None)
+
+
+def test_postgres_folder_grants_queries_worker_and_concurrent_revision(postgres_schema, tmp_path):
+    from dataclasses import replace
+    from fastapi import HTTPException
+    from openreporting import dashboards, datasources, folder_access, security
+    from openreporting.config import Settings
+    from openreporting.reporting import service
+    settings = replace(Settings.from_env(), data_dir=tmp_path, database_url=postgres_schema.dsn,
+                       secret_key_file='', ldap_enabled=False, mail_enabled=False, mfa_required_roles=(),
+                       zabbix_url='', zabbix_token_file='')
+    application_db.init_db(settings)
+    datasources.provision(settings)
+    admin = {'id': security.create_user(settings, 'acl_owner', 'isolated-pg-owner-password'), 'role': 'admin'}
+    editor = {'id': security.create_user(settings, 'acl_editor', 'isolated-pg-editor-password', 'editor'), 'role': 'editor'}
+    folder = dashboards.save_folder(settings, admin, 'PG restricted')['uid']
+    dashboards.save(settings, admin, {'uid': 'pg-private', 'title': 'PG private', 'panels': [
+        {'id': 1, 'type': 'stat', 'targets': [{'refId': 'A', 'scenario': 'sine', 'datasource': {'uid': 'testdata'}}]}]}, folder_uid=folder)
+    rid = service.save_report(settings, admin, {'name': 'PG private report', 'dashboard_uid': 'pg-private', 'formats': ['csv']})['id']
+    body = {'restricted': True, 'revision': 0, 'grants': [{'user_id': editor['id'], 'permission': 'edit'}]}
+    def replace_permissions():
+        try:
+            folder_access.replace_policy(settings, admin, folder, body)
+            return 200
+        except HTTPException as exc:
+            return exc.status_code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(lambda _: replace_permissions(), range(2))) == [200, 409]
+    assert dashboards.search(settings, editor)[0]['uid'] == 'pg-private'
+    assert dashboards.folders(settings, editor)[0]['canEdit']
+    assert dashboards.tags(settings, editor) == []
+    assert service.list_reports(settings, editor)[0]['id'] == rid
+    run = service.request_run(settings, editor, rid, {})['run_id']
+    service.execute(settings, run)
+    assert service.list_runs(settings, rid, user=editor)[0]['status'] == 'completed'
+    assert service.verified_file(settings, run, 'csv', editor)[0].is_file()
+    pending = service.request_run(settings, editor, rid, {})['run_id']
+    folder_access.replace_policy(settings, admin, folder, {**body, 'revision': 1, 'grants': []})
+    assert dashboards.search(settings, editor) == []
+    assert dashboards.folders(settings, editor) == []
+    assert service.list_reports(settings, editor) == []
+    assert service.list_runs(settings, user=editor) == []
+    assert service.list_schedules(settings, user=editor) == []
+    with pytest.raises(HTTPException):
+        service.verified_file(settings, run, 'csv', editor)
+    service.execute(settings, pending)
+    assert next(r for r in service.list_runs(settings, rid, user=admin) if r['id'] == pending)['status'] == 'blocked'
+    with application_db.connect(settings) as conn:
+        assert application_db.verify_audit(conn) == (True, None)

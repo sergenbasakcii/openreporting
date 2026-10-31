@@ -219,11 +219,15 @@ jobs:
         env:
           OPENREPORTING_PLAYWRIGHT_MODULE: ${{ github.workspace }}/build/mfa-browser/node_modules/playwright
           OPENREPORTING_AXE_MODULE: ${{ github.workspace }}/build/mfa-browser/node_modules/@axe-core/playwright
-        run: python tools/mfa_browser_acceptance.py
+        run: |
+          python tools/mfa_browser_acceptance.py
+          python tools/folder_browser_acceptance.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mfa-browser-evidence
-          path: build/mfa-browser-evidence.json
+          path: |
+            build/mfa-browser-evidence.json
+            build/folder-browser-evidence.json
           retention-days: 14
 
   oracle-userspace:

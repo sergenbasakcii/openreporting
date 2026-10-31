@@ -22,7 +22,7 @@ def frontend_settings(request: Request, user=Depends(authenticate)):
     settings = settings_of(request)
     return {"version": __version__, "mailEnabled": settings.mail_enabled,
             "recipientDomains": list(settings.recipient_domains), "publicUrl": settings.public_url,
-            "platform": platform.system(), "features": {"reports": True, "explore": True}}
+            "platform": platform.system(), "features": {"reports": True, "explore": True, "folderAcl": True}}
 
 
 @router.get("/api/time/resolve")

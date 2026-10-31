@@ -245,7 +245,7 @@ def test_upgrade_v3_preserves_users_sessions_and_source_data(tmp_path,monkeypatc
             before=tuple(conn.execute('SELECT * FROM users').fetchone())
     db.init_db(settings)
     with db.connect(settings) as conn:
-        assert db.schema_version(conn)==4
+        assert db.schema_version(conn)==db.CURRENT_VERSION
         assert tuple(conn.execute('SELECT * FROM users').fetchone())==before
         assert conn.execute('SELECT token_hash FROM sessions').fetchone()[0]=='opaque-hash'
         assert conn.execute('SELECT COUNT(*) FROM user_mfa').fetchone()[0]==0
