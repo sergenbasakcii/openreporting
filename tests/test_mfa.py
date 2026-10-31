@@ -37,6 +37,13 @@ def enroll(client):
     started = client.post('/api/user/mfa/setup',json={'password':PASSWORD},headers=headers)
     assert started.status_code==200,started.text
     data = started.json()
+    # Enrollment QR encodes exactly the otpauth URI for this secret (rendered server-side as SVG).
+    from urllib.parse import parse_qs, urlsplit
+    from openreporting.mfa import qr_data_uri
+    uri = urlsplit(data['uri'])
+    assert uri.scheme == 'otpauth' and uri.netloc == 'totp'
+    assert parse_qs(uri.query) == {'secret': [data['secret']], 'issuer': ['OpenReporting']}
+    assert data['qr'].startswith('data:image/svg+xml') and data['qr'] == qr_data_uri(data['uri'])
     confirmed = client.post('/api/user/mfa/confirm',json={'password':PASSWORD,'code':pyotp.TOTP(data['secret']).at(NOW),
                            'setup_token':data['setup_token']},headers=headers)
     assert confirmed.status_code==200,confirmed.text

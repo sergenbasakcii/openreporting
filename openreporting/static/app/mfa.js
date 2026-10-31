@@ -23,6 +23,12 @@ function factorDialog(action) {
   let alive = true;
   const password = input({ type: 'password', autocomplete: 'current-password', required: true, maxlength: 1024 });
   const code = input({ autocomplete: 'one-time-code', required: true, maxlength: 128 });
+  // Enrollment confirms with the app's current 6-digit code only (recovery codes do not exist yet).
+  const setupCode = input({ autocomplete: 'one-time-code', required: true, maxlength: 6, placeholder: '123456',
+    onInput: (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); } });
+  setupCode.setAttribute('inputmode', 'numeric');
+  setupCode.setAttribute('pattern', '[0-9]{6}');
+  setupCode.classList.add('mfa-code');
   const error = h('div', { class: 'alert error', role: 'alert', hidden: true });
   const stage = h('div');
   const submit = button(setup ? 'Kurulumu başlat' : action === 'disable' ? 'İki adımlı girişi kapat' : 'Kodları yenile', { variant: 'primary', type: 'submit' });
@@ -33,12 +39,24 @@ function factorDialog(action) {
         const data = await post('/api/user/mfa/setup', { password: password.value });
         if (!alive) return;
         pending = data;
-        stage.replaceChildren(h('p', { text: 'Doğrulayıcı uygulamanızda yeni bir hesap ekleyin: OpenReporting, zamana dayalı (TOTP), 6 hane, 30 saniye. Aşağıdaki anahtarı elle girin.' }),
-          field('Kurulum anahtarı', input({ value: data.secret, readonly: true, class: 'mono' })),
-          field('Doğrulayıcı kodu', code), h('p', { class: 'hint', text: 'Kurulum 10 dakika geçerlidir. Kurtarma kodları onaydan sonra gösterilir.' }));
-        submit.textContent = 'Kurulumu onayla'; submit.setAttribute('aria-label', 'Kurulumu onayla'); code.focus();
+        const grouped = data.secret.replace(/(.{4})/g, '$1 ').trim();
+        stage.replaceChildren(
+          h('p', { text: '1. Telefonunuzdaki doğrulayıcı uygulamasıyla (Google Authenticator, Microsoft Authenticator vb.) bu QR kodu okutun.' }),
+          h('div', { class: 'mfa-qr' }, h('img', { src: data.qr, alt: 'Doğrulayıcı uygulaması için QR kod', width: 200, height: 200 })),
+          h('details', { class: 'mfa-manual' }, h('summary', { text: 'QR kodu okutamıyor musunuz? Anahtarı elle girin' }),
+            h('p', { class: 'hint', text: 'Uygulamada "Kurulum anahtarı gir" seçin; tür: zamana dayalı. Anahtar yalnız A–Z harfleri ve 2–7 rakamlarından oluşur (0, 1, 8, 9 yoktur).' }),
+            input({ value: grouped, readonly: true, class: 'mono', label: 'Kurulum anahtarı' })),
+          field('2. Uygulamada görünen 6 haneli kod', setupCode),
+          h('p', { class: 'hint', text: 'Kurulum 10 dakika geçerlidir. Kurtarma kodları onaydan sonra gösterilir.' }));
+        submit.textContent = 'Kurulumu onayla'; submit.setAttribute('aria-label', 'Kurulumu onayla'); setupCode.focus();
       } else {
-        const body = { password: password.value, code: code.value.trim() };
+        if (pending && !/^\d{6}$/.test(setupCode.value)) {
+          error.textContent = 'Uygulamada görünen 6 haneli sayıyı girin (kurulum anahtarını değil).';
+          error.hidden = false;
+          setupCode.focus();
+          return;
+        }
+        const body = { password: password.value, code: (pending ? setupCode : code).value.trim() };
         if (pending) body.setup_token = pending.setup_token;
         const result = await post(`/api/user/mfa/${setup ? 'confirm' : action}`, body);
         if (!alive) { location.reload(); return; }
@@ -52,7 +70,7 @@ function factorDialog(action) {
     error, field('Mevcut parola', password), stage, submit);
   if (!setup) stage.append(field('Doğrulayıcı veya kurtarma kodu', code));
   const dialog = modal({ title: 'İki adımlı giriş', body: form, closeOnBackdrop: false,
-    onClose: () => { alive = false; pending = null; password.value = ''; code.value = ''; stage.replaceChildren(); } });
+    onClose: () => { alive = false; pending = null; password.value = ''; code.value = ''; setupCode.value = ''; stage.replaceChildren(); } });
   return dialog;
 }
 

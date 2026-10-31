@@ -346,3 +346,11 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .subsection-heading { font-size: 14px; }
 /* Security setup uses existing theme surfaces; one-time codes remain selectable. */
 .mfa-codes { overflow-x: auto; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 13px; line-height: 1.7; }
+
+/* ---- two-step login enrollment: QR first, manual key as fallback ---- */
+.mfa-qr { display: flex; justify-content: center; margin: 4px 0 12px; }
+.mfa-qr img { width: 200px; height: 200px; background: #fff; border-radius: 6px; image-rendering: pixelated; }
+.mfa-manual { margin-bottom: 12px; }
+.mfa-manual summary { cursor: pointer; color: var(--text-muted); font-size: 13px; }
+.mfa-manual .input { margin-top: 6px; letter-spacing: 1px; }
+.mfa-code { font-size: 20px; letter-spacing: 6px; text-align: center; max-width: 180px; }

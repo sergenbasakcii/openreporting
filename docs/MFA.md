@@ -8,8 +8,10 @@ RFC 6238, SHA-1, 6 hane ve 30 saniyelik TOTP desteklemelidir.
 
 ## Kurulum ve politika
 
-HTTPS altında giriş yapın, profil kartından mevcut parolayı doğrulayın ve yeni
-anahtarı doğrulayıcınıza elle ekleyin. Anahtar yalnız bu kurulum yanıtında gösterilir;
+HTTPS altında giriş yapın, profil kartından mevcut parolayı doğrulayın ve ekrandaki **QR kodu**
+doğrulayıcı uygulamanızla okutun (QR sunucuda üretilir; dış servis kullanılmaz). Okutulamazsa
+"Anahtarı elle girin" bölümündeki anahtar kullanılır. Onay için uygulamadaki 6 haneli kod girilir.
+Anahtar yalnız bu kurulum yanıtında gösterilir;
 kurulum 10 dakika geçerlidir. Ekranı kapatıp yeniden başlatmak eski bekleyen anahtarı
 geçersiz kılar. İlk kodla onaydan sonra **10 kurtarma kodunu ayrı güvenli emanete alın**.
 Kodlar sonradan okunamaz; her biri yalnız bir kez geçerlidir. Etkinleştirme tüm

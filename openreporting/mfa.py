@@ -12,6 +12,7 @@ from datetime import datetime,timedelta,timezone
 
 from fastapi import HTTPException
 import pyotp
+import segno
 
 from .db import audit,connect,transaction,utcnow,schema_version,CURRENT_VERSION,verify_audit
 from .domain import parse_utc
@@ -130,8 +131,16 @@ def start_setup(settings,user,password):
             setup_hash=excluded.setup_hash,last_counter=-1,recovery_hashes='[]',updated_at=excluded.updated_at''',
             (user['id'],sealed,expires,security.digest(setup_token),utcnow()))
         audit(db,user['id'],'mfa.setup_started','user',user['id'])
-    return {'secret':secret,'setup_token':setup_token,'expires_at':expires,
-            'uri':pyotp.TOTP(secret).provisioning_uri(name=user['username'],issuer_name='OpenReporting')}
+    uri = pyotp.TOTP(secret).provisioning_uri(name=user['username'],issuer_name='OpenReporting')
+    return {'secret':secret,'setup_token':setup_token,'expires_at':expires,'uri':uri,'qr':qr_data_uri(uri)}
+
+
+def qr_data_uri(uri):
+    """Enrollment QR as an inline SVG data URI: rendered on the server, nothing leaves this response.
+
+    Dark modules on an explicit white quiet zone so phone cameras read it on the dark theme too.
+    """
+    return segno.make(uri,error='m',micro=False).svg_data_uri(scale=5,border=4,dark='#000000',light='#ffffff')
 
 
 def confirm_setup(settings,user,password,code,setup_token):

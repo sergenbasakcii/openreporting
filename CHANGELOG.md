@@ -1,5 +1,11 @@
 # Değişiklik günlüğü
 
+## Yayınlanmamış
+- İki adımlı giriş kurulumu artık **QR kod** gösterir (sunucuda `segno` ile üretilir, dış servis yok);
+  anahtarı elle girme yalnız yedek seçenektir. Onay alanı yalnız 6 haneli kodu kabul eder ve anahtarın
+  yanlışlıkla girilmesini açık bir mesajla engeller.
+- Kali Linux, Debian ailesinden test/lab ortamı olarak kurulum betiğince kabul edilir.
+
 ## 1.1.0 — 2026-10-31
 
 ### İnceleme düzeltmeleri (birleştirme öncesi)
