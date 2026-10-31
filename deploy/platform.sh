@@ -6,7 +6,8 @@ detect_platform() {
   local id="$1" version="$2" major minor
   major="${version%%.*}"
   case "$id" in
-    ubuntu|debian)
+    # Kali is Debian-based (same apt/systemd/nginx layout); supported for test labs.
+    ubuntu|debian|kali)
       PLATFORM_FAMILY=debian
       PLATFORM_PYTHON=''
       NGINX_SITE=/etc/nginx/sites-available/openreporting.conf
@@ -27,7 +28,7 @@ detect_platform() {
       TLS_CERT_DEFAULT=/etc/pki/tls/certs/openreporting.crt
       TLS_KEY_DEFAULT=/etc/pki/tls/private/openreporting.key
       ;;
-    *) die 'Desteklenen kurulum aileleri: Ubuntu/Debian ve Oracle Linux' ;;
+    *) die 'Desteklenen kurulum aileleri: Ubuntu/Debian/Kali ve Oracle Linux' ;;
   esac
   PLATFORM_ID="$id" PLATFORM_VERSION="$version" PLATFORM_MAJOR="$major"
 }

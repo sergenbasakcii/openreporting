@@ -24,6 +24,14 @@ def test_oracle_platform_uses_native_paths(version,tmp_path):
     assert result.stdout.splitlines()==['oracle','/etc/nginx/conf.d/openreporting.conf','/etc/pki/tls/private/openreporting.key']
 
 
+@pytest.mark.parametrize('id',['ubuntu','debian','kali'])
+def test_debian_family_uses_debian_paths(id,tmp_path):
+    result=run(f'detect_platform {id} 2025.3
+printf "%s\n" "$PLATFORM_FAMILY" "$NGINX_SITE"',tmp_path)
+    assert result.returncode==0,result.stderr
+    assert result.stdout.splitlines()==['debian','/etc/nginx/sites-available/openreporting.conf']
+
+
 @pytest.mark.parametrize('id,version',[('ol','7.9'),('ol','8.9'),('ol','8'),('ol','9.3'),('ol','9'),('ol','11.0'),('unknown','9')])
 def test_unsupported_os_fails_before_any_package_action(id,version,tmp_path):
     result=run(f'detect_platform {id} {version}\nprintf mutation > "$TEST_LOG"',tmp_path)
@@ -32,7 +40,7 @@ def test_unsupported_os_fails_before_any_package_action(id,version,tmp_path):
 
 
 @pytest.mark.parametrize('id,version,package_command,python_package',[('ol','8.10','dnf','python3.12-pip'),
-    ('ol','9.4','dnf','python3.12-pip'),('ol','10.0','dnf','python3-pip'),('ubuntu','24.04','apt','python3-venv')])
+    ('ol','9.4','dnf','python3.12-pip'),('ol','10.0','dnf','python3-pip'),('ubuntu','24.04','apt','python3-venv'),('kali','2025.3','apt','python3-venv')])
 def test_distribution_package_selection_without_host_install(id,version,package_command,python_package,tmp_path):
     result=run('dnf(){ printf "dnf %s\\n" "$*" >> "$TEST_LOG"; }; apt-get(){ printf "apt %s\\n" "$*" >> "$TEST_LOG"; };\n'
                f'detect_platform {id} {version}\ninstall_platform_packages 1 0',tmp_path)
