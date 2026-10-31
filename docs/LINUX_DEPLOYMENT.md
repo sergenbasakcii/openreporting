@@ -24,11 +24,11 @@ Gerçek kaynak/rapor/TLS/LDAP/SMTP yüküyle kurum kabulü yapılmadan bu tablo 
 ```bash
 # 1a) GitHub’dan (özel depo: salt-okunur bir deploy key veya “Contents: read” yetkili ince taneli token gerekir)
 sudo apt-get install -y git
-git clone --branch v1.0.0 https://github.com/sergenbasakcii/openreporting.git /tmp/openreporting && cd /tmp/openreporting
+git clone --branch v1.1.0 https://github.com/sergenbasakcii/openreporting.git /tmp/openreporting && cd /tmp/openreporting
 
 # 1b) veya internetsiz sunucuya paket olarak taşıyın
-scp openreporting-1.0.0.zip admin@sunucu:/tmp/ && ssh admin@sunucu
-cd /tmp && unzip openreporting-1.0.0.zip -d openreporting && cd openreporting
+scp openreporting-1.1.0.zip admin@sunucu:/tmp/ && ssh admin@sunucu
+cd /tmp && unzip openreporting-1.1.0.zip -d openreporting && cd openreporting
 
 # 2a) Kurum sertifikası ile
 sudo ./deploy/install-ubuntu.sh --domain openreporting.sirket.local \

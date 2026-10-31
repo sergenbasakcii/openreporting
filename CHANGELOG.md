@@ -1,6 +1,6 @@
 # Değişiklik günlüğü
 
-## Yayınlanmamış
+## 1.1.0 — 2026-10-31
 
 ### İnceleme düzeltmeleri (birleştirme öncesi)
 - E-posta gönderimi yarıda kalan **tamamlanmış** rapor artık indirilebilir kalır; yalnız teslim durumu

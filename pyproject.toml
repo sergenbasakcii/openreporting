@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openreporting"
-version = "1.0.0"
+version = "1.1.0"
 description = "Grafana-style dashboards and group-based PDF/Excel reporting for Zabbix and SQL (read-only sources)"
 readme = "README.md"
 requires-python = ">=3.11"
