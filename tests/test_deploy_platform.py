@@ -26,8 +26,7 @@ def test_oracle_platform_uses_native_paths(version,tmp_path):
 
 @pytest.mark.parametrize('id',['ubuntu','debian','kali'])
 def test_debian_family_uses_debian_paths(id,tmp_path):
-    result=run(f'detect_platform {id} 2025.3
-printf "%s\n" "$PLATFORM_FAMILY" "$NGINX_SITE"',tmp_path)
+    result=run(f'detect_platform {id} 2025.3\nprintf "%s\\n" "$PLATFORM_FAMILY" "$NGINX_SITE"',tmp_path)
     assert result.returncode==0,result.stderr
     assert result.stdout.splitlines()==['debian','/etc/nginx/sites-available/openreporting.conf']
 
