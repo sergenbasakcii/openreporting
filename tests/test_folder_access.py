@@ -95,6 +95,7 @@ def test_uid_tampering_mutations_queries_and_old_new_destinations(state):
             ('post', '/api/dashboards/variables/resolve', {'uid': 'private', 'dashboard': model}),
             ('post', '/api/ds/query', {'dashboardUid': 'private', 'targets': [{'refId': 'A'}]}),
             ('put', f'/api/folders/{folder}', {'title': 'unauthorized rename'}),
+            ('put', f'/api/folders/{folder}', {'title': 'Other content'}),
             ('post', '/api/dash-reports', {'name': 'Denied report', 'dashboard_uid': 'private'}),
             ('put', f'/api/dash-reports/{rid}', {'name': 'Retarget attempt', 'dashboard_uid': 'public'}),
             ('post', f'/api/dash-reports/{rid}/runs', {}),
@@ -234,3 +235,13 @@ def test_two_independent_restricted_folders_require_both_move_permissions(state)
     assert dashboards.get(settings, 'private', actors['viewer'])['meta']['folderUid'] is None
     with db.connect(settings) as conn:
         assert db.verify_audit(conn) == (True, None)
+
+
+def test_deleted_private_dashboard_uid_cannot_reveal_orphaned_notes(state):
+    settings, app, actors, folder, _, rid, _ = state
+    restrict(state)
+    service.delete_report(settings, actors['admin'], rid)
+    dashboards.delete(settings, actors['admin'], 'private')
+    dashboards.save(settings, actors['editor'], {'uid': 'private', 'title': 'New shared dashboard', 'panels': []})
+    with signin(app, 'viewer') as client:
+        assert client.get('/api/annotations?dashboardUID=private').json() == []

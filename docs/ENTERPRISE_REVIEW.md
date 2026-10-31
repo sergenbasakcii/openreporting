@@ -26,7 +26,7 @@ Oracle Linux 8.10/9.8/10.2 kullanıcı alanında kurulum paketleri, servis dosya
 gerçek nginx HTTPS/MFA ve PDF/XLSX/CSV worker kabulü başarılıdır;
 [ortam kanıtı](evidence/oracle-linux-userspace-2026-10-31.json) PID1/SELinux Enforcing
 ve tam VM/kurum kabulünün açık kaldığını kaydeder. Ubuntu dışındaki bu kapsam tam host kabulü değildir.
-Klasör içerik izinleri için 9 izole SQLite/API/worker testi, tarayıcıda 8 koyu/açık tema erişilebilirlik taraması geçti; [sınırlar](FOLDER_PERMISSIONS.md) ve [tarayıcı kanıtı](evidence/folder-browser-2026-10-31.json). PostgreSQL ve son commit CI kabulü ayrıca izlenir. Tenant/kaynak izolasyonu kapanmış sayılmaz.
+Klasör içerik izinleri için 10 izole SQLite/API/worker testi, tarayıcıda 8 koyu/açık tema erişilebilirlik taraması geçti; [sınırlar](FOLDER_PERMISSIONS.md) ve [tarayıcı kanıtı](evidence/folder-browser-2026-10-31.json). PostgreSQL ve son commit CI kabulü ayrıca izlenir. Tenant/kaynak izolasyonu kapanmış sayılmaz.
 Test dosyası referansları o başlığın kanıt alanını gösterir; her satır için ayrı bir yeni test yazıldığı iddia edilmez.
 
 Gövde sınırı, Host/Origin izolasyonu, logo yedeği, izole kurtarma doğrulayıcı ve bağımlılık taraması eklendi.

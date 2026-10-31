@@ -408,6 +408,7 @@ def delete(settings, user, uid):
         folder_access.require_folder(db, user, row["folder_id"], edit=True)
         if db.execute("SELECT 1 FROM dash_reports WHERE dashboard_uid=?", (uid,)).fetchone():
             raise DashboardError("Bu dashboard'u kullanan raporlar var; önce raporları silin")
+        db.execute("DELETE FROM annotations WHERE dashboard_uid=?", (uid,))
         db.execute("DELETE FROM dashboard_stars WHERE dashboard_id=?", (row["id"],))
         db.execute("DELETE FROM dashboard_versions WHERE dashboard_id=?", (row["id"],))
         db.execute("DELETE FROM dashboards WHERE id=?", (row["id"],))
@@ -504,15 +505,14 @@ def save_folder(settings, user, title, uid=None):
         raise DashboardError("Klasör adı 1-120 karakter olmalı ve 'Genel' olamaz")
     now = utcnow()
     with connect(settings) as db, transaction(db):
+        folder_access.require_folder(db, user, _folder_id(db, uid) if uid else None, edit=True)
         if db.execute("SELECT 1 FROM folders WHERE title=? AND uid<>?", (title, uid or "")).fetchone():
             raise DashboardError("Bu adla bir klasör zaten var")
         if uid:
-            folder_access.require_folder(db, user, _folder_id(db, uid), edit=True)
             if not db.execute("SELECT 1 FROM folders WHERE uid=?", (uid,)).fetchone():
                 raise DashboardError("Klasör bulunamadı")
             db.execute("UPDATE folders SET title=?,updated_at=?,updated_by=? WHERE uid=?", (title, now, user["id"], uid))
         else:
-            folder_access.require_folder(db, user, None, edit=True)
             uid = new_uid()
             db.execute("INSERT INTO folders VALUES(?,?,?,?,?,?)", (identity(), uid, title, now, now, user["id"]))
         audit(db, user["id"], "folder.saved", "folder", uid, {"title": title})

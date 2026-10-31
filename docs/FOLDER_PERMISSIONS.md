@@ -26,7 +26,8 @@ ve tenant tanımı bu sürümün kapsamında değildir.
 ## Korunan yollar
 
 - Dashboard listesi, klasör/sayı/etiketler; sürüm içeriği ve geçmişi; yıldızlar;
-  dashboard notları, silme, geri yükleme, import ve overwrite.
+  dashboard notları, silme, geri yükleme, import ve overwrite. Dashboard silinirse
+  ona bağlı notlar aynı işlemde kaldırılır; UID yeniden kullanımı eski notları açmaz.
 - Kaydetme/taşıma işleminde aynı yazma işlemi içinde hem eski hem hedef klasörün
   düzenleme izni gerekir. Erişim filtresi SQL sıralama/limitinden önce uygulanır.
 - Kayıtlı viewer paneli ve değişken çözümleme, rapor önizlemesi ve PDF/XLSX/CSV
