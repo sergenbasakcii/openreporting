@@ -32,7 +32,9 @@ function totp(secret) {
         // Never save full axe node HTML: this page can contain one-time secrets.
         const violations = result.violations.map(v => ({ id: v.id, impact: v.impact, count: v.nodes.length }));
         results.push({ stage, theme, violations });
-        assert.deepEqual(violations, [], `${stage}/${theme}`);
+        // Selectors only (no node HTML) so a failure names the element without exposing secrets.
+        const where = result.violations.flatMap(v => v.nodes.map(n => `${v.id}: ${n.target.join(' ')} (${(n.failureSummary || '').replace(/\s+/g, ' ').slice(0, 300)})`));
+        assert.deepEqual(violations, [], `${stage}/${theme} ${where.join('; ')}`);
       }
     }
     async function login(name, code) {
@@ -67,9 +69,15 @@ function totp(secret) {
       const dialog = page.getByRole('dialog');
       await dialog.getByLabel('Mevcut parola', { exact: true }).fill(password);
       await dialog.getByRole('button', { name: 'Kurulumu başlat', exact: true }).click();
-      const secret = await dialog.getByLabel('Kurulum anahtarı', { exact: true }).inputValue();
+      // Enrollment is QR first; the manual key is a collapsed fallback grouped by four characters.
+      await dialog.getByRole('img', { name: 'Doğrulayıcı uygulaması için QR kod' }).waitFor();
+      assert.ok((await dialog.locator('.mfa-qr img').getAttribute('src')).startsWith('data:image/svg+xml'), 'QR is an inline SVG');
+      const secret = (await dialog.getByLabel('Kurulum anahtarı', { exact: true }).inputValue()).replace(/\s/g, '');
       await scan('setup-confirm');
-      await dialog.getByLabel('Doğrulayıcı kodu', { exact: true }).fill(totp(secret));
+      const codeField = dialog.getByLabel('2. Uygulamada görünen 6 haneli kod', { exact: true });
+      await codeField.fill('KEY-not-a-code');
+      assert.equal(await codeField.inputValue(), '', 'Only digits are accepted');
+      await codeField.fill(totp(secret));
       await dialog.getByRole('button', { name: 'Kurulumu onayla', exact: true }).click();
       await page.getByRole('heading', { name: 'Kurtarma kodlarını saklayın' }).waitFor();
       await scan('recovery-once');

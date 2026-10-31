@@ -4,7 +4,7 @@
   --bg-hover: rgba(204, 204, 220, .08); --bg-active: rgba(204, 204, 220, .14);
   --border: rgba(204, 204, 220, .12); --border-strong: rgba(204, 204, 220, .22);
   --text: #ccccdc; --text-strong: #fff; --text-muted: rgba(204, 204, 220, .65); --text-faint: rgba(204, 204, 220, .68);
-  --primary: #3d71d9; --primary-text: #6e9fff; --primary-hover: #4f80e8;
+  --primary: #3d71d9; --primary-text: #6e9fff; --primary-hover: #2f62c9;
   --success: #1a7f4b; --success-text: #6ccf8e; --warning: #f5b73d; --error: #d10e5c; --error-text: #ff5286;
   --shadow: 0 8px 24px rgba(1, 4, 9, .75); --radius: 2px; --radius-lg: 6px;
   --nav-width: 228px; --topbar-height: 48px; --focus: 0 0 0 2px #111217, 0 0 0 4px #3d71d9;
