@@ -16,7 +16,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from openreporting.config import Settings
 from openreporting.security import create_user
 from openreporting.web import create_app
-from openreporting import dashboards
+from openreporting import dashboards, db, folder_access
 
 
 def main():
@@ -28,8 +28,13 @@ def main():
         password=secrets.token_urlsafe(32)
         owner = {'id':create_user(settings,'folderadmin',password,'admin'),'role':'admin'}
         create_user(settings,'foldereditor',password,'editor')
-        create_user(settings,'folderviewer',password,'viewer')
+        viewer_id = create_user(settings,'folderviewer',password,'viewer')
+        inactive_id = create_user(settings,'inactiveuser',password,'viewer')
         folder = dashboards.save_folder(settings,owner,'Browser folder')
+        folder_access.replace_policy(settings,owner,folder['uid'],{'restricted':False,'revision':0,'grants':[
+            {'user_id':viewer_id,'permission':'edit'},{'user_id':inactive_id,'permission':'view'}]})
+        with db.connect(settings) as conn, db.transaction(conn):
+            conn.execute('UPDATE users SET active=0 WHERE id=?',(inactive_id,))
         dashboards.save(settings,owner,{'uid':'folder-ui','title':'Folder UI content','panels':[]},folder_uid=folder['uid'])
         listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen(128)
         server=uvicorn.Server(uvicorn.Config(app,access_log=False,log_level='warning',lifespan='on'))

@@ -19,6 +19,9 @@ Genel/root klasör paylaşılandır. Yeni klasörler başlangıçta paylaşılan
 İki yönetici aynı revizyonu kaydettiğinde biri 409 alır; tekrar açıp güncel izinleri
 görmelidir. Bilinmeyen/etkin olmayan veya yinelenen kullanıcılar kaydedilmez.
 Değişiklik ve izin verilen kullanıcı kimlikleri denetim zincirine yazılır.
+Yönetici penceresi kaydedilirken etkin olmayan hesapların ve zaten tam erişimli
+yönetici hesaplarının gereksiz kişisel grant kayıtları temizlenir. Rolü izleyiciye
+düşmüş bir hesabın eski edit kaydı yalnız görüntüleme etkisiyle gösterilir.
 LDAP kullanıcılarına yerel kullanıcı kimlikleri üzerinden izin verilir; dizin
 grup/rol güncellemesi uygulamadaki global rol sınırını korur. LDAP grup ACL eşlemesi
 ve tenant tanımı bu sürümün kapsamında değildir.

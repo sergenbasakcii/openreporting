@@ -116,12 +116,14 @@ async function permissionsDialog(folder, refresh) {
   try {
     const [policy, users] = await Promise.all([get(`/api/folders/${folder.uid}/permissions`), get('/api/users')]);
     let restricted = policy.restricted;
-    const choices = new Map(policy.grants.map(g => [g.user_id, g.permission]));
+    const eligible = users.filter(u => u.active && u.role !== 'admin');
+    const ids = new Set(eligible.map(u => u.id));
+    const choices = new Map(policy.grants.filter(g => ids.has(g.user_id)).map(g => [g.user_id, g.permission]));
     const list = h('div');
-    for (const user of users.filter(u => u.active && u.role !== 'admin')) {
+    for (const user of eligible) {
       list.append(field(`${user.display_name || user.username} (${user.role})`, select([
         { value: '', label: 'İzin yok' }, { value: 'view', label: 'Görüntüleme' },
-        ...(user.role === 'editor' ? [{ value: 'edit', label: 'Düzenleme' }] : [])
+        ...(user.role === 'editor' || choices.get(user.id) === 'edit' ? [{ value: 'edit', label: user.role === 'viewer' ? 'Görüntüleme (rol sınırı)' : 'Düzenleme' }] : [])
       ], choices.get(user.id) || '', v => { if (v) choices.set(user.id, v); else choices.delete(user.id); })));
     }
     const show = () => { list.hidden = !restricted; };
