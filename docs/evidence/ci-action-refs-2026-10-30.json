@@ -1,0 +1,27 @@
+{
+  "checked_at_utc": "2026-10-30T04:13:15.211398+00:00",
+  "source": "Public GitHub REST tag refs in the upstream actions namespace",
+  "actions": [
+    {
+      "repository": "actions/checkout",
+      "tag": "v4",
+      "commit": "11d5960a326750d5838078e36cf38b85af677262"
+    },
+    {
+      "repository": "actions/setup-python",
+      "tag": "v5",
+      "commit": "a26af69be951a213d495a4c3e4e4022e16d87065"
+    },
+    {
+      "repository": "actions/setup-node",
+      "tag": "v4",
+      "commit": "49933ea5288caeca8642d1e84afbd3f7d6820020"
+    },
+    {
+      "repository": "actions/upload-artifact",
+      "tag": "v4",
+      "commit": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+    }
+  ],
+  "scope": "Reference snapshot; not an independent source audit, signed application release or provenance attestation"
+}

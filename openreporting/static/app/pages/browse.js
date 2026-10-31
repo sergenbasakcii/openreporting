@@ -1,5 +1,5 @@
 // Dashboard browser (folders, search, tags, starred) and the import page.
-import { h, button, input, select, textarea, field, toggle, tagEl, timeAgo, clear, toast, confirmDialog, promptDialog, menu, loading } from '../dom.js';
+import { h, button, input, select, textarea, field, toggle, tagEl, timeAgo, clear, toast, confirmDialog, promptDialog, menu, modal, loading } from '../dom.js';
 import { icon } from '../icons.js';
 import { get, post, put, del, invalidate } from '../api.js';
 import { navigate, setBreadcrumbs } from '../router.js';
@@ -29,7 +29,7 @@ export async function browsePage(root, { app, query, folderUid }) {
       h('button', { type: 'button', text: 'Liste', onclick: (e) => { state.view = 'list'; e.currentTarget.classList.add('on'); e.currentTarget.previousSibling.classList.remove('on'); draw(); } }))), listHost);
   root.append(page);
   get('/api/dashboards/tags').then((tags) => {
-    tagSel.append(select([{ value: '', label: 'Tüm etiketler' }, ...tags.map((t) => ({ value: t.term, label: `${t.term} (${t.count})` }))], state.tag, (v) => { state.tag = v; draw(); }));
+    tagSel.append(select([{ value: '', label: 'Tüm etiketler' }, ...tags.map((t) => ({ value: t.term, label: `${t.term} (${t.count})` }))], state.tag, (v) => { state.tag = v; draw(); }, { label: 'Etiket filtresi' }));
   });
   let seq = 0;
   async function draw() {
@@ -60,12 +60,13 @@ export async function browsePage(root, { app, query, folderUid }) {
       return;
     }
     const groups = new Map([['', { title: 'Genel', uid: '', items: [] }]]);
-    for (const f of folders) groups.set(f.uid, { title: f.title, uid: f.uid, items: [] });
+    for (const f of folders) groups.set(f.uid, { title: f.title, uid: f.uid, canEdit: f.canEdit, items: [] });
     for (const d of results) (groups.get(d.folderUid || '') || groups.get('')).items.push(d);
     for (const g of groups.values()) {
       const body = h('div', { style: { paddingLeft: '18px' } }, g.items.map(row), g.items.length ? null : h('p', { class: 'faint', text: 'Boş klasör' }));
       const head = h('div', { class: 'folder-head' }, icon('folder-open'), h('span', { text: g.title }), h('span', { class: 'faint', text: `(${g.items.length})` }), h('span', { class: 'spacer' }),
-        canEdit && g.uid ? button('', { icon: 'dots', variant: 'ghost', size: 'sm', onClick: (e) => { e.stopPropagation(); menu(e.currentTarget, [
+        canEdit && g.canEdit !== false && g.uid ? button('', { icon: 'dots', title: `${g.title} klasör işlemleri`, variant: 'ghost', size: 'sm', onClick: (e) => { e.stopPropagation(); menu(e.currentTarget, [
+          ...(app.user.role === 'admin' && app.settings?.features?.folderAcl ? [{ label: 'Klasör izinleri', icon: 'settings', onClick: () => permissionsDialog(g, draw) }] : []),
           { label: 'Yeniden adlandır', icon: 'edit', onClick: async () => { const t = await promptDialog('Klasörü yeniden adlandır', 'Ad', g.title); if (t) { try { await put(`/api/folders/${g.uid}`, { title: t }); draw(); } catch (err) { toast(err.message, 'error'); } } } },
           { label: 'Sil', icon: 'trash', onClick: async () => { if (await confirmDialog('Klasörü sil', 'Yalnızca boş klasörler silinebilir.', { danger: true, okText: 'Sil' })) { try { await del(`/api/folders/${g.uid}`); draw(); } catch (err) { toast(err.message, 'error'); } } } },
           { label: 'Bu klasörde yeni dashboard', icon: 'plus', onClick: () => navigate(`/dashboards/new?folderUid=${g.uid}`) }], { align: 'right' }); } }) : null);
@@ -78,7 +79,7 @@ export async function browsePage(root, { app, query, folderUid }) {
 
 export async function importPage(root, { app }) {
   setBreadcrumbs([{ label: 'Dashboard’lar', href: '/dashboards' }, { label: 'İçe aktar' }]);
-  const folders = await get('/api/folders').catch(() => []);
+  const folders = (await get('/api/folders').catch(() => [])).filter(f => f.canEdit !== false);
   const area = textarea({ rows: 18, class: 'code-editor', placeholder: '{ "title": "...", "panels": [...] }' });
   const folderSel = select([{ value: '', label: 'Genel' }, ...folders.map((f) => ({ value: f.uid, label: f.title }))], '', () => {});
   let overwrite = false;
@@ -109,3 +110,35 @@ export async function importPage(root, { app }) {
 }
 
 export { loading };
+
+
+async function permissionsDialog(folder, refresh) {
+  try {
+    const [policy, users] = await Promise.all([get(`/api/folders/${folder.uid}/permissions`), get('/api/users')]);
+    let restricted = policy.restricted;
+    const eligible = users.filter(u => u.active && u.role !== 'admin');
+    const ids = new Set(eligible.map(u => u.id));
+    const choices = new Map(policy.grants.filter(g => ids.has(g.user_id)).map(g => [g.user_id, g.permission]));
+    const list = h('div');
+    for (const user of eligible) {
+      list.append(field(`${user.display_name || user.username} (${user.role})`, select([
+        { value: '', label: 'İzin yok' }, { value: 'view', label: 'Görüntüleme' },
+        ...(user.role === 'editor' || choices.get(user.id) === 'edit' ? [{ value: 'edit', label: user.role === 'viewer' ? 'Düzenleme (izleyici rolü nedeniyle etkisiz)' : 'Düzenleme' }] : [])
+      ], choices.get(user.id) || '', v => { if (v) choices.set(user.id, v); else choices.delete(user.id); })));
+    }
+    const show = () => { list.hidden = !restricted; };
+    show();
+    const body = h('div', h('p', { text: 'Paylaşılan klasörleri tüm kullanıcılar görebilir. Kısıtlı klasörlerde yalnızca seçilen kullanıcılar ve yöneticiler erişebilir.' }),
+      toggle('Klasör erişimini kısıtla', restricted, v => { restricted = v; show(); }), list,
+      h('p', { class: 'faint', text: 'İzin değişikliği rapor zamanlamalarını kapatır; yeniden yönetici onayı gerekir. Veri kaynağı ve uygulama rolleri ayrıca geçerlidir.' }));
+    const dialog = modal({ title: `Klasör izinleri: ${folder.title}`, body, footer: [
+      button('Vazgeç', { onClick: () => dialog.close() }),
+      button('Kaydet', { variant: 'primary', onClick: async () => {
+        try {
+          await put(`/api/folders/${folder.uid}/permissions`, { restricted, revision: policy.revision,
+            grants: [...choices].map(([user_id, permission]) => ({ user_id, permission })) });
+          invalidate(''); dialog.close(); toast('Klasör izinleri kaydedildi', 'ok'); refresh();
+        } catch (error) { toast(error.message, 'error'); }
+      } })] });
+  } catch (error) { toast(error.message, 'error'); }
+}

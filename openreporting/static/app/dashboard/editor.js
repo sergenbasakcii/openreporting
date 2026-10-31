@@ -22,8 +22,8 @@ function thresholdsEditor(panel, onChange) {
     wrap.append(button('Eşik ekle', { icon: 'plus', size: 'sm', onClick: () => commit({ ...t, steps: [...steps, { color: 'red', value: (Number(steps[steps.length - 1].value) || 0) + 10 }] }) }));
     [...steps].reverse().forEach((step) => {
       const idx = steps.indexOf(step);
-      const colorIn = h('input', { type: 'color', value: toHex(step.color), title: step.color, onchange: (e) => { steps[idx] = { ...step, color: e.target.value }; commit({ ...t, steps }); } });
-      const named = select([{ value: '', label: 'Renk' }, ...COLOR_CHOICES.map((c) => ({ value: c, label: c }))], NAMED[step.color] ? step.color : '', (v) => { if (v) { steps[idx] = { ...step, color: v }; commit({ ...t, steps }); } });
+      const colorIn = h('input', { type: 'color', value: toHex(step.color), title: step.color, 'aria-label': 'Eşik rengi', onchange: (e) => { steps[idx] = { ...step, color: e.target.value }; commit({ ...t, steps }); } });
+      const named = select([{ value: '', label: 'Renk' }, ...COLOR_CHOICES.map((c) => ({ value: c, label: c }))], NAMED[step.color] ? step.color : '', (v) => { if (v) { steps[idx] = { ...step, color: v }; commit({ ...t, steps }); } }, { label: 'Eşik renk adı' });
       named.style.width = '110px';
       const valueEl = step.value === null || step.value === undefined ? h('span', { class: 'input', style: { display: 'flex', alignItems: 'center' }, text: 'Taban' })
         : input({ type: 'number', value: step.value, onChange: (e) => { steps[idx] = { ...step, value: Number(e.target.value) }; commit({ ...t, steps }); } });
@@ -48,7 +48,7 @@ function mappingsEditor(panel, onChange) {
           wrap.append(h('div', { class: 'threshold-row' }, h('span', { class: 'badge', text: 'değer' }),
             input({ value: val, onChange: (e) => { const o = { ...m.options }; delete o[val]; o[e.target.value] = res; list[i] = { ...m, options: o }; commit(list); } }),
             input({ value: res.text || '', placeholder: 'Gösterilecek metin', onChange: (e) => { list[i] = { ...m, options: { ...m.options, [val]: { ...res, text: e.target.value } } }; commit(list); } }),
-            h('input', { type: 'color', value: toHex(res.color || 'green'), onchange: (e) => { list[i] = { ...m, options: { ...m.options, [val]: { ...res, color: e.target.value } } }; commit(list); } }),
+            h('input', { type: 'color', 'aria-label': 'Değer eşlemesi rengi', value: toHex(res.color || 'green'), onchange: (e) => { list[i] = { ...m, options: { ...m.options, [val]: { ...res, color: e.target.value } } }; commit(list); } }),
             button('', { icon: 'trash', variant: 'ghost', size: 'sm', onClick: () => { list.splice(i, 1); commit(list); } })));
         }
       } else if (m.type === 'range') {
@@ -57,7 +57,7 @@ function mappingsEditor(panel, onChange) {
           input({ type: 'number', value: o.from ?? '', placeholder: 'min', onChange: (e) => { list[i] = { ...m, options: { ...o, from: e.target.value === '' ? null : Number(e.target.value) } }; commit(list); } }),
           input({ type: 'number', value: o.to ?? '', placeholder: 'max', onChange: (e) => { list[i] = { ...m, options: { ...o, to: e.target.value === '' ? null : Number(e.target.value) } }; commit(list); } }),
           input({ value: o.result?.text || '', placeholder: 'Metin', onChange: (e) => { list[i] = { ...m, options: { ...o, result: { ...(o.result || {}), text: e.target.value } } }; commit(list); } }),
-          h('input', { type: 'color', value: toHex(o.result?.color || 'green'), onchange: (e) => { list[i] = { ...m, options: { ...o, result: { ...(o.result || {}), color: e.target.value } } }; commit(list); } }),
+          h('input', { type: 'color', 'aria-label': 'Aralık eşlemesi rengi', value: toHex(o.result?.color || 'green'), onchange: (e) => { list[i] = { ...m, options: { ...o, result: { ...(o.result || {}), color: e.target.value } } }; commit(list); } }),
           button('', { icon: 'trash', variant: 'ghost', size: 'sm', onClick: () => { list.splice(i, 1); commit(list); } })));
       }
     });
@@ -87,7 +87,7 @@ function overridesEditor(panel, onChange) {
       const body = h('div', { class: 'q-body' });
       (ov.properties || []).forEach((p, pi) => {
         let ctl;
-        if (p.id === 'color') ctl = h('input', { type: 'color', value: toHex(p.value?.fixedColor || 'green'), onchange: (e) => { ov.properties[pi] = { id: 'color', value: { mode: 'fixed', fixedColor: e.target.value } }; commit(list); } });
+        if (p.id === 'color') ctl = h('input', { type: 'color', 'aria-label': 'Geçersiz kılma rengi', value: toHex(p.value?.fixedColor || 'green'), onchange: (e) => { ov.properties[pi] = { id: 'color', value: { mode: 'fixed', fixedColor: e.target.value } }; commit(list); } });
         else if (p.id === 'unit') ctl = select(unitOptions(), p.value || 'auto', (v) => { ov.properties[pi] = { ...p, value: v }; commit(list); });
         else if (p.id === 'custom.transform') ctl = select([{ value: 'negative-Y', label: 'Negatif Y' }, { value: 'constant', label: 'Yok' }], p.value || 'negative-Y', (v) => { ov.properties[pi] = { ...p, value: v }; commit(list); });
         else if (p.id === 'custom.hidden') ctl = toggle('', !!p.value, (v) => { ov.properties[pi] = { ...p, value: v }; commit(list); });
@@ -154,7 +154,7 @@ export function openPanelEditor({ panel, dashboard, ctx, variablesList, onApply,
     close();
     if (onCancel) onCancel();
   };
-  const titleEl = h('h3', { text: `Panel düzenle · ${work.title || ''}` });
+  const titleEl = h('h2', { text: `Panel düzenle · ${work.title || ''}` });
   shell.append(h('div', { class: 'editor-top' }, button('', { icon: 'arrow-up', variant: 'ghost', title: 'Dashboard’a dön', onClick: apply }), titleEl,
     button('Vazgeç', { onClick: discard }), button('Uygula', { onClick: apply }), onSave ? button('Kaydet', { icon: 'save', variant: 'primary', onClick: () => { apply(); onSave(); } }) : null));
   const previewBox = h('div', { class: 'preview-box' });
@@ -197,7 +197,7 @@ export function openPanelEditor({ panel, dashboard, ctx, variablesList, onApply,
     clear(right);
     const search = input({ placeholder: 'Seçeneklerde ara…', value: filter, onInput: debounce((e) => drawOptions(e.target.value), 250) });
     right.append(h('div', { class: 'opt-search' }, search));
-    const picker = h('div', { class: 'viz-picker' }, ORDER.map((type) => h('button', { type: 'button', class: work.type === type ? 'on' : '', onclick: () => {
+    const picker = h('div', { class: 'viz-picker' }, ORDER.filter(type => !filter || PLUGINS[type].name.toLocaleLowerCase('tr').includes(filter.toLocaleLowerCase('tr'))).map((type) => h('button', { type: 'button', class: work.type === type ? 'on' : '', onclick: () => {
       const prevTargets = work.targets;
       const next = withDefaults({ ...work, type, options: {}, fieldConfig: { defaults: { ...(work.fieldConfig?.defaults || {}), custom: undefined }, overrides: work.fieldConfig?.overrides || [] } });
       Object.keys(work).forEach((k) => delete work[k]);

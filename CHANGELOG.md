@@ -1,5 +1,116 @@
 # Değişiklik günlüğü
 
+## 1.1.0 — 2026-10-31
+
+### İnceleme düzeltmeleri (birleştirme öncesi)
+- E-posta gönderimi yarıda kalan **tamamlanmış** rapor artık indirilebilir kalır; yalnız teslim durumu
+  "bilinmiyor" olur ve e-posta yeniden gönderilmez. Yarıda kalan üretimler incelemeye düşer.
+- Yükseltme: eski kurulumlarda boş `OPENREPORTING_PUBLIC_URL` nginx `server_name`'den,
+  boş `OPENREPORTING_ALLOWED_HOSTS` sunucu adı/IP'lerinden doldurulur (yeni Host kontrolü erişimi kesmesin);
+  yükseltme sonrası genel adla sağlık kontrolü yapılır; geri dönüşte şema değiştiyse veritabanı ön yedekten
+  otomatik geri yüklenir; anahtar dahil yedek eski sürümle de çalışır.
+- HTTP kaynakları: sunucunun kendi localhost servisleri varsayılan kapalı
+  (`OPENREPORTING_ALLOW_LOOPBACK_DATASOURCES`), bulut metadata adresleri ve IPv6 içine gömülü IPv4
+  (NAT64/6to4/Teredo) engellenir; yanıt okumaya toplam süre sınırı eklendi; "007" gibi kimlikler metin kalır.
+- PromQL/LogQL değişken denetimi tek tırnak ve ters tırnaklı dizgileri doğru izler.
+- Giriş: eşzamanlılık sınırı dolunca hemen 429 yerine kısa süre beklenir; pasif hesaplarda da aynı parola
+  maliyeti ödenir (zamanlama sızıntısı yok); eski başarısız giriş kayıtları budanır; gizli dashboard ana sayfa
+  isteğinde var olmayanla aynı yanıtı alır; MFA'da localhost istisnası yalnız yerel HTTP kurulumunda geçerli.
+- Yeni grafikler dashboard saat dilimini, birim/ondalık ayarlarını kullanır; kesirli histogram aralığı çökmez;
+  tablo veren eski ısı haritası panelleri zaman serisi görünümüne döner. MFA ve giriş hataları Türkçe.
+- PostgreSQL geçişlerinde tüm tamsayılar BIGINT.
+
+### Kurumsal değerlendirme ve işletim
+- CI uzak action'ları resmî upstream tag→commit kaydıyla SHA'ya sabitlendi; checkout Git
+  credential persistence kapatıldı ve sabitleme kontrolü eklendi. Release imzası değildir.
+- Build backend ve test araçları da ayrı wheel SHA kilitlerine alındı; hazırlanan backend ile
+  ağsız uygulama wheel'i iki kez üretilip aynı dosya hash'i doğrulanır. CI build/test CVE
+  taramaları ve SBOM'ları ekler; OS/runner ve imzalı provenance kapsamı ayrıca açıktır.
+- Pahalı giriş doğrulaması süreç başına dört işle sınırlandı; taşan girişler DB/parola/dizin
+  işine girmeden kısa Retry-After ile 429 alır. Başarısızlıkta kapasite geri bırakılır.
+- Eski raw anahtarla uyumlu sürümlü keyring ve SQLite için ayrı hazırlık, atomik offline
+  kaynak sırrı rekey ve doğrulanan primary-only retirement komutları eklendi. Aktif anahtar
+  otomatik değiştirilmez; hata tam rollback olur, kullanıcı parolaları/oturumları korunur.
+- Test edilmiş runtime sürümleri wheel SHA-256 kilidine alındı; Ubuntu/Windows/Docker
+  kurulum yolları hash kontrolü ve kaynak paket fallback reddi kullanır. Build/OS araçları
+  bu runtime kilidinin dışındadır; hermetik/imzalı release iddiası yoktur.
+- Sunucunun ürettiği istek kimliği, veri içermeyen yapısal HTTP kaydı, süreç bazlı gecikme
+  histogramı ve kesilen yanıt sayacı eklendi. Beklenmeyen 500 ayrıntıları istemciye taşınmaz.
+- Sentetik viewer yükü gerçek HTTP üzerinde ayrı geçici uygulamada ölçülür; işletim olay
+  senaryoları ve ölçüm sınırları belgelendi. Üretim kapasitesi/kurum kabulü iddiası yoktur.
+- Host başlığı yalnız loopback, kayıtlı PUBLIC_URL ve açıkça tanımlanan DNS/IP alias'larına kabul edilir;
+  cross-origin tarayıcı mutasyonları ve belirsiz Host/Origin başlıkları reddedilir. Ağır audit readiness yöneticilerle sınırlıdır.
+- İstek gövdeleri başlık eksik/yanlış olsa ve chunked gelse de 2 MB akış sınırından geçer;
+  reddedilen gövde endpoint mutasyonuna ulaşmaz.
+- Cryptography 46 sürümünde taranan güvenlik duyuruları nedeniyle bağımlılık 50.0.2+ olarak güncellendi;
+  eski Fernet verilerinin açılması doğrulandı. Runtime CVE taraması ve CycloneDX SBOM CI'a eklendi.
+- `verify-backup`, yedeği canlı veriyi değiştirmeyen geçici dizinde açarak DB/audit/rapor/logo/anahtar
+  bütünlüğünü doğrular; yol kaçışı, link, cihaz girdileri ve boyut aşımı reddedilir.
+  Ayrı kabul testinde geri açılan uygulama oturum açar, eski arşiv/logo sunar ve yeni rapor üretir.
+- 120 maddelik kanıt/açık risk kaydı eklendi (docs/ENTERPRISE_REVIEW.md).
+- Veritabanı/şema arızası sağlık uçlarında, bozuk audit zinciri readiness kontrolünde HTTP 503 döndürür.
+  Kimlik deposu hataları ayrıntı/sır sızdırmadan 503 verir; süreç canlılığı ayrı kalır.
+- Gece yedeği rapor logolarını da içerir; eksik SQLite kaynağı salt okunur açılarak sahte boş yedek önlenir.
+
+### Kurumsal kimlik ve posta bağlantıları
+- LDAP/Active Directory: doğrulanan LDAPS veya zorunlu StartTLS, salt okunur servis hesabı,
+  güvenli kullanıcı araması, kalıcı dizin kimliği ve doğrudan grup üyeliğinden rol eşleme.
+- Şema v3 dizin profillerini yerel hesaplardan ayırır; parola saklanmaz, yerel hesap devralınamaz.
+  Rol değişiminde oturum iptali ve son yerel kurtarma yöneticisinin korunması eklendi.
+- SMTP: STARTTLS ve başlangıçtan TLS, kurum CA zinciri, süre sınırı, AUTH veya TLS relay,
+  açık ret/kısmi ret/belirsiz teslimat ayrımı ve güvenli parola dosyaları.
+- Sunucu durumunda LDAP/SMTP bağlantı kontrolü; `doctor --check-integrations` ve `check-ldap`.
+  Kurulum ve kabul sınırları docs/ENTERPRISE_DEPLOYMENT.md içinde.
+
+### Tema ve erişilebilirlik düzeltmeleri
+- Koyu/açık temada düşük kontrastlı yardımcı metinler ve renkli değerler okunur hale getirildi;
+  kayıtlı grafik/eşik paletleri ve sayfa düzeni korundu.
+- Etiket, zaman aralığı erişilebilir adı, başlık sırası ve giriş ana bölgesi düzeltildi;
+  klavye ile bölüm açma/kapama ve odak dönüşü gerçek tarayıcıda doğrulandı.
+- Açılır seçim listeleri ve seçenek yüzeyleri koyu/açık temanın renklerini kullanır.
+- Yeni grafiklerin ipuçlarındaki beyaz arka plan giderildi; tema değişiminde açık paneller
+  mevcut veriyle yeniden çizilir, ek veri sorgusu yapılmaz. Sistem teması değişiklikleri izlenir.
+- PDF önizleme hazırlanırken açılan boş beyaz sekme yerine mevcut temaya uygun bekleme ekranı gösterilir.
+
+### Veri kaynakları ve görselleştirmeler
+- Şelale, huni, ağaç haritası, hiyerarşi halkası, gül ve paralel koordinat panellerine vektör PDF eklendi; kalan tablo karşılığı sayısı 6 oldu.
+- Histogram, XY, balon, kutu ve mum grafiklerine yerel vektör PDF çizimi eklendi; tabloya aktarılan yeni tür sayısı 17’den 12’ye indi.
+- Prometheus, Loki, HTTP JSON ve HTTP CSV veri kaynakları eklendi (toplam 7 tür).
+- Mevcut panel seçicisine 20 görselleştirme eklendi (toplam 30); mevcut arama grafik adlarını da süzer.
+- Tasarım ve oluşturma akışı korundu. Yeni HTTP kaynakları salt okunur, TLS doğrulamalı, sabit origin ve yanıt bütçeli; metadata adresleri/yönlendirmeler engellenir.
+- Şema v2 mevcut kaynakları koruyarak tür kısıtını genişletir. PDF yeni türlerin on dördünde vektör, diğerlerinde açık etiketli veri tablosu sunar; Excel/CSV aktarımı korunur.
+- Veri biçimleri ve sınırlar: docs/EXTRA_SOURCES_AND_PANELS.md.
+
+
+### Geliştirme altyapısı
+- PostgreSQL worker için veritabanı oturumuna bağlı tekil sahiplik eklendi. Sahiplik bağlantısı kaybolursa
+  iş aşamaları ve e-posta gönderimi durur; otomatik yeniden bağlantıyla sahiplik varsayılmaz.
+- `OPENREPORTING_DATABASE_URL` ile deneysel PostgreSQL uygulama bağlantısı seçilebilir; yapılandırma
+  çıktısı DSN parolasını gizler ve bağlantı hatasında SQLite'a dönülmez. PostgreSQL dosya yedeği henüz
+  desteklenmediği için açık hatayla engellenir. API giriş/dashboard/rapor kuyruğu entegrasyon testi eklendi.
+- PostgreSQL başlangıç şeması, atomik sürüm geçişleri, transaction kapsamlı yazıcı kilidi ve
+  denetim kayıtları için UPDATE/DELETE/TRUNCATE koruması eklendi; gerçek sunucu regresyonları genişletildi.
+- PostgreSQL uygulama sürücüsünün bağlantı/parametre/satır/işlem ilkelleri ve izole PostgreSQL CI sözleşme testi
+  eklendi. Bu ilkeller henüz uygulama veritabanı seçimine bağlı değildir; üretim PostgreSQL desteği tamamlanmadı.
+
+### Güvenlik ve sağlamlık
+- Rapor üretimi bitmiş olsa da e-posta `sending` durumunda yarıda kaldıysa yeniden başlangıçta
+  `needs_review/unknown` yapılır; belirsiz teslimat tekrar kuyruğa alınmaz.
+- Dashboard, klasör, veri kaynağı ve rapor listeleri taşınabilir `LOWER` sıralaması kullanır;
+  aynı ada sahip kayıtlar kimlikle kararlı sıralanır. Dashboard yıldız filtresi SELECT takma adına
+  bağlı kalmaz; metin araması açıkça büyük/küçük harf duyarsızdır ve joker karakterleri kaçırır.
+- SQLite bağlantı, işlem, sürüm/bütünlük kontrolü ve yedekleme işlemleri ayrı sürücü modülüne taşındı;
+  CLI artık bu ayrıntıları çoğaltmıyor. Yedekleme eksik kaynak dosyası oluşturmaz, hedefi özel izinlerle
+  ve üzerine yazmadan açar; başarısız yeni yedeği temizler. Canlı WAL verileri geri yükleme testiyle doğrulandı.
+- Anahtar kayıpken mevcut veritabanı okunamıyorsa yeni şifreleme anahtarı oluşturulmaz;
+  kimlik bilgisi kontrolü salt okunur bağlantıyla yapılır ve veritabanını oluşturmaz.
+- Rapor kuyruğu tekrarları yalnız idempotency anahtarı çakışmasında mevcut işi kullanır;
+  dashboard yıldızları da açık çakışma hedefi kullanır. SQLite'a özel genel hata bastırma kaldırıldı.
+- Veritabanı şema geçişleri, sürüm kaydı ve sürüm numarası artık aynı atomik işlemde uygulanır;
+  başarısız geçiş mevcut veriyi korur ve sonraki başlangıçta yeniden denenebilir.
+- Birden fazla web worker'ın aynı anda ilk açılışında şema sürümü kilit alındıktan sonra okunur;
+  SQLite WAL başlatma kilitleri sınırlı süreyle yeniden denenir.
+
 ## 1.0.0 — 2026-10-27
 
 ### Yeni

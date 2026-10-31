@@ -3,35 +3,22 @@ import argparse
 import getpass
 import logging
 import os
-import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Settings
-from .db import audit, connect, init_db, transaction, verify_audit
+from .db import audit, backup_database, check_integrity, connect, init_db, schema_version, transaction, verify_audit
 from .security import create_user, password_hash
 
 
 def backup(settings, target):
-    source_path = settings.db_path
-    target = Path(target).resolve()
-    if target.exists():
-        raise RuntimeError("Refusing to overwrite an existing backup")
-    if target.is_relative_to(settings.data_dir):
-        raise RuntimeError("Backup should be outside active application data dir")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(source_path) as src, sqlite3.connect(target) as dest:
-        src.backup(dest)
-        result = dest.execute("PRAGMA integrity_check").fetchone()[0]
-        if result != "ok":
-            raise RuntimeError(f"Backup failed integrity check: {result}")
-    os.chmod(target, 0o600)
+    target = backup_database(settings, target)
     print(f"SQLite consistent backup created: {target}")
     print("Important: copy the archive/ directory independently and verify manifest hashes.")
 
 
-def doctor(settings):
+def doctor(settings, *, check_integrations=False):
     """Human-readable installation check; returns a process exit code."""
     import json
     import stat
@@ -71,14 +58,16 @@ def doctor(settings):
         report(False, "PDF yazı tipi", f"{exc} (Ubuntu: apt install fonts-dejavu-core)")
     from .db import CURRENT_VERSION
     with connect(settings) as db:
-        version = db.execute("PRAGMA user_version").fetchone()[0]
+        version = schema_version(db)
         report(version == CURRENT_VERSION, "Veritabanı şeması", f"v{version}")
-        integrity = db.execute("PRAGMA quick_check").fetchone()[0]
-        report(integrity == "ok", "SQLite bütünlük kontrolü", integrity)
+        integrity = check_integrity(db)
+        label = "PostgreSQL bağlantı ve şema kontrolü" if settings.database_url else "SQLite bütünlük kontrolü"
+        report(integrity == "ok", label, integrity)
         valid, broken = verify_audit(db)
         report(valid, "Denetim zinciri", "geçerli" if valid else f"bozuk kayıt #{broken}")
-        admins = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
-        report(admins > 0, "Etkin yönetici hesabı", str(admins))
+        admins = db.execute("""SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
+                               AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)""").fetchone()[0]
+        report(admins > 0, "Etkin yerel kurtarma yöneticisi", str(admins))
         worker = db.execute("SELECT last_tick FROM worker_runtime WHERE singleton_id=1").fetchone()
     if worker:
         from .domain import parse_utc
@@ -88,6 +77,16 @@ def doctor(settings):
         report(False, "Rapor worker sinyali", "worker hiç çalışmadı (systemctl start openreporting-worker)")
     report(not settings.mail_enabled or bool(settings.smtp_host and settings.recipient_domains), "SMTP yapılandırması",
            "etkin" if settings.mail_enabled else "kapalı")
+    report(True, "LDAP yapılandırması", "etkin" if settings.ldap_enabled else "kapalı")
+    if check_integrations:
+        from . import directory_auth, mail_transport
+        for enabled, label, check in ((settings.ldap_enabled, "LDAP bağlantısı", directory_auth.check_connection),
+                                       (settings.mail_enabled, "SMTP bağlantısı", mail_transport.check_connection)):
+            if enabled:
+                try:
+                    report(True, label, check(settings))
+                except Exception:
+                    report(False, label, "DNS, port, TLS sertifikası veya hesap doğrulanamadı; sırlar gösterilmedi")
     report(settings.secure_cookie or os.name == "nt", "Güvenli çerez (HTTPS)", str(settings.secure_cookie))
     from . import datasources
     for ds in datasources.list_all(settings):
@@ -155,19 +154,79 @@ def main(argv=None):
                          help="Trust X-Forwarded-* from the local reverse proxy (127.0.0.1)")
     p_serve.add_argument("--allow-remote", action="store_true",
                          help="Allow a non-loopback bind (containers only; always put TLS in front)")
-    commands.add_parser("doctor", help="Check installation: paths, permissions, fonts, schema, worker, datasources")
+    p_doctor = commands.add_parser("doctor", help="Check installation: paths, permissions, fonts, schema, worker, datasources")
+    p_doctor.add_argument("--check-integrations", action="store_true", help="Check LDAP and SMTP TLS/authentication; never sends mail")
+    p_ldap = commands.add_parser("check-ldap", help="Test a directory user's password and group mapping without provisioning a user")
+    p_ldap.add_argument("username")
     p_export = commands.add_parser("export-dashboards", help="Write every dashboard as JSON into a directory")
     p_export.add_argument("directory")
     p_import = commands.add_parser("import-dashboards", help="Import/overwrite dashboards from *.json files (provisioning)")
     p_import.add_argument("directory")
     commands.add_parser("verify-audit", help="Verify audit hash chain")
+    commands.add_parser('check-postgres', help='Read-only PostgreSQL schema, role and transport preflight; never initializes or migrates')
     p_backup = commands.add_parser("backup", help="Consistent SQLite backup")
     p_backup.add_argument("target")
+    p_verify = commands.add_parser("verify-backup", help="Verify backup DB, audit, report files, logos and key in disposable storage")
+    p_verify.add_argument("directory")
+    p_verify.add_argument("--key-file", help="Separately held encryption key (never printed or copied into the backup)")
+    p_verify.add_argument("--max-unpacked-mb", type=int, default=2048)
+    p_verify.add_argument("--require-logos", action="store_true")
+    p_rotate = commands.add_parser('prepare-key-rotation',help='Create a new versioned key ring; active key and database stay unchanged')
+    p_rotate.add_argument('--output',required=True)
+    p_rekey = commands.add_parser('rekey-secrets',help='Offline SQLite maintenance: re-encrypt datasource credentials to the prepared primary key')
+    p_rekey.add_argument('--services-stopped',action='store_true',help='Acknowledge every web process and worker is stopped for maintenance')
+    p_retire = commands.add_parser('prepare-key-retirement',help='Create a primary-only ring after verifying every stored credential uses it')
+    p_retire.add_argument('--output',required=True)
+    p_retire.add_argument('--services-stopped',action='store_true')
+    p_mfa = commands.add_parser('reset-mfa',help='OS-operator factor recovery; revoke sessions without changing password')
+    p_mfa.add_argument('username')
+    p_mfa.add_argument('--reason',required=True,choices=['lost-device','compromise','recovery'])
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    if args.action == "verify-backup":
+        import json
+        from .backup_verify import BackupVerificationError, verify_backup
+        try:
+            result = verify_backup(args.directory,key_file=args.key_file,max_unpacked_bytes=args.max_unpacked_mb * 1024**2,
+                                   require_logos=args.require_logos)
+        except BackupVerificationError as exc:
+            raise SystemExit(str(exc)) from None
+        print(json.dumps(result))
+        return  # Never initialize, migrate, replace or connect to the live application state.
     settings = Settings.from_env()
+    if args.action == 'check-postgres':
+        import json
+        from .postgres_check import check
+        result = check(settings)
+        print(json.dumps(result))
+        raise SystemExit(0 if result['ok'] else 2)
+    if args.action=='reset-mfa':
+        import json
+        import sqlite3
+        from psycopg import Error as PostgresError
+        from .mfa import admin_reset
+        try:
+            result = admin_reset(settings,args.username,args.reason)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from None
+        except (sqlite3.Error,PostgresError,OSError):
+            raise SystemExit('Factor recovery storage unavailable; no implicit migration or replacement performed') from None
+        print(json.dumps(result))
+        return  # Recovery must not migrate a live/older store implicitly.
+    if args.action in {'prepare-key-rotation','rekey-secrets','prepare-key-retirement'}:
+        import json
+        from .key_rotation import prepare_rotation,prepare_retirement,rekey_secrets
+        from .secrets_store import SecretError
+        try:
+            result = (prepare_rotation(settings,args.output) if args.action=='prepare-key-rotation' else
+                      prepare_retirement(settings,args.output,services_stopped=args.services_stopped) if args.action=='prepare-key-retirement' else
+                      rekey_secrets(settings,services_stopped=args.services_stopped))
+        except SecretError as exc:
+            raise SystemExit(str(exc)) from None
+        print(json.dumps(result))
+        return  # Never initialize/migrate a store or change active key configuration.
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     init_db(settings)
     if args.action == "init":
@@ -187,6 +246,8 @@ def main(argv=None):
             target = db.execute("SELECT id FROM users WHERE username=?", (args.username.strip().lower(),)).fetchone()
             if not target:
                 raise SystemExit("User not found")
+            if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (target["id"],)).fetchone():
+                raise SystemExit("LDAP passwords must be changed in the directory")
             db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, target["id"]))
             db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
             audit(db, "os-admin", "user.password_rotated", "user", target["id"])
@@ -200,6 +261,11 @@ def main(argv=None):
                 remaining = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
                 if remaining <= 1:
                     raise SystemExit("Cannot disable the last active admin")
+                if not db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (target["id"],)).fetchone():
+                    remaining_local = db.execute("""SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
+                        AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)""").fetchone()[0]
+                    if remaining_local <= 1:
+                        raise SystemExit("Cannot disable the last local recovery admin")
             db.execute("UPDATE users SET active=0 WHERE id=?", (target["id"],))
             db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
             audit(db, "os-admin", "user.disabled", "user", target["id"])
@@ -211,10 +277,12 @@ def main(argv=None):
         if args.host not in ("127.0.0.1", "::1") and not args.allow_remote:
             raise SystemExit("API must bind to loopback; use an approved HTTPS reverse proxy for remote access")
         import uvicorn
+        from .http_telemetry import logging_config
         workers = max(1, min(args.workers, 16))
         common = {"host": args.host, "port": args.port, "proxy_headers": args.proxy_headers,
                   "forwarded_allow_ips": "127.0.0.1,::1" if args.proxy_headers else None,
-                  "server_header": False, "date_header": True, "timeout_keep_alive": 15}
+                  "server_header": False, "date_header": True, "timeout_keep_alive": 15, "access_log": False,
+                  "log_config":logging_config()}
         if workers > 1 and os.name != "nt":
             # Each worker builds its own app from the same environment.
             uvicorn.run("openreporting.web:create_app", factory=True, workers=workers, **common)
@@ -222,7 +290,16 @@ def main(argv=None):
             from .web import create_app
             uvicorn.run(create_app(settings), workers=1, **common)
     elif args.action == "doctor":
-        raise SystemExit(doctor(settings))
+        raise SystemExit(doctor(settings, check_integrations=args.check_integrations))
+    elif args.action == "check-ldap":
+        from .directory_auth import authenticate as directory_login, DirectoryUnavailable
+        try:
+            result = directory_login(settings, args.username.strip().lower(), getpass.getpass("Directory password: "))
+        except DirectoryUnavailable as exc:
+            raise SystemExit(str(exc)) from None
+        if result is None:
+            raise SystemExit("LDAP authentication or group admission failed")
+        print(f"LDAP authentication and group mapping verified; role={result.role}. No account or session created.")
     elif args.action == "export-dashboards":
         export_dashboards(settings, args.directory)
     elif args.action == "import-dashboards":

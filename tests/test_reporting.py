@@ -118,6 +118,36 @@ def test_schedule_math_and_periods():
     assert service.next_due("weekly", "Europe/Istanbul", 8, 0, weekday=0, reference=ref) == "2026-10-26T05:00:00+00:00"
     assert service.next_due("monthly", "Europe/Istanbul", 7, 30, month_day=1, reference=ref) == "2026-11-01T04:30:00+00:00"
     assert service.next_due("hourly", "Europe/Istanbul", 0, 5, reference=ref) == "2026-10-24T11:05:00+00:00"
+
+
+def test_scheduled_enqueue_is_idempotent_and_does_not_duplicate_audit(env):
+    from openreporting.db import transaction, verify_audit
+    settings, _, user = env
+    created = service.save_report(settings, user, {"name": "Queue test", "dashboard_uid": "rep-test", "formats": ["csv"]})
+    with connect(settings) as db, transaction(db):
+        report = db.execute("SELECT * FROM dash_reports WHERE id=?", (created["id"],)).fetchone()
+        args = (db, report, user["id"], "2026-10-01T00:00:00+00:00", "2026-10-02T00:00:00+00:00")
+        first = service.enqueue(*args, schedule_id="schedule-test")
+        assert service.enqueue(*args, schedule_id="schedule-test") == first
+        assert db.execute("SELECT COUNT(*) FROM dash_report_runs").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM audit WHERE action='report_run.queued'").fetchone()[0] == 1
+        # Manual requests intentionally represent separate jobs for the same period.
+        assert service.enqueue(*args) != service.enqueue(*args)
+        assert verify_audit(db) == (True, None)
+
+
+def test_dashboard_star_is_idempotent_and_scoped_to_user(env):
+    settings, _, user = env
+    dashboards.star(settings, user, "rep-test")
+    dashboards.star(settings, user, "rep-test")
+    with connect(settings) as db:
+        assert db.execute("SELECT COUNT(*) FROM dashboard_stars WHERE user_id=?", (user["id"],)).fetchone()[0] == 1
+        viewer = dict(db.execute("SELECT id,role FROM users WHERE username='viewer1'").fetchone())
+    assert len(dashboards.search(settings, user, starred=True)) == 1
+    assert dashboards.search(settings, viewer, starred=True) == []
+    dashboards.star(settings, user, "rep-test", False)
+    dashboards.star(settings, user, "rep-test", False)
+    assert dashboards.search(settings, user, starred=True) == []
     start, end = service.schedule_period("daily", "Europe/Istanbul", "2026-10-25T05:00:00+00:00", "previous_period", {})
     assert start == "2026-10-23T21:00:00+00:00" and end == "2026-10-24T21:00:00+00:00"
     start, end = service.schedule_period("weekly", "Europe/Istanbul", "2026-10-26T05:00:00+00:00", "previous_period", {})
@@ -145,7 +175,7 @@ def test_schedule_rules_and_tick(env):
 
 def test_report_api_permissions_preview_and_export(env):
     settings, app, _ = env
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         csrf = http.post("/api/login", json={"username": "viewer1", "password": "a-viewer-password-123"}).json()["csrf"]
         h = {"X-CSRF-Token": csrf}
         assert http.post("/api/dash-reports", json={"name": "x1", "dashboard_uid": "rep-test"}, headers=h).status_code == 403
@@ -183,7 +213,7 @@ def test_customer_logo_upload_and_pdf_embedding(env):
     from fastapi.testclient import TestClient
     from openreporting.reporting import logos
     settings, app, user = env
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         csrf = http.post("/api/login", json={"username": "viewer1", "password": "a-viewer-password-123"}).json()["csrf"]
         data = "data:image/png;base64," + base64.b64encode(_png()).decode()
         assert http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf}, json={"data": data}).status_code == 403
@@ -222,3 +252,15 @@ def test_logo_normalisation_rejects_bad_input():
     from io import BytesIO
     from PIL import Image
     assert max(Image.open(BytesIO(big)).size) <= logos.MAX_EDGE
+
+
+def test_restart_marks_completed_but_sending_delivery_unknown_and_never_requeues(env):
+    settings, _, user = env
+    created = service.save_report(settings, user, {"name": "Interrupted mail", "dashboard_uid": "rep-test", "formats": ["csv"]})
+    run_id = service.request_run(settings, user, created["id"], {})["run_id"]
+    with connect(settings) as db:
+        db.execute("UPDATE dash_report_runs SET status='completed',delivery_status='sending' WHERE id=?", (run_id,))
+    service.mark_interrupted(settings, force=True)
+    run = service.list_runs(settings, created["id"])[0]
+    assert (run["status"], run["delivery_status"]) == ("completed", "unknown")
+    assert service.claim(settings) is None

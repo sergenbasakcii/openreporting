@@ -1,26 +1,34 @@
 # OpenReporting 1.0 — Ubuntu Sunucu Kurulumu ve İşletimi
 
-Desteklenen: **Ubuntu 24.04 LTS (önerilir)**, Ubuntu 22.04 LTS, Debian 12. Gereksinim: systemd, Python ≥ 3.11.
+CI ile doğrulanan üretim tabanı: **Ubuntu 24.04 LTS**, systemd, Python 3.11–3.13 ve yerel SQLite.
+Ubuntu 22.04/Debian 12 bu kabul matrisinde doğrulanmadı; ayrı ortam kabulü gerekir.
+Oracle Linux 8.10/9/10 kurulum yolu ve container/tam host kabul ayrımı
+[Oracle Linux yönergesinde](ORACLE_LINUX.md) açıklanır. `install-ubuntu.sh` uyumlu giriş
+olarak ortak `install-linux.sh` akışını çağırır.
 
 ## 1. Kapasite
 
-| Ölçek | CPU | RAM | Disk |
+Ölçüm öncesi donanım planı (kullanıcı/host veya günlük rapor kapasitesi garantisi değildir):
+
+| Plan | CPU | RAM | Disk |
 | --- | --- | --- | --- |
-| ≤ 50 kullanıcı, ≤ 5.000 host, günlük birkaç yüz rapor | 4 vCPU | 8 GB | 50 GB SSD (arşiv saklama süresine göre büyütün) |
-| Daha büyük | 8 vCPU | 16 GB | arşiv × saklama gün sayısı |
+| İlk kabul ortamı | 4 vCPU | 8 GB | 50 GB SSD (arşiv saklama süresine göre büyütün) |
+| Daha yoğun iş yükü için aday bütçe | 8 vCPU | 16 GB | arşiv × saklama gün sayısı |
 
 Veritabanı SQLite (WAL) ve yerel diskte olmalıdır; NFS/SMB üzerinde çalıştırmayın.
+Ölçülmüş sentetik HTTP sonuçları ve sınırları [performans kabul kaydındadır](PERFORMANCE_ACCEPTANCE.md).
+Gerçek kaynak/rapor/TLS/LDAP/SMTP yüküyle kurum kabulü yapılmadan bu tablo üretim kapasitesi sayılmaz.
 
 ## 2. Kurulum
 
 ```bash
 # 1a) GitHub’dan (özel depo: salt-okunur bir deploy key veya “Contents: read” yetkili ince taneli token gerekir)
 sudo apt-get install -y git
-git clone --branch v1.0.0 https://github.com/sergenbasakcii/openreporting.git /tmp/openreporting && cd /tmp/openreporting
+git clone --branch v1.1.0 https://github.com/sergenbasakcii/openreporting.git /tmp/openreporting && cd /tmp/openreporting
 
 # 1b) veya internetsiz sunucuya paket olarak taşıyın
-scp openreporting-1.0.0.zip admin@sunucu:/tmp/ && ssh admin@sunucu
-cd /tmp && unzip openreporting-1.0.0.zip -d openreporting && cd openreporting
+scp openreporting-1.1.0.zip admin@sunucu:/tmp/ && ssh admin@sunucu
+cd /tmp && unzip openreporting-1.1.0.zip -d openreporting && cd openreporting
 
 # 2a) Kurum sertifikası ile
 sudo ./deploy/install-ubuntu.sh --domain openreporting.sirket.local \
@@ -32,9 +40,13 @@ sudo ./deploy/install-ubuntu.sh --domain openreporting.sirket.local --self-signe
 
 Ubuntu 22.04 sistem Python’u 3.10 olduğundan `--use-deadsnakes` ekleyin (Python 3.12 kurulur) veya `--python /yol/python3.12` verin.
 İnternetsiz ortamda önce internet erişimi olan, aynı Ubuntu ve Python sürümündeki bir makinede depo klasöründe
-`python3 -m pip wheel -w wheels . pip setuptools wheel` ile uygulama, bağımlılık ve kurulum aracı wheel’lerini
-hazırlayıp sunucuya taşıyın ve
+önce build araçlarını `requirements-build.lock` ile hash doğrulayarak kurun;
+`python3 -m pip download --require-hashes --only-binary=:all: -r requirements-build.lock -d wheels` ve
+aynı komutla `requirements-runtime.lock` paketlerini indirin.
+`python3 -m pip wheel --no-deps --no-build-isolation -w wheels .`
+ile runtime, uygulama ve kurulum aracı wheel’lerini hazırlayıp kaynak ağacıyla sunucuya taşıyın ve
 `--wheelhouse /yol/wheels` kullanın.
+Kapsam ve güncelleme kabulü [paket kilidi yönergesindedir](DEPENDENCY_LOCK.md).
 
 Betik **idempotent**tir; tekrar çalıştırmak mevcut `/etc/openreporting/openreporting.env` ve anahtarı korur.
 
@@ -122,6 +134,12 @@ sudo /opt/openreporting/app/deploy/openreporting-admin.sh import-dashboards /var
 
 Gece yedeği `/var/backups/openreporting/YYYYMMDD-HHMMSS/` içine `state.sqlite3`, `archive.tar.gz`, `openreporting.env`
 ve `SHA256SUMS` yazar. Elle: `sudo systemctl start openreporting-backup`. Yedekleri sunucu dışına kopyalayın.
+`archive.tar.gz` rapor arşiviyle birlikte varsa `logos/` dizinini de içerir. LDAP/SMTP parola
+dosyalarını ve kurum CA dosyalarını ayrıca kontrollü kurtarma planına dahil edin.
+
+Sağlık izleme: `/healthz` süreç canlılığını, `/api/health` yerel DB/şema erişimini gösterir
+(arıza: HTTP 503). Yönetici oturumu gerektiren `/readyz` ayrıca audit zincirini doğrular; bozuk zincir
+veya erişilemeyen DB başarılı readiness sayılmaz. Bu kontroller harici veri kaynağına sorgu veya e-posta göndermez.
 
 > **Şifreleme anahtarı (`/etc/openreporting/secret.key`) varsayılan olarak yedeğe konmaz** — veritabanı yedeği çalınsa bile
 > veri kaynağı parolaları çözülemesin diye. Kurulumdan hemen sonra anahtarı ayrı ve güvenli bir yerde (parola kasası,
@@ -131,12 +149,29 @@ ve `SHA256SUMS` yazar. Elle: `sudo systemctl start openreporting-backup`. Yedekl
 
 Geri yükleme:
 
+Önce yedeği canlı verinin üzerine yazmadan doğrulayın. Bu komut yalnız yeni geçici dizinde çalışır;
+SHA256SUMS, DB bütünlüğü/şeması, audit zinciri, rapor manifesti/dosyaları, logolar ve şifreli
+kaynakların ayrı anahtarla açılmasını kontrol eder. Canlı ayarları yüklemez, migrasyon/worker/SMTP çalıştırmaz.
+Çıkış kodu 0 ve `ok:true` başarılı doğrulamadır. GPG yedeğini önce güvenli ayrı bir dizine çözün.
+Varsayılan açılmış boyut bütçesi 2048 MB; büyük arşivlerde `--max-unpacked-mb` ile bilinçli artırın.
+
+```bash
+sudo /opt/openreporting/venv/bin/openreporting verify-backup /var/backups/openreporting/YYYYMMDD-HHMMSS \
+  --key-file /etc/openreporting/secret.key
+```
+
+SHA256SUMS ve audit zinciri tutarlılık kanıtıdır; tam yetkili bir saldırganın yedeği yeniden
+üretmesine karşı bağımsız dijital imza yerine geçmez. Yedeğin kaynağını ve ayrı anahtarın emanetini doğrulayın.
+Canlıya geri yükleme işlemi bakım penceresinde, eşleşen uygulama sürümü ve doğrulanmış yedekle yapılmalıdır.
+
 ```bash
 sudo systemctl stop openreporting-worker openreporting-web
 cd /var/backups/openreporting/20261024-023000 && sha256sum -c SHA256SUMS
 sudo install -o openreporting -g openreporting -m 0640 state.sqlite3 /var/lib/openreporting/state.sqlite3
 sudo rm -f /var/lib/openreporting/state.sqlite3-wal /var/lib/openreporting/state.sqlite3-shm
-sudo tar -C /var/lib/openreporting -xzf archive.tar.gz && sudo chown -R openreporting:openreporting /var/lib/openreporting/archive
+sudo tar -C /var/lib/openreporting -xzf archive.tar.gz
+sudo chown -R openreporting:openreporting /var/lib/openreporting/archive
+if [ -d /var/lib/openreporting/logos ]; then sudo chown -R openreporting:openreporting /var/lib/openreporting/logos; fi
 # Anahtar ayrı saklandıysa oradan, yedeğe dahil edildiyse buradan geri koyun:
 sudo install -o root -g openreporting -m 0640 secret.key /etc/openreporting/secret.key
 sudo systemctl start openreporting-web openreporting-worker

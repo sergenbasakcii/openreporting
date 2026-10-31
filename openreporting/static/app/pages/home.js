@@ -23,7 +23,7 @@ export async function homePage(root, { app }) {
     canEdit ? tile('compass', 'Keşfet', 'Bir dashboard oluşturmadan metrikleri hızlıca sorgulayın.', '/explore') : null);
   page.append(steps);
   if (canEdit && !dashboards.length) {
-    page.append(h('div', { class: 'card', style: { marginTop: '16px' } }, h('h3', { text: 'Örnek dashboard’larla başlayın' }),
+    page.append(h('div', { class: 'card', style: { marginTop: '16px' } }, h('h2', { class: 'section-heading', text: 'Örnek dashboard’larla başlayın' }),
       h('p', { class: 'muted', text: 'Örnekler "TestData (sentetik)" veri kaynağının Zabbix simülasyonunu kullanır (gerçek veri değildir). Veri kaynağını değiştirerek gerçek Zabbix’e uyarlayabilirsiniz.' }),
       h('div', { class: 'toolbar' }, button('Örnek dashboard’ları ekle', { icon: 'plus', variant: 'primary', onClick: async (e) => {
         e.currentTarget.disabled = true;
@@ -38,8 +38,8 @@ export async function homePage(root, { app }) {
   const starred = dashboards.filter((d) => d.isStarred);
   const recent = [...dashboards].sort((a, b) => String(b.updated).localeCompare(String(a.updated))).slice(0, 8);
   page.append(h('div', { class: 'split-2', style: { marginTop: '18px' } },
-    h('div', { class: 'card' }, h('h3', { text: 'Yıldızlı dashboard’lar' }), list(starred, 'Henüz yıldızlı dashboard yok. Dashboard başlığının yanındaki yıldız ile ekleyin.')),
-    h('div', { class: 'card' }, h('h3', { text: 'Son güncellenenler' }), list(recent, 'Henüz dashboard yok.'))));
+    h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Yıldızlı dashboard’lar' }), list(starred, 'Henüz yıldızlı dashboard yok. Dashboard başlığının yanındaki yıldız ile ekleyin.')),
+    h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Son güncellenenler' }), list(recent, 'Henüz dashboard yok.'))));
 }
 
 function tile(iconName, title, text, href) {

@@ -1,0 +1,74 @@
+{
+  "timestamp_utc": "2026-10-30T02:51:46.361726+00:00",
+  "synthetic_only": true,
+  "source_sha256": {
+    "openreporting/http_telemetry.py": "32cf2ead7a3c338d4c2a0f2de1868fd2894edb28ef8b6f8756924f28d4ae37d3",
+    "openreporting/web.py": "4283e64a04963dd5d187f560ecfaa875c9b02c777aca8a62ea404668d8ce8574",
+    "tools/load_acceptance.py": "9d3b66c7a93e20b8f911fd88301c53973b72608c526a2ba62f055e8e8128f120"
+  },
+  "environment": {
+    "os": "Windows",
+    "python": "3.13.9",
+    "cpu_count": 16,
+    "packages": {
+      "fastapi": "0.162.0",
+      "starlette": "1.10.0",
+      "uvicorn": "0.54.0",
+      "httpx": "0.28.1"
+    },
+    "web_processes": 1,
+    "database": "temporary SQLite",
+    "network": "real loopback HTTP",
+    "structured_log": "file",
+    "report_worker": false
+  },
+  "workload": {
+    "concurrent_viewers": 16,
+    "requested_seconds": 120,
+    "elapsed_seconds": 120.144,
+    "series_per_query": 8,
+    "max_data_points": 360,
+    "warmup_returned_points": 2880,
+    "route_mix": [
+      "query",
+      "query",
+      "dashboard",
+      "health",
+      "query"
+    ]
+  },
+  "requests": 7404,
+  "errors": 0,
+  "status_counts": {
+    "200": 7404
+  },
+  "requests_per_second": 61.626,
+  "latency_ms": {
+    "query": {
+      "count": 4445,
+      "p50": 317.362,
+      "p95": 445.654,
+      "p99": 518.903,
+      "max": 618.383
+    },
+    "dashboard": {
+      "count": 1481,
+      "p50": 143.793,
+      "p95": 299.774,
+      "p99": 369.459,
+      "max": 524.644
+    },
+    "health": {
+      "count": 1478,
+      "p50": 190.836,
+      "p95": 303.505,
+      "p99": 357.353,
+      "max": 436.685
+    }
+  },
+  "limits": [
+    "Closed-loop synthetic read workload; not a production capacity promise",
+    "No real source network, nginx/TLS, LDAP/SMTP or concurrent report worker",
+    "No overnight soak, browser rendering or memory leak measurement"
+  ]
+}

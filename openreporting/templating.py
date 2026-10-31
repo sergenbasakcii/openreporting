@@ -35,6 +35,11 @@ def _sql_quote(value):
 
 
 def format_values(values, fmt, *, multi=False, name=""):
+    if fmt == "promql":
+        # A regex value inside a double-quoted PromQL/LogQL label matcher.
+        escaped = [re.sub(r'([\\.^$|?*+(){}\[\]])', r'\\\1', v) for v in values]
+        pattern = escaped[0] if len(escaped) == 1 else "(" + "|".join(escaped) + ")"
+        return json.dumps(pattern, ensure_ascii=False)[1:-1]
     if fmt in (None, "", "raw"):
         if len(values) == 1 and not multi:
             return values[0]
@@ -73,6 +78,33 @@ def format_values(values, fmt, *, multi=False, name=""):
 
 # Formats that keep a value inert inside the datasource's own syntax.
 SAFE_FORMATS = {"sqlstring": {"sqlstring"}, "zabbix": {"zabbix", "regex", "csv", "pipe", "text", "json", "glob"}}
+
+
+def validate_promql_variables(text, variables, builtins):
+    # User variables are only allowed inside double-quoted label strings.
+    # Escaping a value is not sufficient if the author places it as syntax.
+    # Single-quoted and backtick (raw) strings are tracked too, so a '"' inside them
+    # cannot flip the state and make a later bare $var look quoted.
+    state, escaped, inside = None, False, set()
+    for i, char in enumerate(text):
+        if state is None:
+            if char in "\"'`":
+                state = char
+            continue
+        if state == '"':
+            inside.add(i)
+        if escaped:
+            escaped = False
+        elif char == "\\" and state != "`":
+            escaped = True
+        elif char == state:
+            state = None
+    if state is not None and _PATTERN.search(text):
+        raise ValueError("PromQL/LogQL sorgusunda kapanmamış tırnak var")
+    for match in _PATTERN.finditer(text):
+        name = match.group(1) or match.group(2) or match.group(4)
+        if name in variables and name not in builtins and match.start() not in inside:
+            raise ValueError("PromQL/LogQL değişkenlerini çift tırnaklı etiket değerleri içinde kullanın")
 
 
 def interpolate(text, variables, *, default_format=None, builtins=None, strict=False):

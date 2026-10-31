@@ -1,0 +1,47 @@
+{
+  "ok": true,
+  "scans": 8,
+  "results": [
+    {
+      "stage": "shared-policy-dialog",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "shared-policy-dialog",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "restricted-policy-dialog",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "restricted-policy-dialog",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "editor-view-only-dashboard",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "editor-view-only-dashboard",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "stage": "denied-direct-link",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "stage": "denied-direct-link",
+      "theme": "light",
+      "violations": []
+    }
+  ],
+  "pageErrors": []
+}

@@ -1,0 +1,1086 @@
+{
+  "review_date": "2026-10-29",
+  "baseline_commit": "60f58d1",
+  "controls": [
+    {
+      "id": "A01",
+      "area": "Mimari ve kapsam",
+      "control": "Tek web ve tek worker sorumluluğu",
+      "status": "R",
+      "priority": "P2",
+      "evidence": "docs/ARCHITECTURE.md",
+      "note": "Dağıtım topolojisi gözden geçirildi"
+    },
+    {
+      "id": "A02",
+      "area": "Mimari ve kapsam",
+      "control": "Ekran ve rapor için ortak sorgu hattı",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/test_datasources_engine.py",
+      "note": "Aynı motor sözleşmesi testli"
+    },
+    {
+      "id": "A03",
+      "area": "Mimari ve kapsam",
+      "control": "Tek host SQLite ve yerel disk sınırı",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "docs/LINUX_DEPLOYMENT.md",
+      "note": "NFS/SMB desteklenmiyor"
+    },
+    {
+      "id": "A04",
+      "area": "Mimari ve kapsam",
+      "control": "Uygulama DB seçimi ve sessiz fallback reddi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_database_settings.py",
+      "note": "Bozuk PostgreSQL URL reddediliyor"
+    },
+    {
+      "id": "A05",
+      "area": "Mimari ve kapsam",
+      "control": "PostgreSQL üretim işletim paketi",
+      "status": "O",
+      "priority": "P1",
+      "evidence": "docs/adr/0001-application-database-migration.md",
+      "note": "Salt okunur check-postgres ön kontrolü şema/rol/transport/audit ve gerekli veri haklarını inceler; pg_dump/restore, SQLite taşıma ve üretim işletim/geri dönüş paketi halen eksik. docs/POSTGRES_PREFLIGHT.md kapsamı üretim kabulü değildir."
+    },
+    {
+      "id": "A06",
+      "area": "Mimari ve kapsam",
+      "control": "Yapılandırma tür ve sınır doğrulaması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_enterprise_settings.py",
+      "note": "Güvensiz entegrasyon ayarları reddediliyor"
+    },
+    {
+      "id": "A07",
+      "area": "Mimari ve kapsam",
+      "control": "API/driver/rapor modül sınırları",
+      "status": "R",
+      "priority": "P2",
+      "evidence": "openreporting/api/deps.py",
+      "note": "Kaynak sorguları uygulama DB adapterine yönlendirilmiyor"
+    },
+    {
+      "id": "A08",
+      "area": "Mimari ve kapsam",
+      "control": "Resmi veri akışı ve tehdit modeli",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "docs/THREAT_MODEL.md",
+      "note": "Varlıklar, aktörler, güven sınırları ve kötüye kullanım senaryoları kaydedildi; bağımsız denetim değil"
+    },
+    {
+      "id": "A09",
+      "area": "Mimari ve kapsam",
+      "control": "Kapasite ve kullanıcı yükü ölçümü",
+      "status": "P",
+      "priority": "P1",
+      "evidence": "docs/PERFORMANCE_ACCEPTANCE.md",
+      "note": "Gerçek loopback HTTP, geçici SQLite ve kayıtlı panel tanımıyla sentetik viewer ölçümü; gerçek kaynak/kurum kapasitesi açık"
+    },
+    {
+      "id": "A10",
+      "area": "Mimari ve kapsam",
+      "control": "Eksik veri ve bağımlılık hatasında kapalı davranış",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_reporting.py",
+      "note": "Kısmi raporda e-posta engeli testli"
+    },
+    {
+      "id": "B01",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "scrypt parola türetme",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek scrypt roundtrip, ayrı salt, yanlış parola ve maliyet parametresi reddi testli; bağımsız KDF/maliyet sertifikasyonu değil"
+    },
+    {
+      "id": "B02",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Üretimde en az 14 karakter parola",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "13/14 karakter sınırı ve zayıf API resetinin oturumlara dokunmaması testli; önizleme istisnası üretim politikasını değiştirmez"
+    },
+    {
+      "id": "B03",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Parola karşılaştırmasında sabit süreli karşılaştırma",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/security.py",
+      "note": "hmac.compare_digest kullanılıyor"
+    },
+    {
+      "id": "B04",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Bilinmeyen yerel hesap için dummy hash",
+      "status": "R",
+      "priority": "P2",
+      "evidence": "openreporting/security.py",
+      "note": "Hesap keşfi yan kanalını azaltır; dizin gecikmesi eşitlenmez"
+    },
+    {
+      "id": "B05",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Başarısız giriş sayacının kalıcılığı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_platform_core.py",
+      "note": "DB kaydı regresyonu var"
+    },
+    {
+      "id": "B06",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Beş denemede 15 dakika kilit",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "429 davranışı doğrulandı"
+    },
+    {
+      "id": "B07",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Son yerel kurtarma yöneticisi korunması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "LDAP yöneticisi varken de yerel yönetici korunuyor"
+    },
+    {
+      "id": "B08",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Pasif kullanıcının erişiminin reddi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "Dizin girişi yerel pasifliği geri alamaz"
+    },
+    {
+      "id": "B09",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Parola sıfırlamada oturum iptali",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "API ve CLI resetinde iki eski oturumun iptali, eski/yeni parola ve sır içermeyen CLI çıktı kabulü testli"
+    },
+    {
+      "id": "B10",
+      "area": "Yerel kimlik ve hesaplar",
+      "control": "Çok faktörlü kimlik doğrulama",
+      "status": "P",
+      "priority": "P1",
+      "evidence": "tests/test_mfa.py",
+      "note": "Yerel/LDAP TOTP, rol-zorunlu kurulum izolasyonu, tek kullanımlık kurtarma, replay/race/oturum iptali ve key/backup roundtrip testli; SSO/WebAuthn/kimlik avına dayanıklı kurum politikası açık. docs/MFA.md sınırları açıklar."
+    },
+    {
+      "id": "C01",
+      "area": "LDAP ve dizin güveni",
+      "control": "LDAPS zincir ve DNS adı doğrulaması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_ldap_server.py",
+      "note": "Gerçek OpenLDAP TLS ve yanlış hostname reddi"
+    },
+    {
+      "id": "C02",
+      "area": "LDAP ve dizin güveni",
+      "control": "LDAP portunda kimlik bilgisi öncesi StartTLS",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "TLS başarısızsa bind yapılmıyor"
+    },
+    {
+      "id": "C03",
+      "area": "LDAP ve dizin güveni",
+      "control": "Servis hesabı salt okunur istemci ve sunucu ACL",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_ldap_server.py",
+      "note": "Client guard ve yetersiz yetki 50 ayrı doğrulandı"
+    },
+    {
+      "id": "C04",
+      "area": "LDAP ve dizin güveni",
+      "control": "LDAP filtre enjeksiyonunun kaçırılması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "Yıldız/parantez girdisi literal oluyor"
+    },
+    {
+      "id": "C05",
+      "area": "LDAP ve dizin güveni",
+      "control": "Boş parolayla anonim bind reddi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_ldap_server.py",
+      "note": "Boş kullanıcı parolası ağ bindine gitmiyor"
+    },
+    {
+      "id": "C06",
+      "area": "LDAP ve dizin güveni",
+      "control": "Tekil arama ve kalıcı dizin kimliği",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "Çoklu eşleşme ve kimlik/username devralma reddediliyor"
+    },
+    {
+      "id": "C07",
+      "area": "LDAP ve dizin güveni",
+      "control": "Doğrudan grup üyeliğinden rol eşleme",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_ldap_server.py",
+      "note": "Viewer/editor geçişi gerçek memberOf ile testli"
+    },
+    {
+      "id": "C08",
+      "area": "LDAP ve dizin güveni",
+      "control": "Rol düşürmede eski oturumların iptali",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "Eski oturum kaydı kalmıyor"
+    },
+    {
+      "id": "C09",
+      "area": "LDAP ve dizin güveni",
+      "control": "Dizin kesintisinde yerel parolaya fallback reddi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "503 ve yeni profil oluşturmama doğrulandı"
+    },
+    {
+      "id": "C10",
+      "area": "LDAP ve dizin güveni",
+      "control": "Kurum AD ve iç içe grup kabulü",
+      "status": "E",
+      "priority": "P1",
+      "evidence": "docs/ENTERPRISE_DEPLOYMENT.md",
+      "note": "Gerçek kurum kabulü yapılmadı; nested group/primary group çözümü yok"
+    },
+    {
+      "id": "D01",
+      "area": "Oturum ve yetkilendirme",
+      "control": "Rastgele yüksek entropili oturum belirteci",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek API oturumları, token uzunluğu ve DBde yalnız digest saklama kabulü; CSPRNG secrets modülü"
+    },
+    {
+      "id": "D02",
+      "area": "Oturum ve yetkilendirme",
+      "control": "CSRF tokeninin hashli saklanması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek CSRF digest saklama ve rotasyon sonrası eski token reddi testli"
+    },
+    {
+      "id": "D03",
+      "area": "Oturum ve yetkilendirme",
+      "control": "Mutasyonlarda CSRF zorunluluğu",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_platform_core.py",
+      "note": "Başlıksız mutasyon 403"
+    },
+    {
+      "id": "D04",
+      "area": "Oturum ve yetkilendirme",
+      "control": "Yönetici/editör/izleyici rol sınırları",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_report_authorization.py",
+      "note": "API hesap iptali ve güncel rolün kuyruk/zamanlama/render/SMTP devrinde yeniden kontrolü testli; test_reporting.py API rol sınırlarını korur. Klasör içerik ACL D10 kısmi; tenant/kaynak izolasyonu açık. İzleyicide zamanlama alıcılarının redaksiyonu iki APIde testli."
+    },
+    {
+      "id": "D05",
+      "area": "Oturum ve yetkilendirme",
+      "control": "İzleyici serbest sorgu ve metric-find reddi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_review_fixes.py",
+      "note": "Ad hoc sorgu ve değişken tanımı enjeksiyonu reddediliyor"
+    },
+    {
+      "id": "D06",
+      "area": "Oturum ve yetkilendirme",
+      "control": "İzleyicinin kayıtlı paneli çalıştırması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_review_fixes.py",
+      "note": "Gönderilen target ve dönüşümler güven kaynağı değil"
+    },
+    {
+      "id": "D07",
+      "area": "Oturum ve yetkilendirme",
+      "control": "HttpOnly Secure SameSite çerez",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "HTTPS cookie HttpOnly/Secure/SameSite=Strict/Path ve HTTPde gönderilmeme kabulü; browser SameSite matrisi değil"
+    },
+    {
+      "id": "D08",
+      "area": "Oturum ve yetkilendirme",
+      "control": "Oturum süresi ve LDAP üst sınırı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "LDAP varsayılan en çok 60 dakika"
+    },
+    {
+      "id": "D09",
+      "area": "Oturum ve yetkilendirme",
+      "control": "Çıkış ve CSRF yenileme akışı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Same-origin CSRF refresh ve eski token reddi, logout sonrası session401 kabulü"
+    },
+    {
+      "id": "D10",
+      "area": "Oturum ve yetkilendirme",
+      "control": "Çok kiracılı ve klasör bazlı ayrıntılı ACL",
+      "status": "P",
+      "priority": "P1",
+      "evidence": "tests/test_folder_access.py",
+      "note": "Tek kurulumda kullanıcı bazlı klasör içerik ACL: metadata, sürüm/not, kaynak-hedef taşıma, viewer sorgu, rapor/arşiv ve worker iptal testli. Tenant/veri kaynağı yetkileri ve grup ACL yok; editor serbest kaynak sorgusu global. docs/FOLDER_PERMISSIONS.md sınırları korur; bağımsız kurum kabulü değildir."
+    },
+    {
+      "id": "E01",
+      "area": "HTTP ve API savunmaları",
+      "control": "Liveness ve readiness ayrımı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_healthchecks.py",
+      "note": "Liveness DB arızasında da 200; readiness kimlik ister"
+    },
+    {
+      "id": "E02",
+      "area": "HTTP ve API savunmaları",
+      "control": "DB arızasında sağlık HTTP 503",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_healthchecks.py",
+      "note": "SELECT 1 ve şema kontrolü; yerel yeni test"
+    },
+    {
+      "id": "E03",
+      "area": "HTTP ve API savunmaları",
+      "control": "Bozuk audit zincirinde readiness 503",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_healthchecks.py",
+      "note": "Yeni regresyon testi; CI sonucu son kayıtta"
+    },
+    {
+      "id": "E04",
+      "area": "HTTP ve API savunmaları",
+      "control": "Kimlik deposu arızasında redakte 503",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_healthchecks.py",
+      "note": "SQLite/PostgreSQL/OSError detayları gösterilmiyor"
+    },
+    {
+      "id": "E05",
+      "area": "HTTP ve API savunmaları",
+      "control": "Gövde sınırının akış üzerinde uygulanması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_request_limits.py",
+      "note": "11 test: eksik/yanlış Content-Length, chunked, gerçek boyut, framing, endpoint mutasyon izolasyonu"
+    },
+    {
+      "id": "E06",
+      "area": "HTTP ve API savunmaları",
+      "control": "CSP ve frame/object kısıtları",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek HTTP yanıtlarında CSP/frame/object/no-sniff/referrer/HSTS kabulü; inline style istisnası korunuyor"
+    },
+    {
+      "id": "E07",
+      "area": "HTTP ve API savunmaları",
+      "control": "Giriş/API/ağır işlem rate limit",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "deploy/nginx/openreporting.conf",
+      "note": "nginx IP limitleri + dört pahalı login işi/süreç admission sınırı ve Retry-After; dağıtık/global rate limit kabulü değil"
+    },
+    {
+      "id": "E08",
+      "area": "HTTP ve API savunmaları",
+      "control": "Proxy başlıklarına sınırlı güven",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/cli.py",
+      "note": "Yalnız loopback forwarded_allow_ips"
+    },
+    {
+      "id": "E09",
+      "area": "HTTP ve API savunmaları",
+      "control": "Bilinmeyen API yollarında SPA fallback reddi",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/test_platform_core.py",
+      "note": "404 davranışı testli"
+    },
+    {
+      "id": "E10",
+      "area": "HTTP ve API savunmaları",
+      "control": "URL/Host ve origin sınırları",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_http_security.py",
+      "note": "24 Host/Origin yapılandırma ve HTTP senaryosu; rebinding/alias/IPv6/CSRF destekleyen same-origin sınırı, yeni CI bekliyor"
+    },
+    {
+      "id": "F01",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "Zabbix yazma metodu reddi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_datasources_engine.py",
+      "note": "Yalnız get metotları"
+    },
+    {
+      "id": "F02",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "SQL tek ifade ve yazma koruması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_review_fixes.py",
+      "note": "Tırnak ve çoklu ifade hileleri reddediliyor"
+    },
+    {
+      "id": "F03",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "SQL sunucusunda READ ONLY ve timeout",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/datasources/postgres.py",
+      "note": "transaction/connection güvenlik seçenekleri mevcut"
+    },
+    {
+      "id": "F04",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "SQL TLS verify-full varsayılanı",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/datasources/postgres.py",
+      "note": "Kurum CA ve gerçek DB kabulü ayrıca gerekli"
+    },
+    {
+      "id": "F05",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "HTTP kaynaklarında sabit origin GET",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_http_sources.py",
+      "note": "Kayıtlı admin adresi; kullanıcı target URL seçmiyor"
+    },
+    {
+      "id": "F06",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "Redirect ve metadata peer reddi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_http_sources.py",
+      "note": "Link-local/metadata ve 8 MB sınırı testli"
+    },
+    {
+      "id": "F07",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "PromQL/LogQL değişken bağlamı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_http_sources.py",
+      "note": "Yalnız tırnaklı bağlamda güvenli kaçış"
+    },
+    {
+      "id": "F08",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "Eşzamanlılık ve nokta/satır bütçesi",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/query_engine.py",
+      "note": "Süreç bazında semaphore ve genel bütçeler; yükle ölçülecek"
+    },
+    {
+      "id": "F09",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "Regex süre ve uzunluk sınırları",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_review_fixes.py",
+      "note": "Kullanıcı regex doğrulaması ve timeout"
+    },
+    {
+      "id": "F10",
+      "area": "Veri kaynakları ve sorgular",
+      "control": "Eksik sayıların sıfıra çevrilmemesi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_engine_core.py",
+      "note": "Reducer ve sayaç reset davranışı testli"
+    },
+    {
+      "id": "G01",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Şifreli kaynak sırları ve ayrı Fernet anahtarı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_security_acceptance.py",
+      "note": "Gerçek kaynak API kaydı/okuma/listede sır redaksiyonu, SQLite ciphertext ve ayrı anahtarla decrypt kabulü"
+    },
+    {
+      "id": "G02",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Eksik anahtarda yeni anahtar üretmeme",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_secret_key_recovery.py",
+      "note": "Şifreli veri varken anahtar kaybı kapalı hata"
+    },
+    {
+      "id": "G03",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Bilinmeyen/okunamayan DBde anahtar koruması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_secret_key_recovery.py",
+      "note": "İnceleme hatası yeni anahtar yetkisi sayılmıyor"
+    },
+    {
+      "id": "G04",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Atomik numaralı schema geçişleri",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_db_migrations.py",
+      "note": "Başarısız adım veriyi ve sürümü koruyor"
+    },
+    {
+      "id": "G05",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Aynı anda web worker başlangıcı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_db_migrations.py",
+      "note": "Tek sürüm kaydı ve tutarlılık"
+    },
+    {
+      "id": "G06",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Daha yeni schema ile eski kodu reddetme",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_platform_core.py",
+      "note": "Sessiz downgrade yok"
+    },
+    {
+      "id": "G07",
+      "area": "Depolama kripto ve geçişler",
+      "control": "v3te yerel kullanıcı ve kimlik koruması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_directory_auth.py",
+      "note": "v2den geçiş ve tekrar init testli"
+    },
+    {
+      "id": "G08",
+      "area": "Depolama kripto ve geçişler",
+      "control": "PostgreSQL audit append-only ve kilit",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_postgres_store.py",
+      "note": "Gerçek PGde FK ve audit tetikleyicileri"
+    },
+    {
+      "id": "G09",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Anahtar rotasyonu ve anahtar versiyonlama",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_key_rotation.py",
+      "note": "Raw uyumlu bounded ring, ayrı hazırlık, SQLite offline atomik rekey/audit/rollback ve doğrulanan retirement; yedek eski/yeni anahtar kabulü testli; kurum bakım/emanet kabulü ayrıca gerekli"
+    },
+    {
+      "id": "G10",
+      "area": "Depolama kripto ve geçişler",
+      "control": "Disk/DB/yedek şifreleme kurum politikası",
+      "status": "E",
+      "priority": "P1",
+      "evidence": "docs/ENTERPRISE_DEPLOYMENT.md",
+      "note": "Fernet kaynak sırları ve TOTP seedlerini kapsar; tam disk/DB/yedek politikası kuruma bağlı"
+    },
+    {
+      "id": "H01",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "PDF/Excel/CSV gerçek grup bölümleri",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_reporting.py",
+      "note": "Gerçek oluşturulan dosyalar ve arşiv testli"
+    },
+    {
+      "id": "H02",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "CSV/Excel formül enjeksiyonu",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_review_fixes.py",
+      "note": "Tehlikeli metin hücreleri nötrleniyor"
+    },
+    {
+      "id": "H03",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "Logo boyut/piksel/tür doğrulaması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_reporting.py",
+      "note": "Logo normalize ve PDF gömme testli"
+    },
+    {
+      "id": "H04",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "Rapor arşiv SHA ve audit çapası",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_reporting.py",
+      "note": "Bozulmuş dosya indirmesi reddediliyor"
+    },
+    {
+      "id": "H05",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "Takvim ve DST güvenli zamanlama",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_platform_core.py",
+      "note": "Önceki tam dönem ve gelecek çalışma hesabı"
+    },
+    {
+      "id": "H06",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "Kısmi veri e-posta engeli",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_reporting.py",
+      "note": "Varsayılan gönderim kapalı"
+    },
+    {
+      "id": "H07",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "SMTP TLS AUTH ve relay",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_smtp_transport.py",
+      "note": "Gerçek TLS socket; Linux CI implicit TLS dahil"
+    },
+    {
+      "id": "H08",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "Alıcı alan adı ve gönderim boyut sınırı",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/reporting/service.py",
+      "note": "Tam domain izin listesi ve ham 20 MB ek bütçesi"
+    },
+    {
+      "id": "H09",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "Kısmi/belirsiz teslimatı otomatik oynamama",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_smtp_transport.py",
+      "note": "DATA kabul yanıtı kaybı ve alıcı retleri testli"
+    },
+    {
+      "id": "H10",
+      "area": "Rapor ve teslimat doğruluğu",
+      "control": "Yeni tüm grafiklerin vektör PDF eşliği",
+      "status": "P",
+      "priority": "P2",
+      "evidence": "docs/EXTRA_SOURCES_AND_PANELS.md",
+      "note": "20 yeni türün 14ü vektör; 6 tür etiketli veri tablosu"
+    },
+    {
+      "id": "I01",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Mevcut sade tasarımın korunması",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/browser/theme-surfaces.cjs",
+      "note": "Genel izleme hero kaldırıldı; yeni hero yok"
+    },
+    {
+      "id": "I02",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Koyu/açık native seçim yüzeyleri",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/browser/theme-surfaces.cjs",
+      "note": "Gerçek Chromium kabul kontrolü"
+    },
+    {
+      "id": "I03",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Yirmi yeni grafik ve veri doğruluğu",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_extended_panels.mjs",
+      "note": "Veri uydurmama ve gerekli sütunlar testli"
+    },
+    {
+      "id": "I04",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Tema değişiminde sorgusuz yeniden çizim",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/browser/theme-surfaces.cjs",
+      "note": "Canvas disposal ve cached redraw"
+    },
+    {
+      "id": "I05",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Panel inceleme ve PDF bekleme yüzeyi",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/browser/theme-surfaces.cjs",
+      "note": "Beyaz ekran regresyonu giderildi"
+    },
+    {
+      "id": "I06",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "DOM/Markdown güvenli metin oluşturma",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/static/app/markdown.js",
+      "note": "innerHTML yok; link scheme kontrolü"
+    },
+    {
+      "id": "I07",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Modal odak tuzağı ve klavye menüsü",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/browser/accessibility-surfaces.cjs",
+      "note": "Gerçek Chromium: modal Tab/Shift+Tab, Escape/odak dönüşü, menü okları ve bölüm Space/Enter kabulü; tam ekran okuyucu kabulü değil"
+    },
+    {
+      "id": "I08",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "WCAG/ekran okuyucu ve kontrast denetimi",
+      "status": "P",
+      "priority": "P2",
+      "evidence": "tests/browser/accessibility-surfaces.cjs",
+      "note": "axe-core 4.14: giriş + 8 rota, koyu/açık 17 taramada bulgu yok; gerçek ekran okuyucu/bağımsız WCAG kabulü açık"
+    },
+    {
+      "id": "I09",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Mobil/yoğun veri ve uzun metin yerleşimi",
+      "status": "P",
+      "priority": "P2",
+      "evidence": "openreporting/static/app/app.css",
+      "note": "Önceki smoke var; bütün 30 tür mobil matrisi yok"
+    },
+    {
+      "id": "I10",
+      "area": "Arayüz erişilebilirlik ve kullanım",
+      "control": "Kaydetme çakışması ve sürüm geçmişi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_datasources_engine.py",
+      "note": "Optimistic locking ve sürümler testli"
+    },
+    {
+      "id": "J01",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "Tek worker sahipliği",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_platform_core.py",
+      "note": "Aynı veri dizininde ikinci worker reddi"
+    },
+    {
+      "id": "J02",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "PostgreSQL worker bağlantı kaybında durma",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_postgres_store.py",
+      "note": "Sahiplik yeniden varsayılmıyor"
+    },
+    {
+      "id": "J03",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "Worker heartbeat ve stale görünümü",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/api/system.py",
+      "note": "120 saniye stale; alarm entegrasyonu kuruma bağlı"
+    },
+    {
+      "id": "J04",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "Prometheus metrics localhost sınırı",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "openreporting/api/system.py",
+      "note": "Proxy /metrics 404; yerel scrape"
+    },
+    {
+      "id": "J05",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "LDAP/SMTP tanılama mutasyonsuzluğu",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_smtp_transport.py",
+      "note": "SMTP kontrolü MAIL/RCPT/DATA üretmez"
+    },
+    {
+      "id": "J06",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "Sır içermeyen gönderim hatası günlükleri",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_smtp_transport.py",
+      "note": "Parola caplog çıktısında yok"
+    },
+    {
+      "id": "J07",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "Yapısal request kimliği ve gecikme metrikleri",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tests/test_http_telemetry.py",
+      "note": "5 kabul testi: sunucu IDsi, redakte JSON HTTP olayları, hata/reddetme, sınırlı etiketli süreç histogramı ve eksik yanıt; çok süreçli toplama kurum işi"
+    },
+    {
+      "id": "J08",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "SLO hata bütçesi ve alarm sahipliği",
+      "status": "E",
+      "priority": "P1",
+      "evidence": "docs/LINUX_DEPLOYMENT.md",
+      "note": "Kurum SLO/on-call eşiği kabul edilmedi"
+    },
+    {
+      "id": "J09",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "Uçtan uca yük/soak ve p95 ölçümü",
+      "status": "P",
+      "priority": "P1",
+      "evidence": "docs/PERFORMANCE_ACCEPTANCE.md",
+      "note": "Sentetik eşzamanlı HTTP p50/p95/p99 ölçümü var; uzun soak, gerçek kaynak ve eşzamanlı worker kabulü açık"
+    },
+    {
+      "id": "J10",
+      "area": "Gözlemlenebilirlik ve dayanıklılık",
+      "control": "Arıza ve incident müdahale runbooku",
+      "status": "R",
+      "priority": "P1",
+      "evidence": "docs/OPERATIONS_RUNBOOK.md",
+      "note": "12 olay senaryosu, güvenli tanılama, kurtarma kabulü ve kapanış ölçütü yazıldı; gerçek nöbetçi/olay tatbikatı kurumda yapılacak"
+    },
+    {
+      "id": "K01",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Canlı SQLite WAL tutarlı yedek",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_database_backup.py",
+      "note": "Online backup ve audit korunuyor"
+    },
+    {
+      "id": "K02",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Yedek hedefinin yanlışlıkla ezilmesini reddetme",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_database_backup.py",
+      "note": "Mevcut dosya ve aktif veri dizini korunuyor"
+    },
+    {
+      "id": "K03",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Eksik/bozuk kaynaktan sahte yedek üretmeme",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_database_backup.py",
+      "note": "CLI testli; deploy backup kaynak açma modu ayrıca gözden geçirilecek"
+    },
+    {
+      "id": "K04",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Arşiv ve config yedeği",
+      "status": "V",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "Gerçek Ubuntu yedek ve SHA doğrulaması"
+    },
+    {
+      "id": "K05",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Logo gibi ek varlıkların yedeği",
+      "status": "V",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "b51232f Ubuntu CI logo varlığını yedek tar içinde doğruladı"
+    },
+    {
+      "id": "K06",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Tam geri yükleme kabul tatbikatı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/test_backup_verification.py",
+      "note": "14 izole kurtarma testi: DB/audit/arşiv/logo/anahtar, API giriş/readiness ve yeni worker; klasör izinleri/arşiv sınırının geri yüklemede korunması ve eksik yetki tablosunun reddi. Gerçek kurum RPO/RTO kabulü ayrıca açık."
+    },
+    {
+      "id": "K07",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "nginx TLS ve systemd kısıtları",
+      "status": "V",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "Gerçek Ubuntu izin/HTTPS kabulü"
+    },
+    {
+      "id": "K08",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Yükseltme ve veri koruyan kaldırma",
+      "status": "V",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "Gerçek Ubuntu E2E yeşil"
+    },
+    {
+      "id": "K09",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Başarısız schema yükseltmesinde geri dönüş",
+      "status": "P",
+      "priority": "P1",
+      "evidence": "deploy/upgrade.sh",
+      "note": "Eski kod korunuyor; eşleşen DB/anahtar geri dönüşü manuel"
+    },
+    {
+      "id": "K10",
+      "area": "Yedek kurtarma ve dağıtım",
+      "control": "Kurum RPO/RTO ve ayrı anahtar emanet planı",
+      "status": "E",
+      "priority": "P1",
+      "evidence": "docs/ENTERPRISE_DEPLOYMENT.md",
+      "note": "Kurum sahipliği ve geri yükleme süresi ölçülecek"
+    },
+    {
+      "id": "L01",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Python sürüm matrisi",
+      "status": "V",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "3.11/3.12/3.13 testleri"
+    },
+    {
+      "id": "L02",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Tarayıcı ES modüllerinin açık parse kontrolü",
+      "status": "V",
+      "priority": "P1",
+      "evidence": "tests/check_app_syntax.cjs",
+      "note": "Otomatik js mod seçimi hatası kapatıldı"
+    },
+    {
+      "id": "L03",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Gerçek LDAP/PG ve Ubuntu CI kanıtı",
+      "status": "V",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "60f58d1 CI tüm işler başarılı"
+    },
+    {
+      "id": "L04",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Bağımlılıkların tekrarlanabilir kilitlenmesi",
+      "status": "P",
+      "priority": "P1",
+      "evidence": "docs/DEPENDENCY_LOCK.md",
+      "note": "Runtime/build/test wheel SHA kilitleri; temiz offline kurulum, drift/CVE/SBOM ve aynı ortamda iki wheel SHA eşliği; host bootstrap/OS/runner/audit ortamı ve signed provenance açık"
+    },
+    {
+      "id": "L05",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Bağımlılık zafiyet taraması",
+      "status": "V",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "30 Ekim 2026: 28 yerel runtime paketi pip-audit ile tarandı; cryptography 50.0.2 sonrası bilinen açık yok; yeni CI bekliyor"
+    },
+    {
+      "id": "L06",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "SBOM ve bileşen envanteri",
+      "status": "V",
+      "priority": "P2",
+      "evidence": "tools/runtime_requirements.py",
+      "note": "CycloneDX runtime SBOM üretildi; özel paket/yol aktarılmaz, test/audit closure dışında"
+    },
+    {
+      "id": "L07",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "İmzalı sürüm/provenance",
+      "status": "O",
+      "priority": "P1",
+      "evidence": ".github/workflows/ci.yml",
+      "note": "CI action SHA sabitleme/checkout token koruması ve aynı ortam wheel tekrar kanıtı var; imzalı uygulama release/provenance attestasyonu yok"
+    },
+    {
+      "id": "L08",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Güvenlik bildirim ve güncelleme politikası",
+      "status": "P",
+      "priority": "P1",
+      "evidence": "SECURITY.md",
+      "note": "Bildirim/güncelleme ve olay ilk adımları yazıldı; kalıcı özel iletişim kanalı ve SLA sahibi kurum/maintainer tarafından tanımlanmalı"
+    },
+    {
+      "id": "L09",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Uygulama lisansı ve hak sahipliği",
+      "status": "E",
+      "priority": "P1",
+      "evidence": "README.md",
+      "note": "Karar kullanıcıda; lisans seçilmedi ve repo private"
+    },
+    {
+      "id": "L10",
+      "area": "Tedarik zinciri ve teslim yönetişimi",
+      "control": "Gerçek kurum kabulü ve bağımsız güvenlik incelemesi",
+      "status": "E",
+      "priority": "P1",
+      "evidence": "docs/ENTERPRISE_DEPLOYMENT.md",
+      "note": "İzole testler Google onayı veya bağımsız sertifika değildir"
+    }
+  ]
+}

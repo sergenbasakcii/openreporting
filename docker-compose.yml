@@ -13,7 +13,7 @@ services:
   web:
     <<: *hardening
     build: .
-    image: openreporting:1.0.0
+    image: openreporting:1.1.0
     env_file: [deploy/openreporting.env.example]
     environment:
       OPENREPORTING_DATA_DIR: /var/lib/openreporting
@@ -24,7 +24,7 @@ services:
       - openreporting-key:/run/openreporting-key
   worker:
     <<: *hardening
-    image: openreporting:1.0.0
+    image: openreporting:1.1.0
     depends_on: [web]
     env_file: [deploy/openreporting.env.example]
     environment:

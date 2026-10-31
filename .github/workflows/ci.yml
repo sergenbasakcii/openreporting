@@ -9,7 +9,121 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
+  dependency-audit:
+    name: Runtime dependency audit and SBOM
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+      - name: Install application and separate audit tooling
+        run: |
+          python -m pip install pip-audit==2.10.1
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-build.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps --no-build-isolation .
+          python -m pip check
+          python tools/check_runtime_lock.py
+          python tools/check_runtime_lock.py --scope build
+      - name: Inventory installed runtime dependencies
+        run: python tools/runtime_requirements.py --output build/runtime-audit.txt
+      - name: Audit known vulnerabilities and generate CycloneDX SBOM
+        run: python -m pip_audit -r build/runtime-audit.txt --disable-pip --no-deps --strict --progress-spinner off -f cyclonedx-json -o build/runtime-sbom.cdx.json
+      - name: Audit pinned build tools
+        run: python -m pip_audit -r requirements-build.lock --disable-pip --no-deps --strict --progress-spinner off -f cyclonedx-json -o build/build-tools-sbom.cdx.json
+      - name: Audit pinned test tools
+        run: python -m pip_audit -r requirements-test.lock --disable-pip --no-deps --strict --progress-spinner off -f cyclonedx-json -o build/test-tools-sbom.cdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: runtime-dependency-evidence
+          path: |
+            build/runtime-audit.txt
+            build/runtime-sbom.cdx.json
+            build/build-tools-sbom.cdx.json
+            build/test-tools-sbom.cdx.json
+          retention-days: 14
+
+  directory-contract:
+    name: LDAP TLS and group contract
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+      - name: Install isolated directory test tools
+        run: sudo apt-get update -qq && sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq slapd ldap-utils
+      - name: Prepare isolated paths allowed by the existing slapd AppArmor policy
+        run: |
+          sudo install -d -o "$(id -un)" -g "$(id -gn)" -m 0700 /etc/ldap/openreporting-ci /var/lib/ldap/openreporting-ci
+      - name: Install package
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-test.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-build.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps --no-build-isolation .
+          python -m pip check
+          python tools/check_runtime_lock.py
+          python tools/check_runtime_lock.py --scope build
+          python tools/check_runtime_lock.py --scope test
+      - name: Verify actual LDAP TLS, service bind, user bind and memberOf
+        # Only the isolated fixture harness needs root to traverse Ubuntu's
+        # existing private /var/lib/ldap parent. No service policy is relaxed.
+        run: |
+          sudo env OPENREPORTING_TEST_SLAPD=1 OPENREPORTING_TEST_LDAP_DATA_ROOT=/var/lib/ldap/openreporting-ci \
+            LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$(command -v python)" -m pytest -q tests/test_ldap_server.py \
+            --basetemp=/etc/ldap/openreporting-ci/pytest
+
+  postgres-driver:
+    name: PostgreSQL driver contract
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: openreporting_test
+          POSTGRES_USER: openreporting_test
+          POSTGRES_PASSWORD: isolated-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openreporting_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+      - name: Install package
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-test.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-build.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps --no-build-isolation .
+          python -m pip check
+          python tools/check_runtime_lock.py
+          python tools/check_runtime_lock.py --scope build
+          python tools/check_runtime_lock.py --scope test
+      - name: Test PostgreSQL primitives against isolated server
+        env:
+          OPENREPORTING_TEST_POSTGRES_DSN: postgresql://openreporting_test:isolated-ci-password@localhost:5432/openreporting_test
+        run: python -m pytest -q tests/test_postgres_store.py
+
   tests:
     name: Tests (Python ${{ matrix.python }})
     runs-on: ubuntu-24.04
@@ -18,38 +132,138 @@ jobs:
       matrix:
         python: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python }}
       - name: Install fonts
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
       - name: Install package
-        run: python -m pip install --upgrade pip && python -m pip install ".[test]"
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-test.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-build.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps --no-build-isolation .
+          python -m pip check
+          python tools/check_runtime_lock.py
+          python tools/check_runtime_lock.py --scope build
+          python tools/check_runtime_lock.py --scope test
       - name: Pytest
         run: python -m pytest -q -p no:cacheprovider
+      - name: Enterprise evidence matrix consistency
+        if: matrix.python == '3.13'
+        run: |
+          python tools/render_enterprise_review.py
+          git diff --exit-code -- docs/ENTERPRISE_REVIEW.md
+          python tools/check_workflow_pins.py
+      - name: Offline wheel reproducibility
+        if: matrix.python == '3.13'
+        run: python tools/check_wheel_repro.py
+      - name: Synthetic HTTP concurrency acceptance
+        if: matrix.python == '3.13'
+        run: python tools/load_acceptance.py --users 4 --seconds 5 --output build/load-ci.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && matrix.python == '3.13'
+        with:
+          name: synthetic-http-load-evidence
+          path: |
+            build/load-ci.json
+            build/wheel-repro.json
+          retention-days: 14
 
   lint:
     name: Shell and JS checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: shellcheck
         run: shellcheck -x -s bash deploy/*.sh
       - name: bash -n
         run: for f in deploy/*.sh; do bash -n "$f"; done
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
       - name: JS syntax
-        run: find openreporting/static/app -name '*.js' -print0 | xargs -0 -n1 node --check
+        run: node tests/check_app_syntax.cjs
+      - name: Visualization models
+        run: node --test tests/test_extended_panels.mjs tests/test_accessible_colors.mjs
+
+  mfa-browser:
+    name: MFA browser acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Locked Python dependencies
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-build.lock
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-runtime.lock
+          python -m pip install --no-deps --no-build-isolation .
+          python -m pip check
+      - name: Browser QA tooling (not runtime dependencies)
+        run: |
+          npm install --prefix build/mfa-browser --no-audit --no-fund playwright@1.62.1 @axe-core/playwright@4.14.0
+          build/mfa-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Disposable MFA UI and accessibility acceptance
+        env:
+          OPENREPORTING_PLAYWRIGHT_MODULE: ${{ github.workspace }}/build/mfa-browser/node_modules/playwright
+          OPENREPORTING_AXE_MODULE: ${{ github.workspace }}/build/mfa-browser/node_modules/@axe-core/playwright
+        run: |
+          python tools/mfa_browser_acceptance.py
+          python tools/folder_browser_acceptance.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mfa-browser-evidence
+          path: |
+            build/mfa-browser-evidence.json
+            build/folder-browser-evidence.json
+          retention-days: 14
+
+  oracle-userspace:
+    name: Oracle Linux ${{ matrix.oracle }} userspace contract
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        oracle: ['8', '9', '10']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Official Oracle Linux container acceptance
+        run: |
+          mkdir -p build/oracle-${{ matrix.oracle }}
+          docker pull oraclelinux:${{ matrix.oracle }}
+          docker image inspect oraclelinux:${{ matrix.oracle }} --format '{{json .RepoDigests}}' > build/oracle-${{ matrix.oracle }}/image-digests.json
+          docker run --rm --init -e OPENREPORTING_ORACLE_CI=1 \
+            -v "$GITHUB_WORKSPACE:/src:ro" -v "$GITHUB_WORKSPACE/build/oracle-${{ matrix.oracle }}:/evidence" \
+            oraclelinux:${{ matrix.oracle }} bash /src/deploy/ci-oracle-linux.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: oracle-linux-${{ matrix.oracle }}-evidence
+          path: build/oracle-${{ matrix.oracle }}
+          retention-days: 14
 
   ubuntu-install:
     name: End-to-end Ubuntu install
     runs-on: ubuntu-24.04
     needs: [tests, lint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Install with installer script (self-signed TLS)
         run: sudo ./deploy/install-ubuntu.sh --domain openreporting.ci.local --self-signed -y
       - name: Services are active
@@ -76,6 +290,7 @@ jobs:
       - name: Admin, login and report run through the API
         run: |
           set -euo pipefail
+          umask 077
           sudo systemd-run --quiet --wait --pipe --collect -p User=openreporting -p Group=openreporting \
             -p EnvironmentFile=/etc/openreporting/openreporting.env /opt/openreporting/venv/bin/python - <<'EOF'
           from openreporting.config import Settings
@@ -85,6 +300,12 @@ jobs:
           base=https://openreporting.ci.local
           opts=(-sS -k --resolve openreporting.ci.local:443:127.0.0.1 -c /tmp/jar -b /tmp/jar -H 'Content-Type: application/json')
           csrf=$(curl "${opts[@]}" -X POST "$base/api/login" -d '{"username":"ciadmin","password":"ci-admin-password-1234"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf"])')
+          # The installed production template requires admin enrollment. Never log seeds/codes.
+          curl "${opts[@]}" -f -H "X-CSRF-Token: $csrf" -X POST "$base/api/user/mfa/setup" -d '{"password":"ci-admin-password-1234"}' \
+            | /opt/openreporting/venv/bin/python -c 'import json,sys,pyotp; d=json.load(sys.stdin); json.dump({"password":"ci-admin-password-1234","setup_token":d["setup_token"],"code":pyotp.TOTP(d["secret"]).now()},sys.stdout)' > /tmp/mfa-confirm.json
+          curl "${opts[@]}" -f -H "X-CSRF-Token: $csrf" -X POST "$base/api/user/mfa/confirm" --data-binary @/tmp/mfa-confirm.json > /tmp/mfa-recovery.json
+          python3 -c 'import json; d=json.load(open("/tmp/mfa-recovery.json")); json.dump({"username":"ciadmin","password":"ci-admin-password-1234","otp":d["recovery_codes"][0]},open("/tmp/mfa-login.json","w"))'
+          csrf=$(curl "${opts[@]}" -f -X POST "$base/api/login" --data-binary @/tmp/mfa-login.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf"])')
           dash='{"dashboard":{"uid":"ci","title":"CI","templating":{"list":[{"name":"host","type":"query","datasource":{"uid":"testdata"},"query":{"type":"host","group":"WAN Routers"},"multi":true,"includeAll":true,"current":{"value":["$__all"]}}]},"panels":[{"id":1,"type":"timeseries","title":"CPU $host","gridPos":{"x":0,"y":0,"w":24,"h":8},"targets":[{"refId":"A","datasource":{"uid":"testdata"},"group":{"filter":"WAN Routers"},"host":{"filter":"$host"},"item":{"filter":"CPU utilization"}}]}]}}'
           curl "${opts[@]}" -H "X-CSRF-Token: $csrf" -X POST "$base/api/dashboards/db" -d "$dash" | grep -q '"uid":"ci"'
           rid=$(curl "${opts[@]}" -H "X-CSRF-Token: $csrf" -X POST "$base/api/dash-reports" \
@@ -103,8 +324,59 @@ jobs:
         run: sudo /opt/openreporting/app/deploy/openreporting-admin.sh doctor
       - name: Backup
         run: |
+          sudo systemd-run --quiet --wait --pipe --collect -p User=openreporting -p Group=openreporting \
+            -p EnvironmentFile=/etc/openreporting/openreporting.env /opt/openreporting/venv/bin/python - <<'EOF'
+          import base64, io
+          from PIL import Image
+          from openreporting.config import Settings
+          from openreporting.reporting import logos
+          from openreporting.db import connect, transaction, audit
+          from openreporting.secrets_store import encrypt
+          settings = Settings.from_env()
+          image = Image.new("RGB", (20, 20), "blue")
+          png = io.BytesIO(); image.save(png, format="PNG")
+          logos.save(settings, base64.b64encode(png.getvalue()).decode())
+          secured = encrypt(settings, {"token":"isolated-backup-token"})
+          with connect(settings) as db, transaction(db):
+              db.execute("UPDATE datasources SET secure_json=? WHERE uid='testdata'", (secured,))
+              audit(db, "ci", "backup.fixture_seeded", "datasource", "testdata")
+          EOF
           sudo systemctl start openreporting-backup.service
           sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1) && ls -la "$latest" && cd "$latest" && sha256sum -c SHA256SUMS && test ! -e secret.key'
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1); tar -tzf "$latest/archive.tar.gz" | grep -q "^logos/.*\.png$"'
+      - name: Restore acceptance in disposable storage
+        run: |
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1); /opt/openreporting/venv/bin/openreporting verify-backup "$latest" --key-file /etc/openreporting/secret.key --require-logos'
+      - name: Offline key rotation and primary-only backup acceptance
+        run: |
+          sudo systemctl stop openreporting-worker openreporting-web
+          sudo /opt/openreporting/app/deploy/openreporting-admin.sh prepare-key-rotation --output /var/lib/openreporting/staged-ring.json
+          sudo install -o root -g openreporting -m 0640 /var/lib/openreporting/staged-ring.json /etc/openreporting/keyring-ci.json
+          sudo sed -i 's#^OPENREPORTING_SECRET_KEY_FILE=.*#OPENREPORTING_SECRET_KEY_FILE=/etc/openreporting/keyring-ci.json#' /etc/openreporting/openreporting.env
+          sudo /opt/openreporting/app/deploy/openreporting-admin.sh rekey-secrets --services-stopped
+          sudo /opt/openreporting/app/deploy/openreporting-admin.sh prepare-key-retirement --services-stopped --output /var/lib/openreporting/staged-primary.json
+          sudo install -o root -g openreporting -m 0640 /var/lib/openreporting/staged-primary.json /etc/openreporting/keyring-primary-ci.json
+          sudo sed -i 's#^OPENREPORTING_SECRET_KEY_FILE=.*#OPENREPORTING_SECRET_KEY_FILE=/etc/openreporting/keyring-primary-ci.json#' /etc/openreporting/openreporting.env
+          sudo systemctl start openreporting-web openreporting-worker
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8810/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8810/api/health
+          sudo systemd-run --quiet --wait --pipe --collect -p User=openreporting -p Group=openreporting \
+            -p EnvironmentFile=/etc/openreporting/openreporting.env /opt/openreporting/venv/bin/python - <<'EOF'
+          from openreporting.config import Settings
+          from openreporting import datasources
+          settings = Settings.from_env()
+          source = datasources.get(settings, 'testdata')
+          from openreporting import db, mfa
+          with db.connect(settings) as connection:
+              factor = connection.execute('SELECT * FROM user_mfa WHERE enabled=1').fetchone()
+              assert factor is not None and len(mfa.seed(settings, factor)) == 32
+          print('Source successfully opened with primary-only keyring')
+          EOF
+          sudo systemctl start openreporting-backup.service
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting/*/ | tail -1); /opt/openreporting/venv/bin/openreporting verify-backup "$latest" --key-file /etc/openreporting/keyring-primary-ci.json --require-logos'
+          sudo env OPENREPORTING_DATA_DIR=/var/lib/openreporting OPENREPORTING_BACKUP_INCLUDE_KEY=true \
+            OPENREPORTING_BACKUP_DIR=/var/backups/openreporting-included /opt/openreporting/app/deploy/backup.sh
+          sudo bash -c 'latest=$(ls -1d /var/backups/openreporting-included/*/ | tail -1); cmp -s "$latest/secret.key" /etc/openreporting/keyring-primary-ci.json && /opt/openreporting/venv/bin/openreporting verify-backup "$latest" --require-logos'
       - name: Upgrade from a fresh copy
         run: |
           cp -a "$GITHUB_WORKSPACE" /tmp/openreporting-next

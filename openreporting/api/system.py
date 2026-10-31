@@ -5,13 +5,14 @@ from datetime import datetime, timezone
 from shutil import disk_usage
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from .. import __version__
-from ..db import connect, verify_audit
+from ..db import audit, connect, transaction, verify_audit
 from ..domain import parse_utc
+from ..healthchecks import database_ready
 from ..security import authenticate
-from .deps import admin_read, settings_of
+from .deps import admin, admin_read, settings_of
 
 router = APIRouter()
 
@@ -21,7 +22,7 @@ def frontend_settings(request: Request, user=Depends(authenticate)):
     settings = settings_of(request)
     return {"version": __version__, "mailEnabled": settings.mail_enabled,
             "recipientDomains": list(settings.recipient_domains), "publicUrl": settings.public_url,
-            "platform": platform.system(), "features": {"reports": True, "explore": True}}
+            "platform": platform.system(), "features": {"reports": True, "explore": True, "folderAcl": True}}
 
 
 @router.get("/api/time/resolve")
@@ -42,11 +43,10 @@ def health(request: Request):
     settings = settings_of(request)
     try:
         with connect(settings) as db:
-            db.execute("SELECT 1").fetchone()
-        database = "ok"
+            database = "ok" if database_ready(db) else "failing"
     except Exception:  # noqa: BLE001 - health must never raise
         database = "failing"
-    return {"database": database, "version": __version__}
+    return JSONResponse({"database": database, "version": __version__}, status_code=200 if database == "ok" else 503)
 
 
 def _worker_state(settings):
@@ -81,6 +81,35 @@ def admin_stats(request: Request, user=Depends(admin_read)):
             "platform": f"{platform.system()} {platform.release()}", "pid": os.getpid()}
 
 
+@router.get("/api/admin/integrations")
+def integrations(request: Request, user=Depends(admin_read)):
+    from ..mail_transport import security_mode
+    settings = settings_of(request)
+    return {"ldap": {"enabled": settings.ldap_enabled, "session_minutes": settings.ldap_session_minutes},
+            "smtp": {"enabled": settings.mail_enabled, "security": security_mode(settings)}}
+
+
+@router.post("/api/admin/integrations/{kind}/check")
+def check_integration(kind: str, request: Request, user=Depends(admin)):
+    from .. import directory_auth, mail_transport
+    if kind not in {"ldap", "smtp"}:
+        raise HTTPException(404, "Bağlantı bulunamadı")
+    settings = settings_of(request)
+    enabled = settings.ldap_enabled if kind == "ldap" else settings.mail_enabled
+    if not enabled:
+        raise HTTPException(409, "Bu bağlantı sunucu ayarlarında kapalı")
+    try:
+        check = directory_auth.check_connection if kind == "ldap" else mail_transport.check_connection
+        message = check(settings)
+        ok = True
+    except Exception:  # Never expose directory responses, authentication challenges or secrets.
+        ok = False
+        message = "Bağlantı doğrulanamadı. DNS, port, sertifika ve hesap ayarlarını kontrol edin."
+    with connect(settings) as db, transaction(db):
+        audit(db, user["id"], "integration.checked", "integration", kind, {"ok": ok})
+    return {"ok": ok, "message": message}
+
+
 @router.get("/metrics", response_class=PlainTextResponse)
 def metrics(request: Request):
     """Prometheus exposition; loopback-only (scrape locally or through an authenticated proxy)."""
@@ -102,4 +131,4 @@ def metrics(request: Request):
         lines.append(f"openreporting_worker_heartbeat_age_seconds {age:.1f}")
     disk = disk_usage(settings.data_dir)
     lines.append(f"openreporting_data_disk_free_bytes {disk.free}")
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n" + request.app.state.http_metrics.exposition()

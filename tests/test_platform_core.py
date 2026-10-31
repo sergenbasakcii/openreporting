@@ -24,7 +24,7 @@ def http(settings):
     app = create_app(settings)
     create_user(settings, "admin1", "an-administrator-password", "admin")
     create_user(settings, "editor1", "an-editor-password-123", "editor")
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://localhost") as client:
         yield client
 
 

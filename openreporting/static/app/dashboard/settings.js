@@ -76,7 +76,7 @@ function variableForm(v, dash, onDone) {
     } else if (work.type === 'custom' || work.type === 'interval') {
       box.append(field('Değerler (virgülle; "metin : değer")', input({ value: work.query || '', placeholder: work.type === 'interval' ? '1m,5m,1h,1d' : 'Prod : prod, Test : test', onChange: (e) => { work.query = e.target.value; } })));
     } else if (work.type === 'datasource') {
-      box.append(field('Veri kaynağı türü', select([{ value: 'zabbix', label: 'Zabbix' }, { value: 'postgres', label: 'PostgreSQL' }, { value: 'testdata', label: 'TestData' }], work.query || 'zabbix', (x) => { work.query = x; })));
+      box.append(field('Veri kaynağı türü', select([{ value: 'zabbix', label: 'Zabbix' }, { value: 'postgres', label: 'PostgreSQL' }, { value: 'testdata', label: 'TestData' }, { value: 'prometheus', label: 'Prometheus' }, { value: 'loki', label: 'Loki' }, { value: 'httpjson', label: 'HTTP JSON' }, { value: 'csv', label: 'HTTP CSV' }], work.query || 'zabbix', (x) => { work.query = x; })));
     } else {
       box.append(field(work.type === 'textbox' ? 'Varsayılan değer' : 'Değer', input({ value: work.query || '', onChange: (e) => { work.query = e.target.value; } })));
     }
@@ -148,7 +148,7 @@ async function versionsTab(uid, onRestore) {
 export async function openSettings({ dashboard, meta, onApply, onRestore }) {
   const dash = JSON.parse(JSON.stringify(dashboard));
   const state = { folderUid: meta.folderUid || null };
-  const folders = await get('/api/folders').catch(() => []);
+  const folders = (await get('/api/folders').catch(() => [])).filter(f => f.canEdit !== false);
   const content = h('div');
   let current = 'general';
   const show = async (id) => {

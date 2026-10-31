@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from .db import connect, transaction, utcnow
 from .domain import identity, parse_utc
 from .portable import exclusive_local_lock
+from .postgres_store import WorkerOwnershipLost, assert_worker_ownership
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +79,12 @@ def _atomic_write(target: Path, data: bytes):
 
 @contextmanager
 def exclusive_worker(settings):
-    """One scheduler/SMTP owner per local NTFS/ext4 application data volume."""
+    """One scheduler/SMTP owner per PostgreSQL database or local SQLite volume."""
+    if settings.database_url:
+        from . import postgres_store
+        with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms):
+            yield
+        return
     with exclusive_local_lock(settings.data_dir / "worker.lock"):
         yield
 
@@ -88,7 +94,7 @@ def update_worker_heartbeat(settings, worker_id, started_at, error=""):
         db.execute("""INSERT INTO worker_runtime(singleton_id,worker_id,started_at,last_tick,tick_count,last_error)
               VALUES(1,?,?,?,1,?) ON CONFLICT(singleton_id) DO UPDATE SET
               worker_id=excluded.worker_id,started_at=excluded.started_at,last_tick=excluded.last_tick,
-              tick_count=CASE WHEN worker_id=excluded.worker_id THEN tick_count+1 ELSE 1 END,
+              tick_count=CASE WHEN worker_runtime.worker_id=excluded.worker_id THEN worker_runtime.tick_count+1 ELSE 1 END,
               last_error=excluded.last_error""",
               (worker_id,started_at,utcnow(),error[:400]))
 
@@ -141,10 +147,13 @@ def _run_locked(settings, once, interval):
             errors = []
 
             def phase(name, func, *args):
+                assert_worker_ownership()
                 # Each phase is isolated: a failing schedule never blocks report runs.
                 try:
                     return func(*args)
                 except Exception as exc:  # noqa: BLE001 - recorded in the heartbeat row
+                    if isinstance(exc, WorkerOwnershipLost):
+                        raise
                     log.exception("Worker phase %s failed", name)
                     errors.append(f"{name}: {exc}"[:200])
                     if once:

@@ -46,9 +46,9 @@ function zabbixEditor(target, ds, ctx, onChange) {
   const wrap = h('div');
   const qType = { '0': 'metrics', '2': 'itemvalues', '3': 'itemid', '4': 'problems', '5': 'problems' }[String(t.queryType)] || t.queryType || 'metrics';
   const line1 = h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'Sorgu türü' }),
-    select(QUERY_TYPES, qType, (v) => { set({ queryType: v }); rerender(); }, { class: 'auto-width' }));
+    select(QUERY_TYPES, qType, (v) => { set({ queryType: v }); rerender(); }, { class: 'auto-width', label: 'Sorgu türü' }));
   if (ds.type === 'testdata') {
-    line1.prepend(h('span', { class: 'q-label', text: 'Senaryo' }), select(SCENARIOS, t.scenario || 'zabbix_sim', (v) => { set({ scenario: v }); rerender(); }));
+    line1.prepend(h('span', { class: 'q-label', text: 'Senaryo' }), select(SCENARIOS, t.scenario || 'zabbix_sim', (v) => { set({ scenario: v }); rerender(); }, { label: 'Senaryo' }));
   }
   wrap.append(line1);
   const rerender = () => { const fresh = queryEditor(t, ds, ctx, onChange); wrap.replaceWith(fresh); };
@@ -83,7 +83,7 @@ function zabbixEditor(target, ds, ctx, onChange) {
         input({ value: (t.trigger && t.trigger.filter) || '', placeholder: '/.*/', onChange: (e) => set({ trigger: { filter: e.target.value } }) }),
         h('span', { class: 'q-label', text: 'En düşük önem' }),
         select([0, 1, 2, 3, 4, 5].map((v) => ({ value: String(v), label: ['Sınıflandırılmamış', 'Bilgi', 'Uyarı', 'Ortalama', 'Yüksek', 'Felaket'][v] })),
-          String((t.options && t.options.minSeverity) || 0), (v) => set({ options: { ...(t.options || {}), minSeverity: Number(v) } }))));
+          String((t.options && t.options.minSeverity) || 0), (v) => set({ options: { ...(t.options || {}), minSeverity: Number(v) } }), { label: 'En düşük önem' })));
     }
   }
   if (qType === 'metrics' || qType === 'itemid') {
@@ -91,7 +91,7 @@ function zabbixEditor(target, ds, ctx, onChange) {
     wrap.append(functionsEditor(t.functions || [], (functions) => set({ functions })));
     wrap.append(h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'Veri' }),
       select([{ value: 'auto', label: 'Otomatik (history / trend)' }, { value: 'history', label: 'Ham history' }, { value: 'trends', label: 'Trend (saatlik)' }],
-        opts.mode || (opts.useTrends === 'true' ? 'trends' : opts.useTrends === 'false' ? 'history' : 'auto'), (v) => set({ options: { ...opts, mode: v, useTrends: undefined } })),
+        opts.mode || (opts.useTrends === 'true' ? 'trends' : opts.useTrends === 'false' ? 'history' : 'auto'), (v) => set({ options: { ...opts, mode: v, useTrends: undefined } }), { label: 'Veri kaynağı modu' }),
       toggle('Devre dışı item’ları göster', !!opts.showDisabledItems, (v) => set({ options: { ...opts, showDisabledItems: v } }))));
   }
   return wrap;
@@ -104,7 +104,7 @@ function postgresEditor(target, ds, ctx, onChange) {
     rows: 8, class: 'code-editor', onChange: (e) => set({ rawSql: e.target.value }) });
   if (!t.rawSql) setTimeout(() => set({ rawSql: sql.value }), 0);
   return h('div', h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'Biçim' }),
-    select([{ value: 'time_series', label: 'Zaman serisi' }, { value: 'table', label: 'Tablo' }], t.format || 'time_series', (v) => set({ format: v }))), sql,
+    select([{ value: 'time_series', label: 'Zaman serisi' }, { value: 'table', label: 'Tablo' }], t.format || 'time_series', (v) => set({ format: v }), { label: 'Sorgu sonuç biçimi' })), sql,
   h('p', { class: 'hint' }, 'Makrolar: $__timeFilter(ts), $__unixEpochFilter(clock), $__timeGroupAlias(ts, 5m), $__unixEpochGroupAlias(clock, $__interval), $__timeFrom(), $__timeTo(). ',
     'Zaman serisi için "time" sütunu, isteğe bağlı "metric" sütunu ve sayısal değer sütunları döndürün. Sorgular salt-okunur işlemde çalışır.'),
   functionsEditor(t.functions || [], (functions) => set({ functions })));
@@ -117,7 +117,7 @@ function expressionEditor(target, ctx, onChange) {
   const wrap = h('div');
   const rerender = () => wrap.replaceWith(expressionEditor(t, ctx, onChange));
   wrap.append(h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'İfade türü' }),
-    select([{ value: 'math', label: 'Matematik' }, { value: 'reduce', label: 'Tek değere indir' }, { value: 'resample', label: 'Yeniden örnekle' }], type, (v) => { set({ type: v }); rerender(); })));
+    select([{ value: 'math', label: 'Matematik' }, { value: 'reduce', label: 'Tek değere indir' }, { value: 'resample', label: 'Yeniden örnekle' }], type, (v) => { set({ type: v }); rerender(); }, { label: 'İfade türü' })));
   if (type === 'math') {
     wrap.append(h('div', { class: 'q-line' }, input({ value: t.expression || '', placeholder: '$A / $B * 100', onChange: (e) => set({ expression: e.target.value }) })),
       h('p', { class: 'hint', text: 'Sorgulara $A, $B ile başvurun. +, -, *, /, %, **, karşılaştırmalar ve abs, log, sqrt, round, min, max kullanılabilir. Çok serili sorgular host etiketine göre eşleştirilir.' }));
@@ -125,16 +125,19 @@ function expressionEditor(target, ctx, onChange) {
     wrap.append(h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'Girdi' }), input({ value: t.expression || 'A', onChange: (e) => set({ expression: e.target.value }) })));
     if (type === 'reduce') {
       queryCatalog().then((c) => wrap.append(h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'Hesaplama' }),
-        select(c.reducers, t.reducer || 'mean', (v) => set({ reducer: v })))));
+        select(c.reducers, t.reducer || 'mean', (v) => set({ reducer: v }), { label: 'Hesaplama' }))));
     } else {
       wrap.append(h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'Pencere' }), input({ value: t.window || '5m', onChange: (e) => set({ window: e.target.value }) }),
-        h('span', { class: 'q-label', text: 'Fonksiyon' }), select(['avg', 'min', 'max', 'sum', 'last'], t.downsampler || 'avg', (v) => set({ downsampler: v }))));
+        h('span', { class: 'q-label', text: 'Fonksiyon' }), select(['avg', 'min', 'max', 'sum', 'last'], t.downsampler || 'avg', (v) => set({ downsampler: v }), { label: 'Yeniden örnekleme fonksiyonu' })));
     }
   }
   return wrap;
 }
 
 export function queryEditor(target, ds, ctx, onChange) {
+  if (['prometheus', 'loki'].includes(ds?.type)) return h('div', field(ds.type === 'prometheus' ? 'PromQL' : 'LogQL', textarea({ value: target.expr || '', rows: 4, placeholder: ds.type === 'prometheus' ? 'rate(http_requests_total[5m])' : '{job="app"}', onChange: e => onChange({ ...target, expr: e.target.value }) })));
+  if (['httpjson', 'csv'].includes(ds?.type)) return h('p', { class: 'hint', text: 'Kayıtlı uç noktadan tablo okunur. Alan seçimi ve düzenleme için Dönüşümler sekmesini kullanın.' });
+
   if (!ds) return h('div', { class: 'alert warn', text: 'Veri kaynağı bulunamadı; bir veri kaynağı seçin.' });
   if (ds.type === '__expr__') return expressionEditor(target, ctx, onChange);
   if (ds.type === 'postgres') return postgresEditor(target, ds, ctx, onChange);
@@ -219,9 +222,9 @@ export function queriesTab(panel, ctx, onChange) {
       const body = h('div', { class: 'q-body' });
       const refInput = h('span', { class: 'ref', contenteditable: 'true', spellcheck: 'false', text: target.refId,
         onblur: (e) => { const v = e.target.textContent.trim().toUpperCase().replace(/[^A-Z0-9_]/g, ''); if (v && !targets.some((t, i) => i !== index && t.refId === v)) { target.refId = v; onChange(); } else e.target.textContent = target.refId; } });
-      const head = h('div', { class: 'q-head' }, button('', { icon: 'chevron-down', variant: 'ghost', size: 'sm', onClick: () => row.classList.toggle('collapsed') }), refInput,
+      const head = h('div', { class: 'q-head' }, button('', { icon: 'chevron-down', variant: 'ghost', size: 'sm', title: 'Sorguyu daralt veya genişlet', onClick: (e) => { row.classList.toggle('collapsed'); e.currentTarget.setAttribute('aria-expanded', String(!row.classList.contains('collapsed'))); } }), refInput,
         isExpr ? h('span', { class: 'badge info', text: 'İfade' }) : null,
-        !isExpr && mixed ? select(list.map((d) => ({ value: d.uid, label: d.name })), (target.datasource && target.datasource.uid) || (list[0] && list[0].uid), (uid) => { target.datasource = { uid }; onChange(); draw(); }) : null,
+        !isExpr && mixed ? select(list.map((d) => ({ value: d.uid, label: d.name })), (target.datasource && target.datasource.uid) || (list[0] && list[0].uid), (uid) => { target.datasource = { uid }; onChange(); draw(); }, { label: `${target.refId} sorgusunun veri kaynağı` }) : null,
         h('span', { class: 'spacer' }),
         button('', { icon: target.hide ? 'eye-off' : 'eye', variant: 'ghost', size: 'sm', title: target.hide ? 'Göster' : 'Gizle (yalnızca ifadelerde kullan)', onClick: () => { target.hide = !target.hide; onChange(); draw(); } }),
         button('', { icon: 'copy', variant: 'ghost', size: 'sm', title: 'Çoğalt', onClick: () => { targets.splice(index + 1, 0, { ...JSON.parse(JSON.stringify(target)), refId: nextRef(targets) }); onChange(); draw(); } }),

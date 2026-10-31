@@ -12,8 +12,21 @@
 # $env:OPENREPORTING_SMTP_HOST = 'smtp-staging.example.internal'
 # $env:OPENREPORTING_SMTP_PORT = '587'
 # $env:OPENREPORTING_SMTP_STARTTLS = 'true'
+# $env:OPENREPORTING_SMTP_SECURITY = 'starttls'  # or 'tls' with port 465
+# $env:OPENREPORTING_SMTP_CA_FILE = 'C:\certificates\corporate-ca.pem'
+# $env:OPENREPORTING_SMTP_USER = 'reporter'
+# $env:OPENREPORTING_SMTP_PASSWORD_FILE = 'C:\OpenReporting-Secrets\smtp-password.txt'
 # $env:OPENREPORTING_SMTP_FROM = 'report-test@example.internal'
 # $env:OPENREPORTING_ALLOWED_RECIPIENT_DOMAINS = 'example.internal'
+
+# Optional LDAP staging test. Protect secret files with NTFS ACLs for the current user.
+# $env:OPENREPORTING_LDAP_ENABLED = 'true'
+# $env:OPENREPORTING_LDAP_URL = 'ldaps://directory.example.com:636'
+# $env:OPENREPORTING_LDAP_BIND_DN = 'CN=ReportReader,OU=ServiceAccounts,DC=example,DC=com'
+# $env:OPENREPORTING_LDAP_BIND_PASSWORD_FILE = 'C:\OpenReporting-Secrets\ldap-password.txt'
+# $env:OPENREPORTING_LDAP_BASE_DN = 'DC=example,DC=com'
+# $env:OPENREPORTING_LDAP_GROUP_ROLES = '{"CN=ReportReaders,OU=Groups,DC=example,DC=com":"viewer"}'
+# $env:OPENREPORTING_LDAP_CA_FILE = 'C:\certificates\corporate-ca.pem'
 
 # If Windows fonts are unavailable, select a local TrueType font:
 # $env:OPENREPORTING_PDF_FONT_FILE = 'C:\Windows\Fonts\arial.ttf'

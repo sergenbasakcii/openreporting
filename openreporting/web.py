@@ -6,10 +6,15 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import Settings
 from .db import connect, init_db, transaction, verify_audit
 from .domain import DomainError
+from .healthchecks import database_ready
+from .request_limits import RequestBodyLimitMiddleware
+from .http_security import OriginValidationMiddleware, trusted_hosts
+from .http_telemetry import HttpMetrics, HttpTelemetryMiddleware
 from .security import authenticate, digest, login, logout, require_csrf, require_role
 
 log = logging.getLogger(__name__)
@@ -21,31 +26,37 @@ SPA_PREFIXES = ("d/", "dashboards", "dashboard/", "explore", "datasources", "rep
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=80)
-    password: str
+    password: str = Field(max_length=1024)
+    otp: str | None = Field(default=None,max_length=128)
 
 
 def create_app(settings: Settings | None = None):
     from . import __version__, datasources as datasource_registry
     from .api import dashboards as dashboards_api, datasources as datasources_api, reports as reports_api
-    from .api import system as system_api, users as users_api
+    from .api import system as system_api, users as users_api, mfa as mfa_api
 
     settings = settings or Settings.from_env()
     init_db(settings)
     datasource_registry.provision(settings)
     app = FastAPI(title="OpenReporting", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings
+    app.state.http_metrics = HttpMetrics()
     static = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
-    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api):
+    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api,mfa_api):
         app.include_router(module.router)
+    app.add_middleware(RequestBodyLimitMiddleware)
+    app.add_middleware(OriginValidationMiddleware)
+    app.add_middleware(TrustedHostMiddleware,allowed_hosts=trusted_hosts(settings),www_redirect=False)
 
     @app.middleware("http")
     async def headers(request, call_next):
-        if request.method in ("POST", "PUT", "PATCH"):
-            length = request.headers.get("content-length")
-            if length is not None and (not length.isdecimal() or int(length) > 2_000_000):
-                return JSONResponse({"detail": "Request too large"}, status_code=413)
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Request contents and exception messages can contain credentials.
+            # The correlated HTTP 500 event is emitted by the outer telemetry layer.
+            response = JSONResponse({'detail': 'Internal server error'}, status_code=500)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -56,7 +67,8 @@ def create_app(settings: Settings | None = None):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         if settings.secure_cookie:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        if request.url.path.startswith("/static/") and not request.url.path.endswith((".html",)):
+        path = request.scope.get("path", "")
+        if path.startswith("/static/") and not path.endswith((".html",)):
             response.headers["Cache-Control"] = "no-cache"
         return response
 
@@ -74,14 +86,24 @@ def create_app(settings: Settings | None = None):
 
     @app.get("/readyz")
     def ready(user=Depends(authenticate)):
-        with connect(settings) as db:
-            audit_ok, broken_id = verify_audit(db)
-        return {"state_database": "ready", "audit_chain_valid": audit_ok, "audit_broken_id": broken_id,
-                "mail_enabled": settings.mail_enabled}
+        require_role(user, "admin")
+        database_ok, audit_ok, broken_id = False, None, None
+        try:
+            with connect(settings) as db:
+                database_ok = database_ready(db)
+                if database_ok:
+                    audit_ok, broken_id = verify_audit(db)
+        except Exception:  # A readiness probe must not expose storage exception details.
+            database_ok = False
+        return JSONResponse({"state_database": "ready" if database_ok else "unavailable", "audit_chain_valid": audit_ok,
+                             "audit_broken_id": broken_id, "mail_enabled": settings.mail_enabled},
+                            status_code=200 if database_ok and audit_ok else 503)
 
     @app.post("/api/login")
-    def sign_in(body: Credentials, response: Response):
-        token, csrf, expiry = login(settings, body.username, body.password)
+    def sign_in(body: Credentials, request: Request,response: Response):
+        if body.otp:
+            mfa_api.ensure_transport(request)
+        token, csrf, expiry = login(settings, body.username, body.password,body.otp)
         response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=settings.secure_cookie,
                             samesite="strict", max_age=settings.session_hours * 3600, path="/")
         return {"csrf": csrf, "expires_at": expiry}
@@ -98,7 +120,7 @@ def create_app(settings: Settings | None = None):
         # The CSRF token is minted on login and held in JS memory. A tab reload
         # logs the user into the same cookie session via a CSRF rotation endpoint.
         return {"user": {"id": user["id"], "username": user["username"], "role": user["role"]},
-                "expires_at": user["expires_at"]}
+                "expires_at": user["expires_at"],'mfa_enrollment_required':user['mfa_enrollment_required']}
 
     @app.post("/api/session/csrf")
     def csrf_refresh(request: Request, user=Depends(authenticate)):
@@ -131,4 +153,5 @@ def create_app(settings: Settings | None = None):
             return (static / "index.html").read_text(encoding="utf8")
         raise HTTPException(404, "Not found")
 
+    app.add_middleware(HttpTelemetryMiddleware, metrics=app.state.http_metrics)
     return app

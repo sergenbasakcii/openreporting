@@ -11,7 +11,9 @@ from .postgres import SSL_MODES, PostgresDataSource
 from .testdata import SCENARIOS, TestDataSource
 from .zabbix import ZabbixDataSource, validate_url
 
-TYPES = {"zabbix": ZabbixDataSource, "postgres": PostgresDataSource, "testdata": TestDataSource}
+from .http_sources import PrometheusDataSource, LokiDataSource, JSONDataSource, CSVDataSource, validate_http_url
+
+TYPES = {"prometheus": PrometheusDataSource, "loki": LokiDataSource, "httpjson": JSONDataSource, "csv": CSVDataSource, "zabbix": ZabbixDataSource, "postgres": PostgresDataSource, "testdata": TestDataSource}
 TYPE_INFO = [
     {"type": "zabbix", "name": "Zabbix", "description": "Zabbix API: host grupları, hostlar, item'lar, history/trend, problemler",
      "secure_fields": ["token"]},
@@ -20,6 +22,12 @@ TYPE_INFO = [
     {"type": "testdata", "name": "TestData (sentetik)",
      "description": "Gerçek olmayan, deterministik örnek veri ve Zabbix simülasyonu", "secure_fields": []},
 ]
+TYPE_INFO += [{"type": kind, "name": name, "description": description, "secure_fields": ["token"]} for kind, name, description in [
+ ("prometheus", "Prometheus / Mimir / VictoriaMetrics", "PromQL zaman serileri"),
+ ("loki", "Loki", "LogQL log ve metrik sorguları"),
+ ("httpjson", "HTTP JSON", "REST uç noktasından tablo"),
+ ("csv", "HTTP CSV", "CSV uç noktasından tablo"),
+]]
 SECURE_FIELDS = {t["type"]: t["secure_fields"] for t in TYPE_INFO}
 _UID = re.compile(r"^[A-Za-z0-9_-]{2,40}$")
 _TABLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
@@ -55,6 +63,13 @@ def _pem(text):
     return text.strip() + "\n"
 
 
+def _int(data, key, default):
+    try:
+        return int(data.get(key, default))
+    except (TypeError, ValueError):
+        raise DataSourceError(f"{key} bir tam sayı olmalı") from None
+
+
 def validate(kind, url, json_data, settings):
     if kind not in TYPES:
         raise DataSourceError("Unsupported datasource type")
@@ -69,9 +84,9 @@ def validate(kind, url, json_data, settings):
         for key, default in (("trends_from", "7d"), ("trends_range", "4d")):
             clean[key] = str(data.get(key) or default)
             parse_duration(clean[key])
-        clean["cache_ttl"] = max(0, min(int(data.get("cache_ttl", 60)), 3600))
-        clean["timeout"] = max(3, min(int(data.get("timeout", 30)), 300))
-        clean["max_items"] = max(1, min(int(data.get("max_items", 500)), 20000))
+        clean["cache_ttl"] = max(0, min(_int(data, "cache_ttl", 60), 3600))
+        clean["timeout"] = max(3, min(_int(data, "timeout", 30), 300))
+        clean["max_items"] = max(1, min(_int(data, "max_items", 500), 20000))
         clean["ca_pem"] = _pem(data.get("ca_pem", ""))
         clean["history_source"] = "sql" if data.get("history_source") == "sql" else "api"
         if clean["history_source"] == "sql":
@@ -84,6 +99,11 @@ def validate(kind, url, json_data, settings):
                 if not _TABLE.match(value):
                     raise DataSourceError(f"Geçersiz tablo adı: {value}")
                 clean[key] = value
+    elif kind in ("prometheus", "loki", "httpjson", "csv"):
+        url = validate_http_url(url, settings.allow_http_datasources)
+        clean["timeout"] = max(3, min(_int(data, "timeout", 30), 60))
+        clean["ca_pem"] = _pem(data.get("ca_pem", ""))
+        clean["root"] = str(data.get("root") or "")[:200]
     elif kind == "postgres":
         for key in ("host", "database", "user"):
             value = str(data.get(key, "")).strip()
@@ -95,8 +115,8 @@ def validate(kind, url, json_data, settings):
         if clean["sslmode"] not in SSL_MODES:
             raise DataSourceError("Geçersiz sslmode")
         clean["ca_pem"] = _pem(data.get("ca_pem", ""))
-        clean["timeout_ms"] = max(1000, min(int(data.get("timeout_ms", 30000)), 300000))
-        clean["max_rows"] = max(1, min(int(data.get("max_rows", 200000)), 1_000_000))
+        clean["timeout_ms"] = max(1000, min(_int(data, "timeout_ms", 30000), 300000))
+        clean["max_rows"] = max(1, min(_int(data, "max_rows", 200000), 1_000_000))
         url = f"{clean['host']}:{clean['port']}/{clean['database']}"
     else:
         url = ""
@@ -130,7 +150,7 @@ def get(settings, uid_or_name=None, *, transport=None):
 
 def list_all(settings):
     with connect(settings) as db:
-        rows = db.execute("SELECT * FROM datasources ORDER BY name COLLATE NOCASE").fetchall()
+        rows = db.execute("SELECT * FROM datasources ORDER BY LOWER(name),uid").fetchall()
     return [public(_row(r), settings) for r in rows]
 
 

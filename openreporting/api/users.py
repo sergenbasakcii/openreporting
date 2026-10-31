@@ -4,6 +4,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from .. import folder_access
 from ..db import audit, connect, transaction, utcnow
 from ..security import authenticate, check_password, create_user, password_hash
 from ..timerange import TimeRangeError, zone
@@ -53,8 +54,9 @@ def _email(value):
 @router.get("/api/users")
 def list_users(request: Request, user=Depends(admin_read)):
     with connect(settings_of(request)) as db:
-        return [dict(r) for r in db.execute("""SELECT id,username,role,active,email,display_name,created_at,last_login_at
-                                               FROM users ORDER BY username""")]
+        return [dict(r) for r in db.execute("""SELECT u.id,username,role,active,email,display_name,created_at,last_login_at,
+                                               COALESCE(e.provider,'local') AS auth_provider
+                                               FROM users u LEFT JOIN external_identities e ON e.user_id=u.id ORDER BY username""")]
 
 
 @router.post("/api/users", status_code=201)
@@ -82,6 +84,9 @@ def update_user(user_id: str, body: UserPatch, request: Request, user=Depends(ad
         target = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if not target:
             raise HTTPException(404, "Kullanıcı bulunamadı")
+        external = db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user_id,)).fetchone()
+        if external and body.role is not None:
+            raise HTTPException(409, "LDAP rolleri dizin gruplarıyla yönetilir")
         role = body.role if body.role is not None else target["role"]
         active = int(body.active) if body.active is not None else target["active"]
         if role not in ROLES:
@@ -90,6 +95,11 @@ def update_user(user_id: str, body: UserPatch, request: Request, user=Depends(ad
             admins = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
             if admins <= 1:
                 raise HTTPException(409, "Son etkin yönetici devre dışı bırakılamaz veya rolü değiştirilemez")
+            if not external:
+                local_admins = db.execute("""SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
+                                            AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)""").fetchone()[0]
+                if local_admins <= 1:
+                    raise HTTPException(409, "Son yerel kurtarma yöneticisi korunmalıdır")
         if user_id == user["id"] and not active:
             raise HTTPException(409, "Kendi hesabınızı devre dışı bırakamazsınız")
         email = _email(body.email) if body.email is not None else target["email"]
@@ -109,6 +119,8 @@ def reset_password(user_id: str, body: PasswordReset, request: Request, user=Dep
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     with connect(settings_of(request)) as db, transaction(db):
+        if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user_id,)).fetchone():
+            raise HTTPException(409, "LDAP parolası dizin hizmetinde değiştirilmelidir")
         if not db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, user_id)).rowcount:
             raise HTTPException(404, "Kullanıcı bulunamadı")
         db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
@@ -119,10 +131,15 @@ def reset_password(user_id: str, body: PasswordReset, request: Request, user=Dep
 @router.get("/api/user")
 def current_user(request: Request, user=Depends(authenticate)):
     with connect(settings_of(request)) as db:
-        row = db.execute("SELECT id,username,role,email,display_name,last_login_at FROM users WHERE id=?",
+        row = db.execute("""SELECT u.id,username,role,email,display_name,last_login_at,COALESCE(e.provider,'local') AS auth_provider
+                            FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.id=?""",
                          (user["id"],)).fetchone()
         prefs = db.execute("SELECT theme,timezone,home_dashboard_uid FROM user_prefs WHERE user_id=?",
                            (user["id"],)).fetchone()
+        if prefs and prefs["home_dashboard_uid"]:
+            target = db.execute("SELECT folder_id FROM dashboards WHERE uid=?", (prefs["home_dashboard_uid"],)).fetchone()
+            if not target or not folder_access.allowed(db, user, target["folder_id"]):
+                prefs = {**dict(prefs), "home_dashboard_uid": None}
     return {**dict(row), "preferences": dict(prefs) if prefs else
             {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None}}
 
@@ -140,6 +157,11 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
         if body.home_dashboard_uid and not db.execute("SELECT 1 FROM dashboards WHERE uid=?",
                                                       (body.home_dashboard_uid,)).fetchone():
             raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı")
+        if body.home_dashboard_uid:
+            try:
+                folder_access.require_dashboard(db, user, body.home_dashboard_uid)
+            except HTTPException:
+                raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı") from None
         db.execute("""INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,updated_at) VALUES(?,?,?,?,?)
                       ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
                       home_dashboard_uid=excluded.home_dashboard_uid,updated_at=excluded.updated_at""",
@@ -151,6 +173,8 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
 def change_password(body: PasswordChange, request: Request, user=Depends(viewer_write)):
     settings = settings_of(request)
     with connect(settings) as db:
+        if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user["id"],)).fetchone():
+            raise HTTPException(409, "LDAP parolası dizin hizmetinde değiştirilmelidir")
         row = db.execute("SELECT password_hash FROM users WHERE id=?", (user["id"],)).fetchone()
     if not row or not check_password(body.old_password, row["password_hash"]):
         raise HTTPException(403, "Mevcut parola hatalı")

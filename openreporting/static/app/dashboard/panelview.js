@@ -91,6 +91,8 @@ export class PanelView {
     this.updateTitle();
     this.ro = new ResizeObserver(() => { if (this.viz && this.viz.resize) this.viz.resize(); });
     this.ro.observe(this.vizEl);
+    this.onThemeChange = () => { if (!this.destroyed && this.viz) this.render(); };
+    window.addEventListener('openreporting:themechange', this.onThemeChange);
   }
 
   updateTitle() {
@@ -195,6 +197,7 @@ export class PanelView {
     this.seq += 1;
     if (this.abort) this.abort.abort();
     this.ro.disconnect();
+    window.removeEventListener('openreporting:themechange', this.onThemeChange);
     this.destroyViz();
     this.el.remove();
   }

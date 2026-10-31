@@ -29,7 +29,7 @@ def web(tmp_path):
     app = create_app(settings)
     create_user(settings, *EDITOR, "editor")
     create_user(settings, *VIEWER, "viewer")
-    with TestClient(app) as http:
+    with TestClient(app, base_url="http://localhost") as http:
         yield http
 
 

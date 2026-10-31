@@ -1,0 +1,53 @@
+{
+  "verified_at_utc": "2026-10-30T22:13:35.478030+00:00",
+  "source_commit": "07449f7",
+  "ci_url": "https://github.com/sergenbasakcii/openreporting/actions/runs/41136230810",
+  "contract": "60 pytest cases per Oracle userspace plus actual nginx HTTPS/MFA/report worker roundtrip; no full-VM acceptance",
+  "environments": [
+    {
+      "scope": "Oracle userspace/package/unit parser/nginx HTTPS/API/worker contract in disposable container",
+      "os": "Oracle Linux Server 10.2",
+      "python": "3.12.15",
+      "machine": "x86_64",
+      "kernel": "7.0.0-1017-azure",
+      "systemd_pid1_verified": false,
+      "selinux_enforcing_verified": false,
+      "full_vm_acceptance": "pending",
+      "application": "1.0.0",
+      "artifact": "oracle-linux-10-evidence",
+      "image_digests": [
+        "oraclelinux@sha256:c45341d07ee8d2397656d34e3e17306bc60c92ac4243da2ecfe8cdee8f25c01e"
+      ]
+    },
+    {
+      "scope": "Oracle userspace/package/unit parser/nginx HTTPS/API/worker contract in disposable container",
+      "os": "Oracle Linux Server 8.10",
+      "python": "3.12.15",
+      "machine": "x86_64",
+      "kernel": "7.0.0-1017-azure",
+      "systemd_pid1_verified": false,
+      "selinux_enforcing_verified": false,
+      "full_vm_acceptance": "pending",
+      "application": "1.0.0",
+      "artifact": "oracle-linux-8-evidence",
+      "image_digests": [
+        "oraclelinux@sha256:1f74281d8cc37c6e4adef0559f4c583022193dcfa8562d2e4a87161b6cd54df8"
+      ]
+    },
+    {
+      "scope": "Oracle userspace/package/unit parser/nginx HTTPS/API/worker contract in disposable container",
+      "os": "Oracle Linux Server 9.8",
+      "python": "3.12.15",
+      "machine": "x86_64",
+      "kernel": "7.0.0-1017-azure",
+      "systemd_pid1_verified": false,
+      "selinux_enforcing_verified": false,
+      "full_vm_acceptance": "pending",
+      "application": "1.0.0",
+      "artifact": "oracle-linux-9-evidence",
+      "image_digests": [
+        "oraclelinux@sha256:4639c9f64cf25ce55e9d54d6ceb18d780cb953e12dca493cc0eb7fbc2b7ac875"
+      ]
+    }
+  ]
+}

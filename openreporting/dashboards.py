@@ -8,10 +8,12 @@ import copy
 import json
 import re
 
+from . import folder_access
 from .db import audit, connect, transaction, utcnow
 from .domain import DomainError, canonical, identity
 
-PANEL_TYPES = {"timeseries", "barchart", "stat", "gauge", "bargauge", "table", "piechart", "text",
+EXTRA_PANEL_TYPES = {'donut', 'radar', 'calendarheatmap', 'heatmap', 'polarbar', 'candlestick', 'histogram', 'scatter', 'funnel', 'treemap', 'boxplot', 'nodegraph', 'stackedarea', 'waterfall', 'stepchart', 'sunburst', 'rosepie', 'parallel', 'bubble', 'sankey'}
+PANEL_TYPES = EXTRA_PANEL_TYPES | {"timeseries", "barchart", "stat", "gauge", "bargauge", "table", "piechart", "text",
                "statusgrid", "row", "heatmap", "statetimeline"}
 TYPE_ALIASES = {"graph": "timeseries", "singlestat": "stat", "grafana-singlestat-panel": "stat",
                 "table-old": "table", "grafana-piechart-panel": "piechart", "grafana-polystat-panel": "statusgrid",
@@ -345,6 +347,9 @@ def save(settings, user, dashboard, *, folder_uid=None, message="", overwrite=Fa
         else:
             folder_id = _folder_id(db, folder_uid)
         row = db.execute("SELECT * FROM dashboards WHERE uid=?", (model["uid"],)).fetchone()
+        if row:
+            folder_access.require_folder(db, user, row["folder_id"], edit=True)
+        folder_access.require_folder(db, user, folder_id, edit=True)
         clash = db.execute("SELECT uid FROM dashboards WHERE title=? AND COALESCE(folder_id,'')=COALESCE(?,'') AND uid<>?",
                            (model["title"], folder_id, model["uid"])).fetchone()
         if clash and not overwrite:
@@ -382,11 +387,12 @@ def get(settings, uid, user=None):
                             WHERE d.uid=?""", (uid,)).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
+        folder_access.require_folder(db, user, row["folder_id"])
+        can_edit = folder_access.allowed(db, user, row["folder_id"], edit=True)
         starred = bool(user and db.execute("SELECT 1 FROM dashboard_stars WHERE user_id=? AND dashboard_id=?",
                                            (user["id"], row["id"])).fetchone())
     model = json.loads(row["data_json"])
     model["version"] = row["version"]
-    can_edit = bool(user and user.get("role") in ("admin", "editor"))
     return {"dashboard": model, "meta": {
         "folderUid": row["folder_uid"], "folderTitle": row["folder_title"] or "Genel", "created": row["created_at"],
         "updated": row["updated_at"], "createdBy": row["created_name"], "updatedBy": row["updated_name"],
@@ -396,19 +402,22 @@ def get(settings, uid, user=None):
 
 def delete(settings, user, uid):
     with connect(settings) as db, transaction(db):
-        row = db.execute("SELECT id,title FROM dashboards WHERE uid=?", (uid,)).fetchone()
+        row = db.execute("SELECT id,title,folder_id FROM dashboards WHERE uid=?", (uid,)).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
+        folder_access.require_folder(db, user, row["folder_id"], edit=True)
         if db.execute("SELECT 1 FROM dash_reports WHERE dashboard_uid=?", (uid,)).fetchone():
             raise DashboardError("Bu dashboard'u kullanan raporlar var; önce raporları silin")
+        db.execute("DELETE FROM annotations WHERE dashboard_uid=?", (uid,))
         db.execute("DELETE FROM dashboard_stars WHERE dashboard_id=?", (row["id"],))
         db.execute("DELETE FROM dashboard_versions WHERE dashboard_id=?", (row["id"],))
         db.execute("DELETE FROM dashboards WHERE id=?", (row["id"],))
         audit(db, user["id"], "dashboard.deleted", "dashboard", uid, {"title": row["title"]})
 
 
-def versions(settings, uid):
+def versions(settings, uid, user=None):
     with connect(settings) as db:
+        folder_access.require_dashboard(db, user, uid)
         row = db.execute("SELECT id FROM dashboards WHERE uid=?", (uid,)).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
@@ -417,8 +426,9 @@ def versions(settings, uid):
                     WHERE v.dashboard_id=? ORDER BY v.version DESC""", (row["id"],))]
 
 
-def version_data(settings, uid, version):
+def version_data(settings, uid, version, user=None):
     with connect(settings) as db:
+        folder_access.require_dashboard(db, user, uid)
         row = db.execute("""SELECT v.data_json FROM dashboard_versions v JOIN dashboards d ON d.id=v.dashboard_id
                             WHERE d.uid=? AND v.version=?""", (uid, int(version))).fetchone()
     if not row:
@@ -427,7 +437,7 @@ def version_data(settings, uid, version):
 
 
 def restore(settings, user, uid, version):
-    model = version_data(settings, uid, version)
+    model = version_data(settings, uid, version, user)
     current = get(settings, uid, user)
     model["version"] = current["dashboard"]["version"]
     return save(settings, user, model, folder_uid=current["meta"]["folderUid"],
@@ -436,11 +446,13 @@ def restore(settings, user, uid, version):
 
 def star(settings, user, uid, value=True):
     with connect(settings) as db, transaction(db):
+        folder_access.require_dashboard(db, user, uid)
         row = db.execute("SELECT id FROM dashboards WHERE uid=?", (uid,)).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
         if value:
-            db.execute("INSERT OR IGNORE INTO dashboard_stars VALUES(?,?)", (user["id"], row["id"]))
+            db.execute("""INSERT INTO dashboard_stars(user_id,dashboard_id) VALUES(?,?)
+                          ON CONFLICT(user_id,dashboard_id) DO NOTHING""", (user["id"], row["id"]))
         else:
             db.execute("DELETE FROM dashboard_stars WHERE user_id=? AND dashboard_id=?", (user["id"], row["id"]))
 
@@ -451,7 +463,7 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
              FROM dashboards d LEFT JOIN folders f ON f.id=d.folder_id WHERE 1=1"""
     params = [user["id"]]
     if query:
-        sql += " AND d.title LIKE ? ESCAPE '\\'"
+        sql += " AND LOWER(d.title) LIKE LOWER(?) ESCAPE '\\'"
         params.append("%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
     if folder_uid is not None:
         if folder_uid == "":
@@ -460,11 +472,12 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
             sql += " AND f.uid=?"
             params.append(folder_uid)
     if starred:
-        sql += " AND starred=1"
-    sql += " ORDER BY d.title COLLATE NOCASE LIMIT ?"
-    params.append(max(1, min(int(limit), 5000)))
+        sql += " AND EXISTS(SELECT 1 FROM dashboard_stars s WHERE s.dashboard_id=d.id AND s.user_id=?)"
+        params.append(user["id"])
     with connect(settings) as db:
-        rows = db.execute(sql, params).fetchall()
+        visible, values = folder_access.visible_sql(db, user, "d.folder_id")
+        sql += " AND " + visible + " ORDER BY LOWER(d.title),d.uid LIMIT ?"
+        rows = db.execute(sql, [*params, *values, max(1, min(int(limit), 5000))]).fetchall()
     results = []
     for row in rows:
         tags = json.loads(row["tags_json"])
@@ -476,11 +489,14 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
     return results
 
 
-def folders(settings):
+def folders(settings, user=None):
     with connect(settings) as db:
-        return [dict(r) for r in db.execute("""SELECT f.uid,f.title,f.updated_at,
+        visible, values = folder_access.visible_sql(db, user, "f.id")
+        rows = db.execute("""SELECT f.id,f.uid,f.title,f.updated_at,
                 (SELECT COUNT(*) FROM dashboards d WHERE d.folder_id=f.id) AS dashboard_count
-                FROM folders f ORDER BY f.title COLLATE NOCASE""")]
+                FROM folders f WHERE """ + visible + " ORDER BY LOWER(f.title),f.uid", values).fetchall()
+        return [{**{k: r[k] for k in ("uid", "title", "updated_at", "dashboard_count")},
+                 "canEdit": folder_access.allowed(db, user, r["id"], edit=True)} for r in rows]
 
 
 def save_folder(settings, user, title, uid=None):
@@ -489,6 +505,7 @@ def save_folder(settings, user, title, uid=None):
         raise DashboardError("Klasör adı 1-120 karakter olmalı ve 'Genel' olamaz")
     now = utcnow()
     with connect(settings) as db, transaction(db):
+        folder_access.require_folder(db, user, _folder_id(db, uid) if uid else None, edit=True)
         if db.execute("SELECT 1 FROM folders WHERE title=? AND uid<>?", (title, uid or "")).fetchone():
             raise DashboardError("Bu adla bir klasör zaten var")
         if uid:
@@ -507,16 +524,18 @@ def delete_folder(settings, user, uid):
         row = db.execute("SELECT id FROM folders WHERE uid=?", (uid,)).fetchone()
         if not row:
             raise DashboardError("Klasör bulunamadı")
+        folder_access.require_folder(db, user, row["id"], edit=True)
         if db.execute("SELECT 1 FROM dashboards WHERE folder_id=?", (row["id"],)).fetchone():
             raise DashboardError("Klasör boş değil; önce dashboard'ları taşıyın veya silin")
         db.execute("DELETE FROM folders WHERE id=?", (row["id"],))
         audit(db, user["id"], "folder.deleted", "folder", uid)
 
 
-def tags(settings):
+def tags(settings, user=None):
     with connect(settings) as db:
         counts = {}
-        for row in db.execute("SELECT tags_json FROM dashboards"):
+        visible, values = folder_access.visible_sql(db, user, "d.folder_id")
+        for row in db.execute("SELECT tags_json FROM dashboards d WHERE " + visible, values):
             for tag in json.loads(row["tags_json"]):
                 counts[tag] = counts.get(tag, 0) + 1
     return [{"term": t, "count": c} for t, c in sorted(counts.items())]

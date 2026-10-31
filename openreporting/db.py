@@ -1,10 +1,51 @@
 import hashlib
 import json
-import sqlite3
-from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from .config import Settings
+from . import postgres_store, sqlite_store
+
+
+def connect(settings):
+    if settings.database_url:
+        postgres_store.assert_worker_ownership()
+        return postgres_store.connect(settings.database_url, timeout_ms=settings.query_timeout_ms)
+    return sqlite_store.connect(settings)
+
+
+def transaction(db):
+    backend = postgres_store if isinstance(db, postgres_store.Connection) else sqlite_store
+    return backend.transaction(db)
+
+
+def schema_version(db):
+    backend = postgres_store if isinstance(db, postgres_store.Connection) else sqlite_store
+    return backend.schema_version(db)
+
+
+def check_integrity(db, *, full=False):
+    if isinstance(db, postgres_store.Connection):
+        # Connectivity/schema metadata only; never claim a physical PostgreSQL scan.
+        db.execute("SELECT 1").fetchone()
+        schema_version(db)
+        return "ok"
+    return sqlite_store.check_integrity(db, full=full)
+
+
+def backup_database(settings, target):
+    if settings.database_url:
+        raise RuntimeError("PostgreSQL backup requires pg_dump; file backup is disabled for this backend")
+    return sqlite_store.backup_database(settings, target)
+
+
+def has_encrypted_secrets(settings):
+    if settings.database_url:
+        with connect(settings) as db:
+            if db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None:
+                return True
+            exists = db.execute("SELECT to_regclass('user_mfa')").fetchone()[0]
+            return bool(exists and db.execute("SELECT 1 FROM user_mfa WHERE secret_json<>'' LIMIT 1").fetchone())
+    return sqlite_store.has_encrypted_secrets(settings)
 
 
 def utcnow():
@@ -88,45 +129,64 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 1
+CURRENT_VERSION = 5
+
+# Each migration is a tuple of complete statements, executed in one transaction.
+# Only the initial schema is split here; later migrations may contain triggers or
+# other statements with internal semicolons and must be supplied explicitly.
+MIGRATIONS = {1: tuple(statement.strip() for statement in SCHEMA.split(";") if statement.strip())}
+_SOURCE_TYPES = "'zabbix','postgres','testdata','prometheus','loki','httpjson','csv'"
+_source_schema = next(s for s in MIGRATIONS[1] if s.startswith("CREATE TABLE IF NOT EXISTS datasources("))
+_source_schema = _source_schema.replace("datasources(", "datasources_v2(", 1).replace("'zabbix','postgres','testdata'", _SOURCE_TYPES)
+MIGRATIONS[2] = (_source_schema, "INSERT INTO datasources_v2 SELECT * FROM datasources", "DROP TABLE datasources", "ALTER TABLE datasources_v2 RENAME TO datasources")
+POSTGRES_MIGRATIONS = {1: postgres_store.bootstrap_statements(MIGRATIONS[1]), 2: (
+    "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
+    f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK(type IN ({_SOURCE_TYPES}))",
+)}
+MIGRATIONS[3] = ("""CREATE TABLE external_identities(
+ user_id TEXT PRIMARY KEY REFERENCES users(id), provider TEXT NOT NULL CHECK(provider='ldap'),
+ subject TEXT NOT NULL, UNIQUE(provider,subject))""",)
+POSTGRES_MIGRATIONS[3] = postgres_store.widen_integers(MIGRATIONS[3])
+MIGRATIONS[4] = ("""CREATE TABLE user_mfa(
+ user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ secret_json TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+ pending_expires_at TEXT NOT NULL DEFAULT '', setup_hash TEXT NOT NULL DEFAULT '', last_counter INTEGER NOT NULL DEFAULT -1,
+ recovery_hashes TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)""",
+ """CREATE TABLE mfa_sessions(token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE)""")
+POSTGRES_MIGRATIONS[4] = postgres_store.widen_integers(MIGRATIONS[4])
+MIGRATIONS[5] = ("""CREATE TABLE folder_policy(
+ folder_id TEXT PRIMARY KEY REFERENCES folders(id) ON DELETE CASCADE,
+ restricted INTEGER NOT NULL DEFAULT 0 CHECK(restricted IN (0,1)), revision INTEGER NOT NULL DEFAULT 0)""",
+ """CREATE TABLE folder_user_grants(
+ folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+ user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(folder_id,user_id))""")
+POSTGRES_MIGRATIONS[5] = postgres_store.widen_integers(MIGRATIONS[5])
+
+
 
 
 def init_db(settings: Settings):
     settings.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     settings.archive_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with connect(settings) as db:
-        version = db.execute("PRAGMA user_version").fetchone()[0]
+    if settings.database_url:
+        with connect(settings) as db:
+            postgres_store.init_schema(db, POSTGRES_MIGRATIONS, CURRENT_VERSION)
+        return
+    with connect(settings) as db, transaction(db):
+        # Acquire the write lock before reading the version: web workers may
+        # initialise the same database concurrently during application startup.
+        version = schema_version(db)
         if version > CURRENT_VERSION:
             raise RuntimeError("This application cannot open a newer database schema")
-        if version == 0:
-            # executescript commits implicitly; the version is set only when the whole schema exists.
-            db.executescript("BEGIN;" + SCHEMA + "PRAGMA user_version=1; COMMIT;")
-            db.execute("INSERT OR IGNORE INTO schema_versions VALUES (1,?)", (utcnow(),))
-        db.commit()
-
-
-@contextmanager
-def connect(settings: Settings):
-    db = sqlite3.connect(settings.db_path, timeout=20, isolation_level=None)
-    try:
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys=ON")
-        db.execute("PRAGMA busy_timeout=20000")
-        db.execute("PRAGMA journal_mode=WAL")
-        yield db
-    finally:
-        db.close()
-
-
-@contextmanager
-def transaction(db):
-    db.execute("BEGIN IMMEDIATE")
-    try:
-        yield
-        db.commit()
-    except BaseException:
-        db.rollback()
-        raise
+        for target in range(version + 1, CURRENT_VERSION + 1):
+            statements = MIGRATIONS.get(target)
+            if statements is None:
+                raise RuntimeError(f"Missing database migration: {target}")
+            for statement in statements:
+                db.execute(statement)
+            db.execute("INSERT INTO schema_versions(version,applied_at) VALUES (?,?)", (target, utcnow()))
+            sqlite_store.set_schema_version(db, target)
 
 
 def audit(db, actor, action, object_type, object_id, details=None):

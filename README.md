@@ -2,7 +2,9 @@
 
 OpenReporting; Zabbix ve SQL (PostgreSQL/TimescaleDB) kaynaklarından **Grafana benzeri dashboard’lar** kurmanızı,
 host grupları üzerinde **sorgu bazlı metrik** çekmenizi ve bunları **PDF / Excel / CSV raporlara** dönüştürüp
-zamanlamanızı sağlar. Tek bir Ubuntu sunucuda çalışır; Redis, Node, CDN veya harici bulut servisi gerektirmez.
+zamanlamanızı sağlar. Tek bir Linux sunucu için tasarlanmıştır; Redis, Node, CDN veya harici bulut servisi gerektirmez.
+Ubuntu 24.04 kurulum kabulü doğrulanmıştır. Oracle Linux 8.10/9.4+/10 için yerel kurulum yolu ve
+izole Oracle kullanıcı alanı testleri vardır; tam Oracle host kabulünün sınırları [yönergede](docs/ORACLE_LINUX.md) açıklanır.
 
 > Kaynak sistemlere **yalnızca okuma** yapılır. Veri olmayan noktalar asla sıfır kabul edilmez; eksik veri içeren
 > raporlar “kısmi” olarak işaretlenir ve varsayılan olarak e-postayla gönderilmez.
@@ -19,7 +21,7 @@ zamanlamanızı sağlar. Tek bir Ubuntu sunucuda çalışır; Redis, Node, CDN v
 | Değişkenler | Sorgu (Zabbix/SQL), özel liste, metin kutusu, sabit, aralık, veri kaynağı; çoklu seçim + “Tümü”, zincirleme (`$group` → `$host`), regex, sıralama, URL ile paylaşım |
 | Raporlar | Dashboard’dan **PDF (vektör)**, **Excel**, **CSV**; kapak + içindekiler; dashboard ızgarası veya akış düzeni; **`split_by` ile her host / grup için ayrı bölüm**; zamanlama (saatlik/günlük/haftalık/aylık/yıllık, “önceki tam dönem”); e-posta; SHA-256 manifest + denetim zinciriyle doğrulanan arşiv; saklama süresi |
 | Yönetim | Veri kaynakları (şifreli kimlik bilgisi, bağlantı testi), kullanıcılar ve roller, tercihler (tema, saat dilimi, ana sayfa), sunucu durumu, denetim kaydı, Prometheus `/metrics` |
-| İşletim | Ubuntu kurulum betiği, sertleştirilmiş systemd servisleri, nginx TLS, günlük yedekleme zamanlayıcısı, yükseltme + geri dönüş, `openreporting doctor`, Docker alternatifi |
+| İşletim | Ubuntu ve Oracle Linux kurulum yolları, sertleştirilmiş systemd servisleri, nginx TLS, günlük yedekleme zamanlayıcısı, yükseltme + geri dönüş, `openreporting doctor`, Docker alternatifi |
 
 
 ## Hızlı başlangıç — Ubuntu sunucu (üretim)
@@ -32,6 +34,12 @@ sudo ./deploy/install-ubuntu.sh --domain openreporting.sirket.local --self-signe
 Kurulum; servis kullanıcısını, `/opt/openreporting` (kod + venv), `/var/lib/openreporting` (veri), `/etc/openreporting` (ayar + anahtar)
 dizinlerini, `openreporting-web` / `openreporting-worker` servislerini, nginx HTTPS ters vekilini ve gece yedeğini hazırlar.
 Ayrıntılar: **[docs/LINUX_DEPLOYMENT.md](docs/LINUX_DEPLOYMENT.md)**.
+
+Oracle Linux: `deploy/install-oracle-linux.sh`; sürüm/Python, SELinux ve gerçek host kabulü
+ayrımı için **[docs/ORACLE_LINUX.md](docs/ORACLE_LINUX.md)**.
+
+LDAP/Active Directory, SMTP TLS/kurum CA'sı, servis hesapları ve canlıya alma kontrolleri:
+**[docs/ENTERPRISE_DEPLOYMENT.md](docs/ENTERPRISE_DEPLOYMENT.md)** (henüz yayınlanmamış geliştirme sürümü).
 
 İlk girişten sonra:
 1. **Yönetim → Veri kaynakları → Veri kaynağı ekle → Zabbix**: `https://zabbix.../api_jsonrpc.php` + salt-okunur API token.
@@ -49,7 +57,7 @@ Kullanım kılavuzu: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 ```
 
 Ayrıntılar: [README_WINDOWS.md](README_WINDOWS.md). Windows yalnızca kişisel değerlendirme içindir; zamanlanmış
-raporların sürekli çalışması için Ubuntu kurulumunu kullanın.
+raporların sürekli çalışması için uygun Linux sunucu kurulumunu ve ortam kabulünü kullanın.
 
 ## Mimari (özet)
 
@@ -82,7 +90,7 @@ openreporting export-dashboards DIR | import-dashboards DIR   # dashboard’lar�
 openreporting backup /yedek/state.sqlite3 | verify-audit
 ```
 
-Ubuntu’da bu komutları servis kullanıcısıyla çalıştırmak için: `sudo /opt/openreporting/app/deploy/openreporting-admin.sh <komut>`.
+Linux sunucuda bu komutları servis kullanıcısıyla çalıştırmak için: `sudo /opt/openreporting/app/deploy/openreporting-admin.sh <komut>`.
 
 ## Güvenlik ilkeleri
 
