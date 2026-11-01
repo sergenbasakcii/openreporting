@@ -207,7 +207,8 @@ def authenticate(request: Request):
     token = request.cookies.get("openreporting_session")
     if not token:
         raise HTTPException(401, "Login required")
-    settings = request.app.state.settings
+    from .runtime_settings import effective
+    settings = effective(request.app.state.settings)
     try:
         with connect(settings) as db:
             row = db.execute("""SELECT u.id,u.username,u.role,u.active,s.csrf_hash,s.expires_at,s.created_at,e.provider,

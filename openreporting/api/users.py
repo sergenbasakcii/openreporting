@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from .. import folder_access
 from ..db import audit, connect, transaction, utcnow
-from ..security import authenticate, check_password, create_user, password_hash
+from ..security import authenticate, check_password, create_user, password_hash, reauthenticate
 from ..timerange import TimeRangeError, zone
 from .deps import admin, admin_read, settings_of, viewer_write
 
@@ -39,6 +39,11 @@ class PasswordChange(BaseModel):
     new_password: str = Field(min_length=14, max_length=256)
 
 
+class MfaReset(BaseModel):
+    reason: str
+    password: str = Field(min_length=1, max_length=1024)
+
+
 class PreferencesIn(BaseModel):
     theme: str = "dark"
     timezone: str = "browser"
@@ -55,8 +60,10 @@ def _email(value):
 def list_users(request: Request, user=Depends(admin_read)):
     with connect(settings_of(request)) as db:
         return [dict(r) for r in db.execute("""SELECT u.id,username,role,active,email,display_name,created_at,last_login_at,
-                                               COALESCE(e.provider,'local') AS auth_provider
-                                               FROM users u LEFT JOIN external_identities e ON e.user_id=u.id ORDER BY username""")]
+                                               COALESCE(e.provider,'local') AS auth_provider,
+                                               COALESCE(m.enabled,0) AS mfa_enabled
+                                               FROM users u LEFT JOIN external_identities e ON e.user_id=u.id
+                                               LEFT JOIN user_mfa m ON m.user_id=u.id ORDER BY username""")]
 
 
 @router.post("/api/users", status_code=201)
@@ -125,6 +132,25 @@ def reset_password(user_id: str, body: PasswordReset, request: Request, user=Dep
             raise HTTPException(404, "Kullanıcı bulunamadı")
         db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
         audit(db, user["id"], "user.password_reset_by_admin", "user", user_id)
+    return {"ok": True}
+
+
+@router.post("/api/users/{user_id}/mfa/reset")
+def reset_mfa(user_id: str, body: MfaReset, request: Request, user=Depends(admin)):
+    """Admin recovery for a lost authenticator; the user enrolls again at next sign-in."""
+    if body.reason not in {"lost-device", "compromise", "recovery"}:
+        raise HTTPException(422, "Geçerli bir sıfırlama nedeni seçin")
+    if user_id == user["id"]:
+        raise HTTPException(409, "Kendi iki adımlı girişinizi Profil sayfasından yönetin")
+    settings = settings_of(request)
+    reauthenticate(settings, user, body.password)
+    with connect(settings) as db, transaction(db):
+        if not db.execute("SELECT 1 FROM users WHERE id=?", (user_id,)).fetchone():
+            raise HTTPException(404, "Kullanıcı bulunamadı")
+        if not db.execute("DELETE FROM user_mfa WHERE user_id=?", (user_id,)).rowcount:
+            raise HTTPException(409, "Bu kullanıcıda iki adımlı giriş kurulu değil")
+        db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+        audit(db, user["id"], "mfa.reset_by_admin", "user", user_id, {"reason": body.reason})
     return {"ok": True}
 
 

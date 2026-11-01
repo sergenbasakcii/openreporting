@@ -61,7 +61,7 @@ def test_full_restore_check_preserves_live_and_backup_files(bundle):
     settings,backup = bundle
     original = {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in backup.iterdir()}
     result = verify_backup(backup,key_file=settings.data_dir / 'secret.key',require_logos=True)
-    assert result == {'ok':True,'schema_version':db.CURRENT_VERSION,'reports':1,'artifacts':1,'logos':1,'encrypted_sources':1,'encrypted_factors':0}
+    assert result == {'ok':True,'schema_version':db.CURRENT_VERSION,'reports':1,'artifacts':1,'logos':1,'encrypted_sources':1,'encrypted_factors':0,'encrypted_settings':0}
     assert {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in backup.iterdir()} == original
     with db.connect(settings) as connection:
         assert db.verify_audit(connection)==(True,None)

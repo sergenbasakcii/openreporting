@@ -10,6 +10,16 @@ def _flag(name: str, default: bool = False) -> bool:
     return value in {"true", "1", "yes"}
 
 
+def _validate_pem(pem: str):
+    import ssl
+    if len(pem) > 65536 or "-----BEGIN CERTIFICATE-----" not in pem:
+        raise ValueError("CA certificate must be PEM text (max 64 KB)")
+    try:
+        ssl.create_default_context().load_verify_locations(cadata=pem)
+    except (ssl.SSLError, ValueError):
+        raise ValueError("Invalid CA certificate PEM") from None
+
+
 def _secret(name: str) -> str:
     """Support mounted secrets without exposing their contents in startup errors."""
     value, filename = os.getenv(name, ""), os.getenv(name + "_FILE", "")
@@ -71,6 +81,9 @@ class Settings:
     ldap_session_minutes: int = 60
     allowed_hosts: tuple[str, ...] = ()
     mfa_required_roles: tuple[str, ...] = ()
+    # PEM bundles entered in the admin UI; used alongside the *_CA_FILE paths.
+    smtp_ca_pem: str = ""
+    ldap_ca_pem: str = ""
 
     @classmethod
     def from_env(cls):
@@ -124,6 +137,11 @@ class Settings:
             allowed_hosts=tuple(x.strip() for x in os.getenv("OPENREPORTING_ALLOWED_HOSTS", "").split(',') if x.strip()),
             mfa_required_roles=tuple(dict.fromkeys(x.strip() for x in os.getenv('OPENREPORTING_MFA_REQUIRED_ROLES','').split(',') if x.strip())),
         )
+        return data.validate()
+
+    def validate(self):
+        """Raise ValueError for an unsafe or inconsistent combination; shared by env and admin UI settings."""
+        data = self
         if not 1 <= data.query_concurrency <= 64 or not 10_000 <= data.max_series_points <= 50_000_000:
             raise ValueError("Invalid query concurrency or point budget")
         if not 0 <= data.report_retention_days <= 36500:
@@ -138,6 +156,9 @@ class Settings:
             raise ValueError("Invalid query timeout")
         if data.mail_enabled and (not data.smtp_host or not data.smtp_from or not data.recipient_domains):
             raise ValueError("Mail requires SMTP host, sender and domain allowlist")
+        for pem in (data.smtp_ca_pem, data.ldap_ca_pem):
+            if pem:
+                _validate_pem(pem)
         from .mail_transport import validate_settings as validate_smtp
         from .directory_auth import validate_settings as validate_ldap
         validate_smtp(data)

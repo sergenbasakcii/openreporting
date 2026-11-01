@@ -84,9 +84,20 @@ durumu, `doctor` sonucu, yönetici hesapları ve ilk giriş adımları özetleni
 | `openreporting-backup.timer` | root | Her gece 02:30 tutarlı yedek |
 | nginx `openreporting.conf` | — | HTTP→HTTPS yönlendirme, TLS 1.2/1.3, gzip, `/metrics` dışarıya kapalı |
 
-## 3. Yapılandırma (`/etc/openreporting/openreporting.env`)
+## 3. Yapılandırma
 
-Değişiklikten sonra: `sudo systemctl restart openreporting-web openreporting-worker`.
+**Arayüzden (önerilen):** *Yönetim → Sistem ayarları* sayfasında E-posta (SMTP), LDAP / Active Directory,
+Güvenlik (oturum süresi, MFA zorunlu roller), Sorgu ve rapor sınırları ile Veri kaynağı politikası
+düzenlenir. Kaydetme mevcut parolayı ister, denetim kaydına yazılır ve yeniden başlatma gerekmeden
+2–3 saniye içinde web ve worker süreçlerine uygulanır. Arayüzde kaydedilen değer dosyadakinin önüne
+geçer; her alanın yanında kaynağı (*Arayüz* / *Sunucu dosyası*) görünür ve bölüm bazında
+*Sunucu dosyasındaki değerlere dön* ile geri alınır. SMTP/LDAP parolaları şifreleme anahtarıyla
+saklanır, tarayıcıya geri gönderilmez; kurum CA sertifikası PEM olarak yapıştırılabilir.
+Saklanan değer açılamaz veya geçersiz hale gelirse ilgili entegrasyon kapatılır ve sayfada uyarı çıkar.
+
+**Dosyadan (`/etc/openreporting/openreporting.env`):** adres, veri dizini, çerez, web işçi sayısı,
+veritabanı ve anahtar yolu gibi süreç düzeyindeki ayarlar yalnız buradan değişir (arayüzde salt okunur
+gösterilir). Değişiklikten sonra: `sudo systemctl restart openreporting-web openreporting-worker`.
 
 | Değişken | Varsayılan | Açıklama |
 | --- | --- | --- |

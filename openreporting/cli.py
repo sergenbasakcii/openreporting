@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Settings
+from .runtime_settings import effective
 from .db import audit, backup_database, check_integrity, connect, init_db, schema_version, transaction, verify_audit
 from .security import create_user, password_hash
 
@@ -290,11 +291,11 @@ def main(argv=None):
             from .web import create_app
             uvicorn.run(create_app(settings), workers=1, **common)
     elif args.action == "doctor":
-        raise SystemExit(doctor(settings, check_integrations=args.check_integrations))
+        raise SystemExit(doctor(effective(settings), check_integrations=args.check_integrations))
     elif args.action == "check-ldap":
         from .directory_auth import authenticate as directory_login, DirectoryUnavailable
         try:
-            result = directory_login(settings, args.username.strip().lower(), getpass.getpass("Directory password: "))
+            result = directory_login(effective(settings), args.username.strip().lower(), getpass.getpass("Directory password: "))
         except DirectoryUnavailable as exc:
             raise SystemExit(str(exc)) from None
         if result is None:

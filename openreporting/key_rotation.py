@@ -10,13 +10,16 @@ from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from .db import CURRENT_VERSION, audit, schema_version, transaction, verify_audit
 from .secrets_store import KEYRING_FORMAT, MAX_KEYS, SecretError, key_id, key_path, read_keys
 
-LOCATIONS = (('datasources','id','secure_json'),('user_mfa','user_id','secret_json'))
+LOCATIONS = (('datasources','id','secure_json'),('user_mfa','user_id','secret_json'),('app_settings','scope','secure_json'))
 
 
 def _valid_payload(payload,table,identity):
     data = json.loads(payload)
     if not isinstance(data,dict):
         raise ValueError('Invalid credential record')
+    if table=='app_settings':
+        from .runtime_settings import valid_payload
+        valid_payload(data,identity)
     if table=='user_mfa':
         import re
         if set(data)!={'type','user_id','secret'} or data['type']!='mfa-totp-v1' or data['user_id']!=identity or not isinstance(data['secret'],str) or not re.fullmatch('[A-Z2-7]{32}',data['secret']):
@@ -86,8 +89,8 @@ def rekey_secrets(settings, *, services_stopped=False):
                     db.execute(f'UPDATE {table} SET {column}=? WHERE {identity}=?',(rotated.decode('ascii'),row[identity]))
                     changed[table] += 1
             if sum(changed.values()):
-                audit(db,'os-admin','secrets.rekeyed','keyring',key_id(keys[0]),{'sources':changed['datasources'],'factors':changed['user_mfa'],'retained_key_ids':[key_id(k) for k in keys[1:]]})
-        return {'primary_id':key_id(keys[0]),'sources_rekeyed':changed['datasources'],'mfa_secrets_rekeyed':changed['user_mfa']}
+                audit(db,'os-admin','secrets.rekeyed','keyring',key_id(keys[0]),{'sources':changed['datasources'],'factors':changed['user_mfa'],'settings':changed['app_settings'],'retained_key_ids':[key_id(k) for k in keys[1:]]})
+        return {'primary_id':key_id(keys[0]),'sources_rekeyed':changed['datasources'],'mfa_secrets_rekeyed':changed['user_mfa'],'settings_secrets_rekeyed':changed['app_settings']}
     except SecretError:
         raise
     except Exception:

@@ -43,8 +43,11 @@ def has_encrypted_secrets(settings):
         with connect(settings) as db:
             if db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None:
                 return True
-            exists = db.execute("SELECT to_regclass('user_mfa')").fetchone()[0]
-            return bool(exists and db.execute("SELECT 1 FROM user_mfa WHERE secret_json<>'' LIMIT 1").fetchone())
+            for table, column in (("user_mfa", "secret_json"), ("app_settings", "secure_json")):
+                exists = db.execute(f"SELECT to_regclass('{table}')").fetchone()[0]
+                if exists and db.execute(f"SELECT 1 FROM {table} WHERE {column}<>'' LIMIT 1").fetchone():
+                    return True
+            return False
     return sqlite_store.has_encrypted_secrets(settings)
 
 
@@ -129,7 +132,7 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 5
+CURRENT_VERSION = 6
 
 # Each migration is a tuple of complete statements, executed in one transaction.
 # Only the initial schema is split here; later migrations may contain triggers or
@@ -162,6 +165,13 @@ MIGRATIONS[5] = ("""CREATE TABLE folder_policy(
  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(folder_id,user_id))""")
 POSTGRES_MIGRATIONS[5] = postgres_store.widen_integers(MIGRATIONS[5])
+# Admin-UI settings layered over the environment file; secrets are Fernet-sealed per scope.
+# Rows are never deleted: a reset clears values and bumps the revision so caches stay monotonic.
+MIGRATIONS[6] = ("""CREATE TABLE app_settings(
+ scope TEXT PRIMARY KEY CHECK(scope IN ('mail','ldap','security','limits','sources')),
+ values_json TEXT NOT NULL DEFAULT '{}', secure_json TEXT NOT NULL DEFAULT '',
+ revision INTEGER NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL)""",)
+POSTGRES_MIGRATIONS[6] = postgres_store.widen_integers(MIGRATIONS[6])
 
 
 

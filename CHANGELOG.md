@@ -1,6 +1,14 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Sistem ayarları sayfası** (Yönetim → Sistem ayarları): SMTP, LDAP/AD (grup → rol eşlemesi,
+  CA PEM), oturum süresi ve MFA zorunlu roller, sorgu/rapor sınırları ve veri kaynağı politikası
+  arayüzden düzenlenir. Değerler sunucu dosyasının önüne geçer, yeniden başlatma olmadan 2–3 sn içinde
+  web ve worker'a uygulanır; kaydetme parola onayı ister, denetim kaydına yazılır, eşzamanlı
+  değişiklik 409 ile korunur. SMTP/LDAP parolaları kapsamına bağlı Fernet ile şifreli saklanır,
+  anahtar rotasyonu ve yedek doğrulamasına dahildir; açılamayan kayıt entegrasyonu kapatır.
+  Bağlantı testi kaydetmeden yapılır. Süreç düzeyi ayarlar salt okunur gösterilir. Şema 6.
+- Yönetici, Kullanıcılar sayfasından başka bir kullanıcının iki adımlı girişini sıfırlayabilir.
 - İki adımlı giriş kurulumu artık **QR kod** gösterir (sunucuda `segno` ile üretilir, dış servis yok);
   anahtarı elle girme yalnız yedek seçenektir. Onay alanı yalnız 6 haneli kodu kabul eder ve anahtarın
   yanlışlıkla girilmesini açık bir mesajla engeller.

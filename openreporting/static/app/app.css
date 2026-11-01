@@ -343,6 +343,11 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 
 .section-heading { font-size: 16px; }
 .card .section-heading { margin-bottom: 10px; }
+.setting-row { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.setting-row:last-of-type { border-bottom: 0; }
+.setting-row .grow { flex: 1; min-width: 0; }
+.setting-row > .badge { margin-top: 22px; }
+@media (max-width: 640px) { .setting-row { flex-direction: column; } .setting-row > .badge { margin-top: 0; } }
 .subsection-heading { font-size: 14px; }
 /* Security setup uses existing theme surfaces; one-time codes remain selectable. */
 .mfa-codes { overflow-x: auto; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 13px; line-height: 1.7; }

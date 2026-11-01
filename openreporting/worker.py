@@ -138,6 +138,7 @@ class _Heartbeat:
 
 def _run_locked(settings, once, interval):
     from .reporting import service as dash_reports
+    from .runtime_settings import effective
     worker_id = identity()
     started_at = utcnow()
     last_retention = 0.0
@@ -161,15 +162,17 @@ def _run_locked(settings, once, interval):
                     return None
 
             update_worker_heartbeat(settings, worker_id, started_at, heartbeat.error)
-            phase("mark_interrupted", dash_reports.mark_interrupted, settings)
-            phase("tick_schedules", dash_reports.tick_schedules, settings)
-            run_id = phase("claim", dash_reports.claim, settings)
+            # Admin-UI changes (SMTP, retention, limits) apply from the next cycle without a restart.
+            current = effective(settings)
+            phase("mark_interrupted", dash_reports.mark_interrupted, current)
+            phase("tick_schedules", dash_reports.tick_schedules, current)
+            run_id = phase("claim", dash_reports.claim, current)
             if run_id:
                 ran.append(run_id)
-                phase("execute", dash_reports.execute, settings, run_id)
+                phase("execute", dash_reports.execute, current, run_id)
             if time.monotonic() - last_retention > 3600:
                 last_retention = time.monotonic()
-                phase("retention", dash_reports.apply_retention, settings)
+                phase("retention", dash_reports.apply_retention, current)
             heartbeat.error = "; ".join(errors)[:400]
             if once:
                 return

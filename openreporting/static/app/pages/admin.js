@@ -20,13 +20,14 @@ export async function usersPage(root, { app }) {
       button('Kullanıcı ekle', { icon: 'plus', variant: 'primary', onClick: () => addUser(draw) })));
     const table = h('table', { class: 'list' }, h('tr', ['Kullanıcı', 'Ad', 'E-posta', 'Rol', 'Durum', 'Son giriş', 'İşlemler'].map((t) => h('th', { text: t }))));
     for (const u of users) {
-      table.append(h('tr', h('td', h('b', { text: u.username }), u.auth_provider === 'ldap' ? h('span', { class: 'badge', text: 'LDAP' }) : null), h('td', { text: u.display_name || '—' }), h('td', { text: u.email || '—' }),
+      table.append(h('tr', h('td', h('b', { text: u.username }), u.auth_provider === 'ldap' ? h('span', { class: 'badge', text: 'LDAP' }) : null, u.mfa_enabled ? h('span', { class: 'badge ok', title: 'İki adımlı giriş etkin', text: '2FA' }) : null), h('td', { text: u.display_name || '—' }), h('td', { text: u.email || '—' }),
         h('td', u.auth_provider === 'ldap' ? h('span', { text: `${ROLE_LABELS[u.role]} · dizin grubu` }) : select(roleOptions, u.role, async (v) => { try { await patch(`/api/users/${u.id}`, { role: v }); toast('Rol güncellendi', 'ok'); } catch (err) { toast(err.message, 'error'); draw(); } }, { label: `${u.username} kullanıcısının rolü` })),
         h('td', u.active ? h('span', { class: 'badge ok', text: 'etkin' }) : h('span', { class: 'badge err', text: 'devre dışı' })),
         h('td', { text: u.last_login_at ? timeAgo(u.last_login_at) : 'hiç' }),
         h('td', { class: 'actions' },
           button('Düzenle', { size: 'sm', onClick: () => editUser(u, draw) }),
           u.auth_provider === 'ldap' ? null : button('Parola sıfırla', { size: 'sm', onClick: () => resetPassword(u) }),
+          u.mfa_enabled && u.id !== app.user.id ? button('İki adımlı girişi sıfırla', { size: 'sm', onClick: () => resetFactor(u, draw) }) : null,
           u.id !== app.user.id ? button(u.active ? 'Devre dışı bırak' : 'Etkinleştir', { size: 'sm', onClick: async () => {
             if (u.active && !(await confirmDialog('Kullanıcıyı devre dışı bırak', `${u.username} oturumları sonlandırılacak.`, { danger: true, okText: 'Devre dışı bırak' }))) return;
             try { await patch(`/api/users/${u.id}`, { active: !u.active }); draw(); } catch (err) { toast(err.message, 'error'); }
@@ -54,6 +55,19 @@ function editUser(u, done) {
     field('E-posta', input({ value: m.email, onChange: (e) => { m.email = e.target.value; } }))),
   footer: [button('Vazgeç', { onClick: () => dlg.close() }), button('Kaydet', { variant: 'primary', onClick: async () => {
     try { await patch(`/api/users/${u.id}`, m); dlg.close(); done(); } catch (err) { toast(err.message, 'error'); }
+  } })] });
+}
+
+const RESET_REASONS = [{ value: 'lost-device', label: 'Telefon kayboldu / değişti' }, { value: 'compromise', label: 'Kurulum anahtarı başkasına göründü' }, { value: 'recovery', label: 'Diğer kurtarma' }];
+
+function resetFactor(u, done) {
+  const m = { reason: 'lost-device', password: '' };
+  const dlg = modal({ title: `İki adımlı girişi sıfırla · ${u.username}`, body: h('div',
+    h('p', { class: 'muted', text: 'Kullanıcının doğrulayıcı kaydı ve kurtarma kodları silinir, açık oturumları kapanır. Parolası değişmez; sonraki girişte QR ile yeniden kurar.' }),
+    field('Neden', select(RESET_REASONS, m.reason, (v) => { m.reason = v; })),
+    field('Sizin mevcut parolanız', input({ type: 'password', autocomplete: 'current-password', onInput: (e) => { m.password = e.target.value; } }))),
+  footer: [button('Vazgeç', { onClick: () => dlg.close() }), button('Sıfırla', { variant: 'danger', onClick: async () => {
+    try { await post(`/api/users/${u.id}/mfa/reset`, m); toast('İki adımlı giriş sıfırlandı', 'ok'); dlg.close(); done(); } catch (err) { toast(err.message, 'error'); }
   } })] });
 }
 

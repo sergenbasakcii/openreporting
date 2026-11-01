@@ -136,6 +136,12 @@ def _verify_copy(target,key,require_logos):
             payload = decrypt(settings,row['secret_json'])
             _valid_payload(json.dumps(payload),'user_mfa',row['user_id'])
             factors += 1
+        settings_secrets = 0
+        for row in db.execute("SELECT scope,secure_json FROM app_settings WHERE secure_json<>''"):
+            if key is None:
+                raise BackupVerificationError('Encryption key is required to verify stored settings')
+            _valid_payload(json.dumps(decrypt(settings,row['secure_json'])),'app_settings',row['scope'])
+            settings_secrets += 1
     logo_files = list((target / 'logos').glob('*.png'))
     for image_file in logo_files:
         if not re.fullmatch(r'[a-f0-9]{64}',image_file.stem) or _hash(image_file) != image_file.stem:
@@ -147,7 +153,7 @@ def _verify_copy(target,key,require_logos):
     logo_count = len(logo_files)
     if require_logos and not logo_count:
         raise BackupVerificationError('Expected report logos are missing from backup')
-    return {'ok':True,'schema_version':CURRENT_VERSION,'reports':reports,'artifacts':artifacts,'logos':logo_count,'encrypted_sources':secrets,'encrypted_factors':factors}
+    return {'ok':True,'schema_version':CURRENT_VERSION,'reports':reports,'artifacts':artifacts,'logos':logo_count,'encrypted_sources':secrets,'encrypted_factors':factors,'encrypted_settings':settings_secrets}
 
 
 def verify_backup(directory,*,key_file=None,max_unpacked_bytes=2 * 1024**3,require_logos=False):

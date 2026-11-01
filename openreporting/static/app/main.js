@@ -74,6 +74,7 @@ function shell(root) {
       h('div', { class: 'nav-section', text: 'Yönetim' }),
       navItem('/datasources', 'Veri kaynakları', 'database', '^/datasources'),
       navItem('/admin/users', 'Kullanıcılar', 'users', '^/admin/users'),
+      navItem('/admin/settings', 'Sistem ayarları', 'settings', '^/admin/settings'),
       navItem('/admin/server', 'Sunucu durumu', 'activity', '^/admin/server'),
       navItem('/admin/audit', 'Denetim kaydı', 'shield', '^/admin/audit'),
     ] : null);
@@ -143,6 +144,7 @@ function registerRoutes() {
   route('/reports/new', lazy('./pages/reports.js', 'reportEditPage'));
   route('/reports/:id', lazy('./pages/reports.js', 'reportEditPage'));
   route('/admin/users', lazy('./pages/admin.js', 'usersPage'));
+  route('/admin/settings', lazy('./pages/settings.js', 'settingsPage'));
   route('/admin/server', lazy('./pages/admin.js', 'serverPage'));
   route('/admin/audit', lazy('./pages/admin.js', 'auditPage'));
   route('/profile', lazy('./pages/admin.js', 'profilePage', { applyTheme }));

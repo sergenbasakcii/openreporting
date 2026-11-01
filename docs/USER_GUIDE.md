@@ -110,7 +110,18 @@ uyarı kutusu çıkar ve (rapor ayarında aksi belirtilmedikçe) e-posta gönder
 
 Arşivdeki her dosya indirilirken manifest SHA-256 özeti ve denetim zinciriyle doğrulanır.
 
-## 7. Klavye kısayolları
+## 7. Yönetim ayarları (yönetici)
+
+- **Sistem ayarları**: E-posta (SMTP), LDAP / Active Directory, Güvenlik, Sorgu ve rapor sınırları,
+  Veri kaynağı politikası sekmeleri. Değiştirdiğiniz alanlar **Kaydet** ile mevcut parolanız sorularak
+  kaydedilir ve birkaç saniye içinde geçerli olur. **Bağlantıyı test et** formdaki değerleri kaydetmeden
+  dener (SMTP'de e-posta gönderilmez). Parolalar kayıtlı olsa da gösterilmez; değiştirmek için yenisini yazın.
+  *Sunucu* sekmesi yalnız sunucu dosyasından değişen ayarları gösterir.
+- **Kullanıcılar**: ekleme, rol, devre dışı bırakma, parola sıfırlama ve telefonunu kaybeden kullanıcı için
+  **İki adımlı girişi sıfırla**.
+- **Profil** (herkes): tema, saat dilimi, ana sayfa, kendi parolanızı değiştirme ve iki adımlı giriş.
+
+## 8. Klavye kısayolları
 
 | Kısayol | İşlem |
 | --- | --- |

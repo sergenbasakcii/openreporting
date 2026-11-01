@@ -97,7 +97,7 @@ def check_integration(kind: str, request: Request, user=Depends(admin)):
     settings = settings_of(request)
     enabled = settings.ldap_enabled if kind == "ldap" else settings.mail_enabled
     if not enabled:
-        raise HTTPException(409, "Bu bağlantı sunucu ayarlarında kapalı")
+        raise HTTPException(409, "Bu bağlantı kapalı; Sistem ayarları sayfasından etkinleştirin")
     try:
         check = directory_auth.check_connection if kind == "ldap" else mail_transport.check_connection
         message = check(settings)

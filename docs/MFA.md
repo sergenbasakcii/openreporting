@@ -48,7 +48,15 @@ alan yalnız rakam kabul eder. Kod sürekli reddediliyorsa telefonun saatinin ot
 fazlasını etmez. Kurulumun 10 dakikalık süresi dolarsa ekran **Yeni QR kod al** düğmesini
 gösterir; uygulamadaki eski kaydı silip yeni QR'ı okutun.
 
-### Yönetici erişimi ve kurtarma (sunucu operatörü)
+### Yönetici erişimi ve kurtarma
+
+Arayüzden: *Yönetim → Kullanıcılar* listesinde iki adımlı girişi açık kullanıcıların yanında
+**İki adımlı girişi sıfırla** düğmesi vardır. Neden seçilir ve yönetici kendi parolasıyla onaylar;
+kullanıcının faktörü ve oturumları silinir, parolası değişmez. Yönetici kendi faktörünü buradan
+sıfırlayamaz (Profil sayfasını kullanır). Zorunlu MFA rolleri *Sistem ayarları → Güvenlik*
+sekmesinden değiştirilir.
+
+Sunucu operatörü (arayüze erişim yoksa):
 
 ```bash
 # Parolayı unutan kullanıcı (faktör korunur, bütün oturumlar kapanır)

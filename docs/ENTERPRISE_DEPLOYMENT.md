@@ -12,12 +12,16 @@ PostgreSQL uygulama veritabanı işletim/geri yükleme desteği hâlâ deneyseld
    `--self-signed` yalnız deneme içindir. API portunu (8810) dış ağa açmayın.
 2. Ayrı bir **yerel kurtarma yöneticisi** oluşturun ve parolasını kurum kasasında saklayın.
    LDAP hesapları mevcut yerel hesapların yerini almaz; son yerel yönetici korunur.
-3. `/etc/openreporting/openreporting.env` dosyasını düzenleyin. Parolaları kaynak koduna,
+3. LDAP ve SMTP ayarlarını tercihen **Yönetim → Sistem ayarları** sayfasından girin
+   (servis parolaları şifreli saklanır ve geri gösterilmez; kaydetme mevcut parolanızı ister,
+   **Bağlantıyı test et** kaydetmeden dener). Alternatif olarak `/etc/openreporting/openreporting.env`
+   dosyası kullanılabilir; arayüzde kaydedilen değer dosyadakinin önüne geçer. Parolaları kaynak koduna,
    komut satırına veya sohbete yazmayın. Dizin/SMTP hesabı, grup DN'leri ve alıcı alan adları
    kuruma göre yapılandırılır; uygulama bunları kendiliğinden keşfetmez.
 4. Dizin ve SMTP sunucularının DNS adı, portu, sertifika zinciri ve ağ erişimini doğrulayın.
    Sunucu saatini NTP ile eşitleyin. Sertifikanın SAN alanı kullanılan DNS adıyla eşleşmelidir.
-5. Aşağıdaki ayarları yaptıktan sonra web ve worker servislerini **birlikte** yeniden başlatın.
+5. Ayarlar dosyadan yapıldıysa web ve worker servislerini **birlikte** yeniden başlatın; arayüzden
+   kaydedilen ayarlar yeniden başlatma gerekmeden birkaç saniye içinde bütün servislere uygulanır.
 6. Bağlantı ve kabul kontrollerini tamamlayıp küçük bir deneme raporunu onaylı test alıcısına gönderin.
 
 HTTP sınırı: `OPENREPORTING_PUBLIC_URL` yalnız gerçek HTTP(S) origin olmalıdır; kullanıcı/parola,

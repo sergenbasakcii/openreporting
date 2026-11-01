@@ -64,7 +64,7 @@ def _connection(settings, user, password):
     import ldap3
     url = urlsplit(settings.ldap_url)
     tls = ldap3.Tls(validate=ssl.CERT_REQUIRED, version=ssl.PROTOCOL_TLS_CLIENT,
-                    ca_certs_file=settings.ldap_ca_file or None, valid_names=[url.hostname], sni=url.hostname,
+                    ca_certs_file=settings.ldap_ca_file or None, ca_certs_data=settings.ldap_ca_pem or None, valid_names=[url.hostname], sni=url.hostname,
                     ssl_options=[ssl.OP_NO_TLSv1, ssl.OP_NO_TLSv1_1])
     server = ldap3.Server(url.hostname, port=url.port or (636 if url.scheme == "ldaps" else 389),
                          use_ssl=url.scheme == "ldaps", tls=tls, connect_timeout=settings.ldap_timeout, get_info=ldap3.NONE)

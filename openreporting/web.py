@@ -16,6 +16,7 @@ from .request_limits import RequestBodyLimitMiddleware
 from .http_security import OriginValidationMiddleware, trusted_hosts
 from .http_telemetry import HttpMetrics, HttpTelemetryMiddleware
 from .security import authenticate, digest, login, logout, require_csrf, require_role
+from .api.deps import settings_of
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class Credentials(BaseModel):
 def create_app(settings: Settings | None = None):
     from . import __version__, datasources as datasource_registry
     from .api import dashboards as dashboards_api, datasources as datasources_api, reports as reports_api
-    from .api import system as system_api, users as users_api, mfa as mfa_api
+    from .api import system as system_api, users as users_api, mfa as mfa_api, settings as settings_api
 
     settings = settings or Settings.from_env()
     init_db(settings)
@@ -43,7 +44,7 @@ def create_app(settings: Settings | None = None):
     app.state.http_metrics = HttpMetrics()
     static = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
-    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api,mfa_api):
+    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api, mfa_api, settings_api):
         app.include_router(module.router)
     app.add_middleware(RequestBodyLimitMiddleware)
     app.add_middleware(OriginValidationMiddleware)
@@ -85,8 +86,9 @@ def create_app(settings: Settings | None = None):
         return {"status": "up"}
 
     @app.get("/readyz")
-    def ready(user=Depends(authenticate)):
+    def ready(request: Request, user=Depends(authenticate)):
         require_role(user, "admin")
+        settings = settings_of(request)
         database_ok, audit_ok, broken_id = False, None, None
         try:
             with connect(settings) as db:
@@ -103,6 +105,7 @@ def create_app(settings: Settings | None = None):
     def sign_in(body: Credentials, request: Request,response: Response):
         if body.otp:
             mfa_api.ensure_transport(request)
+        settings = settings_of(request)
         token, csrf, expiry = login(settings, body.username, body.password,body.otp)
         response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=settings.secure_cookie,
                             samesite="strict", max_age=settings.session_hours * 3600, path="/")
@@ -111,7 +114,7 @@ def create_app(settings: Settings | None = None):
     @app.post("/api/logout")
     def sign_out(request: Request, response: Response, user=Depends(authenticate)):
         require_csrf(request, user)
-        logout(settings, request.cookies.get(SESSION_COOKIE))
+        logout(settings_of(request), request.cookies.get(SESSION_COOKIE))
         response.delete_cookie(SESSION_COOKIE, path="/")
         return {"ok": True}
 
@@ -130,7 +133,7 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(403, "Same-origin request required")
         csrf = secrets.token_urlsafe(32)
         token = request.cookies.get(SESSION_COOKIE)
-        with connect(settings) as db, transaction(db):
+        with connect(settings_of(request)) as db, transaction(db):
             db.execute("UPDATE sessions SET csrf_hash=? WHERE token_hash=?", (digest(csrf), digest(token)))
         return {"csrf": csrf}
 

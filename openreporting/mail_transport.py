@@ -42,6 +42,8 @@ def connection(settings):
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     if settings.smtp_ca_file:
         context.load_verify_locations(cafile=settings.smtp_ca_file)
+    if settings.smtp_ca_pem:
+        context.load_verify_locations(cadata=settings.smtp_ca_pem)
     options = {"host": settings.smtp_host, "port": settings.smtp_port, "timeout": settings.smtp_timeout}
     if settings.smtp_local_hostname:
         options["local_hostname"] = settings.smtp_local_hostname

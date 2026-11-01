@@ -1,11 +1,13 @@
 """Shared FastAPI dependencies: authentication, CSRF and role gates."""
 from fastapi import Depends, HTTPException, Request
 
+from ..runtime_settings import effective
 from ..security import authenticate, require_csrf, require_role
 
 
 def settings_of(request: Request):
-    return request.app.state.settings
+    # Environment settings plus admin-UI overrides (re-read when they change).
+    return effective(request.app.state.settings)
 
 
 def viewer_write(request: Request, user=Depends(authenticate)):

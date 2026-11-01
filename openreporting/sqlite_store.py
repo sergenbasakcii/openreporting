@@ -112,5 +112,8 @@ def has_encrypted_secrets(settings: Settings):
     with _connect_uri(uri) as db:
         if db.execute("SELECT 1 FROM datasources WHERE secure_json<>'' LIMIT 1").fetchone() is not None:
             return True
-        exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_mfa'").fetchone()
-        return bool(exists and db.execute("SELECT 1 FROM user_mfa WHERE secret_json<>'' LIMIT 1").fetchone())
+        for table, column in (("user_mfa", "secret_json"), ("app_settings", "secure_json")):
+            exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
+            if exists and db.execute(f"SELECT 1 FROM {table} WHERE {column}<>'' LIMIT 1").fetchone():
+                return True
+        return False
