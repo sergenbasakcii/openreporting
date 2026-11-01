@@ -40,15 +40,77 @@ load_platform() {
   detect_platform "${ID:-}" "${VERSION_ID:-}"
 }
 
+# Full package-manager output goes to this log; the console shows stages, plan and the failure tail.
+INSTALL_LOG="${OPENREPORTING_INSTALL_LOG:-/var/log/openreporting-install.log}"
+APT_OPTS=(-o Acquire::Retries=3 -o Dpkg::Use-Pty=0)
+
+run_logged() {
+  local stage="$1" rc=0
+  shift
+  printf '\n### %s: %s\n' "$stage" "$*" >> "$INSTALL_LOG"
+  "$@" >> "$INSTALL_LOG" 2>&1 || rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  warn "Başarısız adım: $stage (çıkış kodu $rc)"
+  warn "Komut: $*"
+  tail -n 25 "$INSTALL_LOG" >&2
+  return "$rc"
+}
+
+apt_mirror_help() {
+  warn 'Paket deposuna ulaşılamadı veya paket indirilemedi. Kaynaklar otomatik DEĞİŞTİRİLMEDİ.'
+  warn 'Kontrol edin: ağ/DNS/proxy, /etc/apt/sources.list ve /etc/apt/sources.list.d/*'
+  warn 'HTTP aynası engelleniyorsa kaynaklarda https:// ayna kullanın, ardından: sudo apt-get update'
+  die "Ayrıntılı çıktı: $INSTALL_LOG — sorun giderildikten sonra kurulumu aynı komutla tekrar çalıştırın"
+}
+
+# apt-get update can exit 0 while some indexes failed; treat that as a broken mirror.
+apt_update_checked() {
+  local before
+  before="$(wc -l < "$INSTALL_LOG" 2>/dev/null || echo 0)"
+  run_logged 'Paket listeleri güncelleniyor' apt-get "${APT_OPTS[@]}" update || apt_mirror_help
+  if tail -n "+$((before + 1))" "$INSTALL_LOG" | grep -Eq '^(W|E): (Failed to fetch|Some index files failed)'; then
+    tail -n "+$((before + 1))" "$INSTALL_LOG" | grep -E '^(W|E): ' >&2 || true
+    apt_mirror_help
+  fi
+}
+
+# Prints "new upgraded removed" from an apt-get -s plan on stdin.
+apt_plan_counts() {
+  awk '/^Inst /{ if ($3 ~ /^\[/) u++; else n++ } /^Remv /{ r++ } END { printf "%d %d %d\n", n, u, r }'
+}
+
+apt_preflight() {
+  local allow_removal="$1" plan counts new upgraded removed
+  shift
+  plan="$(LC_ALL=C apt-get "${APT_OPTS[@]}" -s install -y "$@" 2>&1)" || {
+    printf '%s\n' "$plan" >> "$INSTALL_LOG"; printf '%s\n' "$plan" | tail -n 15 >&2
+    die "Paket planı çözülemedi (apt-get -s). Ayrıntı: $INSTALL_LOG"
+  }
+  printf '\n### Paket planı (simülasyon)\n%s\n' "$plan" >> "$INSTALL_LOG"
+  counts="$(printf '%s\n' "$plan" | apt_plan_counts)"
+  read -r new upgraded removed <<< "$counts"
+  ok "Paket planı: $new yeni, $upgraded yükseltme, $removed kaldırma"
+  [ "$upgraded" -le 50 ] || warn "Çok sayıda yükseltme planlandı ($upgraded); sistem güncel değil. Ayrıntı: $INSTALL_LOG"
+  if [ "$removed" -gt 0 ]; then
+    printf '%s\n' "$plan" | awk '/^Remv /{ print "    kaldırılacak: " $2 }' >&2
+    [ "$allow_removal" -eq 1 ] || die 'Kurulum mevcut paketleri kaldırmayı gerektiriyor; hiçbir şey değiştirilmedi. İnceleyip onaylıyorsanız --allow-package-removal ile tekrar çalıştırın.'
+    warn '--allow-package-removal verildi; yukarıdaki paketler kaldırılacak'
+  fi
+}
+
 install_platform_packages() {
-  local nginx="$1" deadsnakes="$2"
+  local nginx="$1" deadsnakes="$2" allow_removal="${3:-0}"
   local pkgs
   if [ "$PLATFORM_FAMILY" = debian ]; then
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
     pkgs=(python3 python3-venv python3-pip fonts-dejavu-core sqlite3 ca-certificates rsync curl openssl tzdata)
     [ "$nginx" -eq 1 ] && pkgs+=(nginx)
-    apt-get install -y -qq "${pkgs[@]}" >/dev/null
+    apt_update_checked
+    apt_preflight "$allow_removal" "${pkgs[@]}"
+    # Download first: a broken mirror fails here before anything is unpacked.
+    run_logged 'Paketler indiriliyor' apt-get "${APT_OPTS[@]}" install -y --download-only "${pkgs[@]}" || apt_mirror_help
+    run_logged 'Paketler kuruluyor' apt-get "${APT_OPTS[@]}" install -y "${pkgs[@]}" \
+      || die "Paket kurulumu başarısız. Ayrıntı: $INSTALL_LOG (dpkg yarım kaldıysa: sudo dpkg --configure -a)"
   else
     [ "$deadsnakes" -eq 0 ] || die '--use-deadsnakes yalnız Ubuntu içindir'
     pkgs=(sqlite ca-certificates rsync curl openssl tzdata dejavu-sans-fonts policycoreutils-python-utils)
@@ -60,11 +122,13 @@ install_platform_packages() {
     fi
     if [ "$nginx" -eq 1 ]; then
       # OL8's default old stream is retired. Do not reset/switch an existing stream silently.
-      [ "$PLATFORM_MAJOR" != 8 ] || dnf module enable -y nginx:1.24
+      [ "$PLATFORM_MAJOR" != 8 ] || run_logged 'nginx 1.24 modülü' dnf module enable -y nginx:1.24 || die "dnf modül etkinleştirme başarısız. Ayrıntı: $INSTALL_LOG"
       pkgs+=(nginx)
     fi
-    dnf install -y "${pkgs[@]}"
+    run_logged 'Paketler kuruluyor' dnf install -y "${pkgs[@]}" \
+      || die "Paket kurulumu başarısız (depo erişimi/abonelik?). Ayrıntı: $INSTALL_LOG"
   fi
+  ok "Sistem paketleri hazır (tam çıktı: $INSTALL_LOG)"
 }
 
 http_backend_port_labeled() {

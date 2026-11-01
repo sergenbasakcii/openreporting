@@ -5,6 +5,17 @@
   anahtarı elle girme yalnız yedek seçenektir. Onay alanı yalnız 6 haneli kodu kabul eder ve anahtarın
   yanlışlıkla girilmesini açık bir mesajla engeller.
 - Kali Linux, Debian ailesinden test/lab ortamı olarak kurulum betiğince kabul edilir.
+- Kurulum betiği paket adımlarını görünür yapar: tam çıktı `/var/log/openreporting-install.log`,
+  hata olduğunda adım/çıkış kodu/son satırlar; `apt-get update` 3 tekrar denemeli ve kısmen indirilemeyen
+  depo dizinlerinde durur (kaynakları değiştirmeden HTTPS ayna önerir). `apt-get -s` planı
+  (yeni/yükseltme/kaldırma) gösterilir; paket kaldıracak plan `--allow-package-removal` olmadan uygulanmaz.
+  Paketler önce indirilir, sonra kurulur. Yarıda kalan kurulum tekrar çalıştırma yönergesi verir.
+- Kurulum sonunda adres, TLS, servis ve yedek zamanlayıcı durumu, `doctor` sonucu, yönetici hesapları,
+  ilk giriş/MFA ve `reset-password`/`reset-mfa` kurtarma adımları özetlenir.
+- MFA kurulumu QR'ın geçerlilik saatini gösterir; süresi dolunca **Yeni QR kod al** ile aynı ekranda
+  yeniden başlar; reddedilen kodda telefon saati ipucu verilir. Google/Microsoft Authenticator alan
+  eşleşmesi ve operatör kurtarma komutları belgelendi; ±30 sn saat sapması test altında.
+- CI: resmi Kali rolling kapsayıcısında gerçek APT planı/indirme/kurulum, kilitli wheel'ler ve nginx HTTPS.
 
 ## 1.1.0 — 2026-10-31
 

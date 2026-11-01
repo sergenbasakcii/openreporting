@@ -16,6 +16,7 @@
 #   --wheelhouse DIR     offline install: pip wheels directory (no internet needed)
 #   --open-firewall      if firewall is active, allow HTTP/HTTPS
 #   --configure-selinux  opt in to Oracle nginx relay + 8810 HTTP port labeling
+#   --allow-package-removal  accept an apt plan that removes installed packages (reviewed first)
 #   -y                   non-interactive (skip optional prompts)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,7 +27,7 @@ SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/platform.sh"
 
 DOMAIN="$(hostname -f 2>/dev/null || hostname)"
-CERT="" KEY="" SELF_SIGNED=0 NGINX=1 ADMIN="" DEADSNAKES=0 WHEELHOUSE="" OPEN_FW=0 YES=0 SELINUX=0 EXPECT_OS=""
+CERT="" KEY="" SELF_SIGNED=0 NGINX=1 ADMIN="" DEADSNAKES=0 WHEELHOUSE="" OPEN_FW=0 YES=0 SELINUX=0 EXPECT_OS="" ALLOW_REMOVAL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2 ;;
@@ -41,13 +42,18 @@ while [ $# -gt 0 ]; do
     --open-firewall) OPEN_FW=1; shift ;;
     --configure-selinux) SELINUX=1; shift ;;
     --expect-os) EXPECT_OS="$2"; shift 2 ;;
+    --allow-package-removal) ALLOW_REMOVAL=1; shift ;;
     -y|--yes) YES=1; shift ;;
-    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) die "Bilinmeyen seçenek: $1 (--help)" ;;
   esac
 done
 
 require_root
+install -m 0600 /dev/null "$INSTALL_LOG.new" && mv -f "$INSTALL_LOG.new" "$INSTALL_LOG"
+printf '# OpenReporting kurulumu %s
+' "$(date -Is)" >> "$INSTALL_LOG"
+trap 'rc=$?; [ "$rc" -eq 0 ] || warn "Kurulum yarıda kaldı (çıkış $rc). Günlük: $INSTALL_LOG — sorunu giderip aynı komutla tekrar çalıştırabilirsiniz; mevcut ayar, anahtar ve veriler korunur."' EXIT
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || die "Geçersiz alan adı: $DOMAIN"
 load_platform
 [ -z "$EXPECT_OS" ] || [ "$EXPECT_OS" = "$PLATFORM_FAMILY" ] || die 'Kurulum betiği bu işletim sistemi ailesi için değil'
@@ -59,17 +65,17 @@ if [ -r /proc/sys/crypto/fips_enabled ] && [ "$(cat /proc/sys/crypto/fips_enable
 fi
 
 log 'Sistem paketleri kuruluyor'
-install_platform_packages "$NGINX" "$DEADSNAKES"
+install_platform_packages "$NGINX" "$DEADSNAKES" "$ALLOW_REMOVAL"
 [ "$NGINX" -eq 0 ] || configure_selinux_proxy "$SELINUX"
 
 PY="$(find_python || true)"
 if [ -z "$PY" ]; then
   if [ "$DEADSNAKES" -eq 1 ]; then
     log "Python 3.12 deadsnakes PPA üzerinden kuruluyor"
-    apt-get install -y -qq software-properties-common >/dev/null
-    add-apt-repository -y ppa:deadsnakes/ppa >/dev/null
-    apt-get update -qq
-    apt-get install -y -qq python3.12 python3.12-venv >/dev/null
+    run_logged 'software-properties-common' apt-get "${APT_OPTS[@]}" install -y software-properties-common || apt_mirror_help
+    run_logged 'deadsnakes PPA' add-apt-repository -y ppa:deadsnakes/ppa || apt_mirror_help
+    apt_update_checked
+    run_logged 'python3.12' apt-get "${APT_OPTS[@]}" install -y python3.12 python3.12-venv || apt_mirror_help
     PY="$(command -v python3.12)"
   else
     die "Python >= 3.11 bulunamadı; dağıtım paketlerini veya --python yolunu doğrulayın."
@@ -187,10 +193,34 @@ elif [ "${HAS_ADMIN:-0}" = "0" ]; then
 fi
 
 log "Kurulum kontrolü"
-as_openreporting "$OPENREPORTING_VENV/bin/openreporting" doctor || warn "doctor bazı uyarılar verdi (yukarıda)"
+DOCTOR=tamam
+as_openreporting "$OPENREPORTING_VENV/bin/openreporting" doctor || { DOCTOR='uyarı var (yukarıda)'; warn "doctor bazı uyarılar verdi (yukarıda)"; }
+ADMINS="$(as_openreporting "$OPENREPORTING_VENV/bin/python" -c '
+import sqlite3, os
+db = sqlite3.connect(os.path.join(os.environ.get("OPENREPORTING_DATA_DIR", "/var/lib/openreporting"), "state.sqlite3"))
+print(", ".join(r[0] for r in db.execute("SELECT username FROM users WHERE role=? AND active=1 ORDER BY username", ("admin",))))' 2>/dev/null || true)"
+MFA_ROLES="$(sed -n 's/^OPENREPORTING_MFA_REQUIRED_ROLES=//p' "$OPENREPORTING_ENV" | tail -n 1)"
+service_state() { systemctl is-active "$1" 2>/dev/null || true; }
+trap - EXIT
 echo
-ok "OpenReporting kuruldu. Adres: $([ "$NGINX" -eq 1 ] && echo "https://$DOMAIN" || echo "http://127.0.0.1:8810 (yerel)")"
-echo "   Servisler : systemctl status openreporting-web openreporting-worker"
-echo "   Günlükler : journalctl -u openreporting-web -u openreporting-worker -f"
+ok "OpenReporting $("$OPENREPORTING_VENV/bin/python" -c 'import openreporting; print(openreporting.__version__)') kuruldu."
+echo "   Adres     : $([ "$NGINX" -eq 1 ] && echo "https://$DOMAIN" || echo "http://127.0.0.1:8810 (yerel)")"
+if [ "$NGINX" -eq 1 ]; then
+  echo "   TLS       : $CERT$([ "$CERT" = "$TLS_CERT_DEFAULT" ] && [ "$SELF_SIGNED" -eq 1 ] && echo ' (kendinden imzalı; tarayıcı uyarısı normaldir)')"
+fi
+echo "   Servisler : web=$(service_state openreporting-web) worker=$(service_state openreporting-worker) yedek-zamanlayıcı=$(service_state openreporting-backup.timer)"
+echo "   Kontrol   : doctor $DOCTOR"
+echo "   Yönetici  : ${ADMINS:-yok — oluşturun: sudo $OPENREPORTING_APP/deploy/openreporting-admin.sh create-user <kullanıcı> --role admin}"
+echo "   Günlükler : journalctl -u openreporting-web -u openreporting-worker -f · kurulum: $INSTALL_LOG"
 echo "   Ayarlar   : $OPENREPORTING_ENV  (değişiklikten sonra: systemctl restart openreporting-web openreporting-worker)"
 echo "   Yedek     : $OPENREPORTING_BACKUPS (her gece 02:30) · elle: systemctl start openreporting-backup"
+echo
+echo "   Sonraki adımlar:"
+echo "    1. Adresi tarayıcıda açın; yönetici kullanıcı adı ve parolasıyla giriş yapın."
+if [ -n "$MFA_ROLES" ]; then
+  echo "    2. İlk girişte iki adımlı giriş istenir ($MFA_ROLES): telefondaki doğrulayıcıyla QR kodu okutun, 6 haneli kodu girin, kurtarma kodlarını saklayın."
+else
+  echo "    2. Profil sayfasından iki adımlı girişi açmanız önerilir."
+fi
+echo "    3. Erişim sorunu: sudo $OPENREPORTING_APP/deploy/openreporting-admin.sh reset-password <kullanıcı>"
+echo "       Telefon kaybı/MFA sıfırlama: sudo $OPENREPORTING_APP/deploy/openreporting-admin.sh reset-mfa <kullanıcı> --reason lost-device"

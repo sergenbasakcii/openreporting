@@ -63,7 +63,7 @@ function totp(secret) {
         await page.getByRole('button', { name: 'Giriş yap', exact: true }).click();
       }
     }
-    async function setup() {
+    async function setup(simulateExpiry = false) {
       await page.getByRole('button', { name: 'İki adımlı girişi kur', exact: true }).click();
       await scan('setup-password');
       const dialog = page.getByRole('dialog');
@@ -72,9 +72,22 @@ function totp(secret) {
       // Enrollment is QR first; the manual key is a collapsed fallback grouped by four characters.
       await dialog.getByRole('img', { name: 'Doğrulayıcı uygulaması için QR kod' }).waitFor();
       assert.ok((await dialog.locator('.mfa-qr img').getAttribute('src')).startsWith('data:image/svg+xml'), 'QR is an inline SVG');
-      const secret = (await dialog.getByLabel('Kurulum anahtarı', { exact: true }).inputValue()).replace(/\s/g, '');
+      const readSecret = async () => (await dialog.getByLabel('Kurulum anahtarı', { exact: true }).inputValue()).replace(/\s/g, '');
+      let secret = await readSecret();
       await scan('setup-confirm');
-      const codeField = dialog.getByLabel('2. Uygulamada görünen 6 haneli kod', { exact: true });
+      let codeField = dialog.getByLabel('2. Uygulamada görünen 6 haneli kod', { exact: true });
+      if (simulateExpiry) {
+        // An expired enrollment offers a fresh QR in place instead of a dead end.
+        await page.route('**/api/user/mfa/confirm', route => route.fulfill({ status: 409, contentType: 'application/json', body: '{"detail":"Setup expired"}' }), { times: 1 });
+        await codeField.fill('000000');
+        await dialog.getByRole('button', { name: 'Kurulumu onayla', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Yeni QR kod al', exact: true }).click();
+        await dialog.getByRole('img', { name: 'Doğrulayıcı uygulaması için QR kod' }).waitFor();
+        const renewedSecret = await readSecret();
+        assert.notEqual(renewedSecret, secret, 'Expired setup issues a new key');
+        secret = renewedSecret;
+        codeField = dialog.getByLabel('2. Uygulamada görünen 6 haneli kod', { exact: true });
+      }
       await codeField.fill('KEY-not-a-code');
       assert.equal(await codeField.inputValue(), '', 'Only digits are accepted');
       await codeField.fill(totp(secret));
@@ -90,7 +103,7 @@ function totp(secret) {
     await login('optionaluser');
     await page.getByRole('heading', { name: 'İki adımlı giriş', exact: true }).waitFor();
     await scan('optional-profile');
-    const codes = await setup();
+    const codes = await setup(true);
     await login('optionaluser', codes[0]);
     await page.getByRole('button', { name: 'Kurtarma kodlarını yenile', exact: true }).waitFor();
     await scan('enabled-profile');
@@ -136,6 +149,6 @@ function totp(secret) {
     assert.deepEqual(errors, []);
     fs.mkdirSync('build', { recursive: true });
     fs.writeFileSync('build/mfa-browser-evidence.json', JSON.stringify({ ok: true, scans: results.length, results, pageErrors: errors }, null, 2));
-    console.log(`MFA optional/required enrollment, recovery rotation, disable, old-server fallback: passed; ${results.length} theme/accessibility scans clean`);
+    console.log(`MFA optional/required enrollment, expired-setup restart, recovery rotation, disable, old-server fallback: passed; ${results.length} theme/accessibility scans clean`);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error.message); process.exit(1); });

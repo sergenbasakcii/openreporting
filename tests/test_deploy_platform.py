@@ -12,9 +12,9 @@ pytestmark=pytest.mark.skipif(not BASH or not Path(BASH).is_file(),reason='Bash 
 
 
 def run(script,tmp_path):
-    env=dict(os.environ,TEST_LOG=str(tmp_path / 'calls'))
+    env=dict(os.environ,TEST_LOG=str(tmp_path / 'calls'),OPENREPORTING_INSTALL_LOG=str(tmp_path / 'install.log'))
     source='set -euo pipefail\nsource deploy/lib.sh\nsource deploy/platform.sh\n'
-    return subprocess.run([BASH,'-c',source+script],cwd=ROOT,env=env,text=True,capture_output=True,timeout=15)
+    return subprocess.run([BASH,'-c',source+script],cwd=ROOT,env=env,text=True,encoding='utf-8',capture_output=True,timeout=15)
 
 
 @pytest.mark.parametrize('version',['8.10','9.4','9.8','10.0','10'])
@@ -47,6 +47,54 @@ def test_distribution_package_selection_without_host_install(id,version,package_
     calls=(tmp_path / 'calls').read_text()
     assert all(line.startswith(package_command+' ') for line in calls.splitlines())
     assert python_package in calls and 'nginx' in calls
+
+
+# apt-get mock: simulation prints $PLAN, update prints $UPDATE, install fails when $FAIL_INSTALL is set.
+MOCK_APT='''
+apt-get(){
+  case " $* " in
+    *" -s "*) printf '%b' "${PLAN:-}" ;;
+    *" update "*) printf 'apt update %s\n' "$*" >> "$TEST_LOG"; printf '%b' "${UPDATE:-}" ;;
+    *) printf 'apt install %s\n' "$*" >> "$TEST_LOG"; [ -z "${FAIL_INSTALL:-}" ] || { echo 'E: Sub-process /usr/bin/dpkg returned an error code (1)'; return 100; } ;;
+  esac
+}
+detect_platform kali 2025.3
+'''
+
+
+def test_apt_plan_counts_new_upgraded_and_removed(tmp_path):
+    plan='Inst nginx (1.26 Kali:kali-rolling [amd64])\nInst libc6 [2.40-1] (2.41-1 Kali)\nConf nginx\nRemv python3-old [1.0]\n'
+    result=run(f"printf '%b' '{plan}' | apt_plan_counts",tmp_path)
+    assert result.returncode==0,result.stderr
+    assert result.stdout.split()==['1','1','1']
+
+
+def test_apt_removal_is_blocked_before_anything_is_installed(tmp_path):
+    result=run(MOCK_APT+"PLAN='Inst nginx (1)\nRemv apache2 [2]\n' install_platform_packages 1 0",tmp_path)
+    assert result.returncode!=0
+    assert 'kaldırılacak: apache2' in result.stderr and '--allow-package-removal' in result.stderr
+    assert 'apt install' not in (tmp_path / 'calls').read_text()
+
+
+def test_apt_removal_proceeds_only_with_explicit_opt_in(tmp_path):
+    result=run(MOCK_APT+"PLAN='Remv apache2 [2]\n' install_platform_packages 1 0 1",tmp_path)
+    assert result.returncode==0,result.stderr
+    installs=[line for line in (tmp_path / 'calls').read_text().splitlines() if line.startswith('apt install')]
+    assert len(installs)==2 and '--download-only' in installs[0] and 'Acquire::Retries=3' in installs[1]
+
+
+def test_failed_index_fetch_stops_with_mirror_guidance(tmp_path):
+    result=run(MOCK_APT+"UPDATE='W: Failed to fetch http://http.kali.org/dists/kali-rolling/InRelease  Connection failed\n' install_platform_packages 1 0",tmp_path)
+    assert result.returncode!=0
+    assert 'Failed to fetch' in result.stderr and 'otomatik DEĞİŞTİRİLMEDİ' in result.stderr and 'https://' in result.stderr
+    assert 'apt install' not in (tmp_path / 'calls').read_text()
+
+
+def test_install_failure_names_stage_exit_code_and_log_tail(tmp_path):
+    result=run(MOCK_APT+'FAIL_INSTALL=1 install_platform_packages 1 0',tmp_path)
+    assert result.returncode!=0
+    assert 'Başarısız adım' in result.stderr and 'çıkış kodu 100' in result.stderr and 'dpkg returned an error' in result.stderr
+    assert str(tmp_path / 'install.log') in result.stderr
 
 
 MOCK_SELINUX='''

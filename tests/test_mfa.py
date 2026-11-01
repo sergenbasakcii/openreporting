@@ -351,3 +351,18 @@ def test_operator_reset_never_bootstraps_a_missing_or_migrates_an_old_store(tmp_
         mfa.admin_reset(settings,'missing','recovery')
     with db.connect(settings) as conn:
         assert db.schema_version(conn)==3
+
+
+def test_enrollment_tolerates_one_step_clock_skew_but_rejects_drift_and_setup_key(state):
+    # Phone clocks up to 30 s off still enroll; larger drift, wrong codes and the setup key itself do not.
+    settings,app,uid = state
+    with TestClient(app,base_url='https://localhost') as client:
+        signed = signin(client);assert signed.status_code==200
+        headers = {'X-CSRF-Token':signed.json()['csrf']}
+        data = client.post('/api/user/mfa/setup',json={'password':PASSWORD},headers=headers).json()
+        otp = pyotp.TOTP(data['secret'])
+        def confirm(code):
+            return client.post('/api/user/mfa/confirm',json={'password':PASSWORD,'code':code,'setup_token':data['setup_token']},headers=headers)
+        for wrong in (otp.at(NOW-90),otp.at(NOW+90),data['secret']):
+            assert confirm(wrong).status_code==403
+        assert confirm(otp.at(NOW-30)).status_code==200

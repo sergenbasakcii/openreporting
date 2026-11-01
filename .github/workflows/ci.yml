@@ -256,6 +256,26 @@ jobs:
           path: build/oracle-${{ matrix.oracle }}
           retention-days: 14
 
+  kali-lab:
+    name: Kali rolling lab install contract
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Official Kali rolling container acceptance
+        run: |
+          mkdir -p build/kali
+          docker pull kalilinux/kali-rolling
+          docker image inspect kalilinux/kali-rolling --format '{{json .RepoDigests}}' > build/kali/image-digests.json
+          docker run --rm --init -e OPENREPORTING_KALI_CI=1             -v "$GITHUB_WORKSPACE:/src:ro" -v "$GITHUB_WORKSPACE/build/kali:/evidence"             kalilinux/kali-rolling bash /src/deploy/ci-kali.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: kali-lab-evidence
+          path: build/kali
+          retention-days: 14
+
   ubuntu-install:
     name: End-to-end Ubuntu install
     runs-on: ubuntu-24.04

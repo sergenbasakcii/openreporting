@@ -47,7 +47,7 @@ function factorDialog(action) {
             h('p', { class: 'hint', text: 'Uygulamada "Kurulum anahtarı gir" seçin; tür: zamana dayalı. Anahtar yalnız A–Z harfleri ve 2–7 rakamlarından oluşur (0, 1, 8, 9 yoktur).' }),
             input({ value: grouped, readonly: true, class: 'mono', label: 'Kurulum anahtarı' })),
           field('2. Uygulamada görünen 6 haneli kod', setupCode),
-          h('p', { class: 'hint', text: 'Kurulum 10 dakika geçerlidir. Kurtarma kodları onaydan sonra gösterilir.' }));
+          h('p', { class: 'hint', text: `Bu QR kod ${expiryText(data.expires_at)} saatine kadar geçerlidir. Kurtarma kodları onaydan sonra gösterilir.` }));
         submit.textContent = 'Kurulumu onayla'; submit.setAttribute('aria-label', 'Kurulumu onayla'); setupCode.focus();
       } else {
         if (pending && !/^\d{6}$/.test(setupCode.value)) {
@@ -63,7 +63,16 @@ function factorDialog(action) {
         completed(result);
       }
     } catch (err) {
-      if (alive) { error.textContent = mfaErrorText(err); error.hidden = false; }
+      if (!alive) return;
+      error.textContent = mfaErrorText(err);
+      if (pending && err.status === 403) error.textContent += ' Kod kabul edilmiyorsa telefonun saatinin otomatik (ağdan) ayarlı olduğunu kontrol edin.';
+      if (pending && err.status === 409) {
+        // Expired or replaced enrollment: drop the old QR so the next submit issues a new one.
+        pending = null; setupCode.value = ''; stage.replaceChildren();
+        submit.textContent = 'Yeni QR kod al'; submit.setAttribute('aria-label', 'Yeni QR kod al');
+        error.textContent = 'Kurulum süresi doldu. Yeni QR kod alıp uygulamadaki eski kaydı silerek tekrar okutun.';
+      }
+      error.hidden = false;
     } finally { if (alive) submit.disabled = false; }
   } },
     h('p', { text: setup ? 'Girişte parolanıza ek bir doğrulayıcı kodu istenir. Önce mevcut parolanızı doğrulayın.' : 'Bu işlem tüm oturumları kapatır. Mevcut parolanız ve yeni bir doğrulayıcı kodu veya kullanılmamış kurtarma kodu gerekir.' }),
@@ -72,6 +81,11 @@ function factorDialog(action) {
   const dialog = modal({ title: 'İki adımlı giriş', body: form, closeOnBackdrop: false,
     onClose: () => { alive = false; pending = null; password.value = ''; code.value = ''; setupCode.value = ''; stage.replaceChildren(); } });
   return dialog;
+}
+
+function expiryText(iso) {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? '10 dakika sonrası' : at.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
 
 // Turkish messages for the second-factor API (its error texts are English).

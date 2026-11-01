@@ -52,6 +52,23 @@ Kapsam ve güncelleme kabulü [paket kilidi yönergesindedir](DEPENDENCY_LOCK.md
 
 Betik **idempotent**tir; tekrar çalıştırmak mevcut `/etc/openreporting/openreporting.env` ve anahtarı korur.
 
+**Özel depoya erişim.** Tercih sırası: (1) sunucuya özel, salt-okunur **deploy key** (SSH:
+`git clone git@github.com:sergenbasakcii/openreporting.git`), (2) yalnız bu depoya ve yalnız
+*Contents: Read-only* izinli, kısa süreli **ince taneli token**. `git clone` parola sorduğunda
+kullanıcı adı GitHub hesabı, “Password” alanı token'dır (GitHub hesap parolası kabul edilmez).
+Token'ı komut satırına ayrı komut olarak yapıştırmayın, ekran görüntüsünde göstermeyin ve
+kurulumdan sonra iptal edin. Token kabuk geçmişine düştüyse `history -d <satır>` ile silin.
+
+**Paket adımı.** Kurulum önce `apt-get update` (3 tekrar denemeli) yapar; bir depo dizini
+indirilemezse durur ve kaynakları **değiştirmeden** ne kontrol edileceğini yazar. Ardından
+`apt-get -s` ile planı gösterir (`N yeni, N yükseltme, N kaldırma`). Plan mevcut bir paketi
+kaldıracaksa hiçbir şeyi değiştirmeden durur; listeyi inceleyip onaylıyorsanız
+`--allow-package-removal` ile tekrar çalıştırın. Paketler önce yalnız indirilir, sonra kurulur.
+Tam çıktı `/var/log/openreporting-install.log` dosyasındadır (yalnız root okur); hata olduğunda
+başarısız adım, çıkış kodu ve günlüğün son satırları ekrana yazılır. Sorun giderildikten sonra
+aynı komut güvenle tekrar çalıştırılır. Kurulum sonunda adres, TLS, servis/yedek zamanlayıcı
+durumu, `doctor` sonucu, yönetici hesapları ve ilk giriş adımları özetlenir.
+
 ### Oluşturulan yapı
 
 | Yol | Sahip / izin | İçerik |
@@ -204,6 +221,10 @@ yükseltilmişse veritabanını son yedekten geri yükleyin.
 
 | Belirti | Kontrol |
 | --- | --- |
+| Kurulum “Failed to fetch … Connection failed” ile duruyor | Ağ/DNS/proxy; `/etc/apt/sources.list*` içindeki ayna; HTTP engelliyse `https://` ayna; sonra `sudo apt-get update` ve kurulumu tekrar çalıştırın |
+| Kurulum “mevcut paketleri kaldırmayı gerektiriyor” diyor | Listelenen paketleri inceleyin; uygunsa `--allow-package-removal` |
+| Doğrulayıcı kodu “geçersiz” | Kurulum anahtarı değil 6 haneli kod girilmeli; telefon saati otomatik olmalı; bkz. [MFA](MFA.md) |
+| Yönetici giriş yapamıyor | `openreporting-admin.sh reset-password <kullanıcı>` / `reset-mfa <kullanıcı> --reason lost-device` |
 | 502 Bad Gateway | `systemctl status openreporting-web`, `journalctl -u openreporting-web -n 100` |
 | Raporlar “Kuyrukta” kalıyor | `systemctl status openreporting-worker`; Sunucu durumu sayfasındaki worker sinyali |
 | “Zabbix API’ye ulaşılamadı” | Sunucudan `curl -I https://zabbix.../api_jsonrpc.php`, DNS, firewall, CA sertifikası |

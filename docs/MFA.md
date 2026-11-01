@@ -32,6 +32,36 @@ bir sonraki girişte tekrar kurulum gerektirir. Parola sıfırlama faktörü kal
 LDAP adımında aynı sabit dizin kimliği ve aynı rol tekrar doğrulanır; yerel hesabı
 dizin hesabına dönüştürmez. Gerçek kurum grupları/CA/saat senkronizasyonu ayrıca kabul edilmelidir.
 
+### Doğrulayıcı uygulamada alan eşleşmesi
+
+QR okutmak en güvenli yoldur; anahtarı elle yazmak yalnız kamera kullanılamıyorsa gerekir.
+
+| Uygulama | Yol | Uygulamadaki alan → OpenReporting |
+| --- | --- | --- |
+| Google Authenticator | **+** → *QR kodu tara* (veya *Kurulum anahtarı gir*) | *Hesap adı*: serbest (ör. OpenReporting) · *Anahtarınız*: **Kurulum anahtarı** · tür: *Zamana dayalı* |
+| Microsoft Authenticator | **+** → *Diğer hesap* → *QR kodu tara* (veya *Kodu el ile girin*) | *Hesap adı*: serbest · *Gizli anahtar*: **Kurulum anahtarı** |
+
+Uygulamanın gösterdiği **6 haneli ve 30 saniyede değişen** sayı, ekrandaki
+*2. Uygulamada görünen 6 haneli kod* alanına yazılır. Kurulum anahtarı bu alana yazılmaz;
+alan yalnız rakam kabul eder. Kod sürekli reddediliyorsa telefonun saatinin otomatik
+(ağdan) ayarlı olduğunu kontrol edin: sunucu ±30 saniyelik sapmayı kabul eder, daha
+fazlasını etmez. Kurulumun 10 dakikalık süresi dolarsa ekran **Yeni QR kod al** düğmesini
+gösterir; uygulamadaki eski kaydı silip yeni QR'ı okutun.
+
+### Yönetici erişimi ve kurtarma (sunucu operatörü)
+
+```bash
+# Parolayı unutan kullanıcı (faktör korunur, bütün oturumlar kapanır)
+sudo /opt/openreporting/app/deploy/openreporting-admin.sh reset-password <kullanıcı>
+# Telefonu kaybolan / kurtarma kodu kalmayan kullanıcı (parola değişmez)
+sudo /opt/openreporting/app/deploy/openreporting-admin.sh reset-mfa <kullanıcı> --reason lost-device
+```
+
+`--reason` değerleri: `lost-device`, `compromise`, `recovery`; işlem denetim kaydına yazılır.
+Sıfırlamadan sonra kullanıcı girişte yeniden QR ile kurulum yapar. Bir kurulum anahtarı ekran
+görüntüsü veya mesajla paylaşıldıysa o kurulumu tamamlamayın; `reset-mfa --reason compromise`
+ile sıfırlayıp yeniden kurun.
+
 ## Sunucu korumaları
 
 160 bit rastgele seed kullanıcı kimliğine bağlı yükle Fernet ile şifrelenir.
