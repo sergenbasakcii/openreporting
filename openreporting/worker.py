@@ -14,6 +14,7 @@ from .portable import exclusive_local_lock
 from .postgres_store import WorkerOwnershipLost, assert_worker_ownership
 
 log = logging.getLogger(__name__)
+STANDBY_POLL_S = 5
 
 
 def schedule_next(cadence, tz_name, hour, minute, reference=None):
@@ -82,7 +83,15 @@ def exclusive_worker(settings):
     """One scheduler/SMTP owner per PostgreSQL database or local SQLite volume."""
     if settings.database_url:
         from . import postgres_store
-        with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms):
+        # Extra replicas (Kubernetes) wait as hot standby instead of crash-looping.
+        last = [0.0]
+
+        def standby():
+            if time.monotonic() - last[0] > 300:
+                last[0] = time.monotonic()
+                log.info("Another report worker is active; waiting as standby")
+        with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms,
+                                             standby_poll_s=STANDBY_POLL_S, on_standby=standby):
             yield
         return
     with exclusive_local_lock(settings.data_dir / "worker.lock"):

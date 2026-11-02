@@ -181,9 +181,9 @@ jobs:
         with:
           persist-credentials: false
       - name: shellcheck
-        run: shellcheck -x -s bash deploy/*.sh deploy/docker/ci-compose.sh && shellcheck -s sh deploy/docker/backup.sh
+        run: shellcheck -x -s bash deploy/*.sh deploy/docker/ci-compose.sh deploy/kubernetes/ci-kind.sh && shellcheck -s sh deploy/docker/backup.sh
       - name: bash -n
-        run: for f in deploy/*.sh deploy/docker/ci-compose.sh; do bash -n "$f"; done && sh -n deploy/docker/backup.sh
+        run: for f in deploy/*.sh deploy/docker/ci-compose.sh deploy/kubernetes/ci-kind.sh; do bash -n "$f"; done && sh -n deploy/docker/backup.sh
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
@@ -292,6 +292,27 @@ jobs:
           path: |
             build/docker
             !build/docker/jar
+          retention-days: 14
+
+  kubernetes:
+    name: Kubernetes multi-replica acceptance (kind)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Render manifests
+        run: kubectl kustomize deploy/kubernetes/base > /dev/null && kubectl kustomize deploy/kubernetes/overlays/kind-ci > /dev/null
+      - name: Ingress TLS, 2 web + 2 worker on PostgreSQL, failover, rolling restart
+        run: OPENREPORTING_K8S_CI=1 EVIDENCE=build/k8s bash deploy/kubernetes/ci-kind.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: kubernetes-evidence
+          path: |
+            build/k8s
+            !build/k8s/acceptance-cookies.txt
+            !build/k8s/acceptance-state.json
           retention-days: 14
 
   ubuntu-install:

@@ -10,6 +10,8 @@ BASE=https://localhost:8443
 
 cp deploy/docker/openreporting.env.example deploy/docker/openreporting.env
 sed -i "s#^OPENREPORTING_PUBLIC_URL=.*#OPENREPORTING_PUBLIC_URL=$BASE#" deploy/docker/openreporting.env
+# The fixture admin exercises business APIs; mandatory enrollment is covered by the MFA browser job.
+sed -i 's#^OPENREPORTING_MFA_REQUIRED_ROLES=.*#OPENREPORTING_MFA_REQUIRED_ROLES=#' deploy/docker/openreporting.env
 printf 'OPENREPORTING_HTTP_PORT=8080\nOPENREPORTING_HTTPS_PORT=8443\nOPENREPORTING_BIND=127.0.0.1\n' > .env
 openssl req -x509 -newkey rsa:3072 -sha256 -days 1 -nodes -subj '/CN=localhost' \
   -addext 'subjectAltName=DNS:localhost' -keyout deploy/docker/certs/key.pem -out deploy/docker/certs/cert.pem 2>/dev/null

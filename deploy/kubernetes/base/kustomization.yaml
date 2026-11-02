@@ -1,0 +1,21 @@
+# OpenReporting on Kubernetes (horizontal web, hot-standby worker, PostgreSQL). Guide: docs/KUBERNETES.md
+# Secrets are created outside git:
+#   openreporting-secrets  (key OPENREPORTING_DATABASE_URL)
+#   openreporting-key      (key secret.key — the Fernet key ring shared by every pod)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs: {app.kubernetes.io/name: openreporting}
+    includeSelectors: false
+resources:
+  - configmap.yaml
+  - storage.yaml
+  - web.yaml
+  - worker.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - autoscaling.yaml
+images:
+  - name: openreporting
+    newName: registry.example.com/openreporting/openreporting
+    newTag: "1.2.0"

@@ -73,6 +73,10 @@ def _fernet(settings) -> Fernet | MultiFernet:
         if cache_key in _cache:
             return _cache[cache_key]
         if not path.exists():
+            if os.getenv("OPENREPORTING_REQUIRE_KEY_FILE") == "true":
+                # Multi-replica deployments share one provisioned key; a pod-local key would split them.
+                raise SecretError(f"Şifreleme anahtarı bulunamadı ({path}); bu kurulumda anahtar önceden sağlanmalı "
+                                  "(Kubernetes Secret). Yeni anahtar üretilmedi.")
             if _has_encrypted_secrets(settings):
                 # Generating a fresh key would silently orphan every stored credential.
                 raise SecretError(f"Şifreleme anahtarı bulunamadı ({path}) ama şifreli kimlik bilgileri var; "

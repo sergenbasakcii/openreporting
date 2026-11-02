@@ -1,0 +1,24 @@
+# Only the ingress controller may reach the web pods (so only it can set X-Forwarded-*). Workers accept
+# no inbound traffic. Egress stays open for PostgreSQL, Zabbix, SMTP and LDAP; restrict it per site.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openreporting-web-ingress
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: openreporting, app.kubernetes.io/component: web}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
+      ports: [{port: 8810, protocol: TCP}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openreporting-worker-no-ingress
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: openreporting, app.kubernetes.io/component: worker}
+  policyTypes: [Ingress]

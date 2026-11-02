@@ -1,0 +1,24 @@
+# ingress-nginx example; adapt annotations for other controllers. TLS certificate: Secret openreporting-tls.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openreporting
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 5m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [openreporting.example.com]
+      secretName: openreporting-tls
+  rules:
+    - host: openreporting.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: openreporting-web, port: {name: http}}

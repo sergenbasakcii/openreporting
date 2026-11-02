@@ -56,3 +56,16 @@ def test_worker_health_reflects_heartbeat_age(tmp_path):
             db.execute('DELETE FROM worker_runtime')
             db.execute(f"INSERT INTO worker_runtime({','.join(values)}) VALUES({','.join('?' * len(values))})", tuple(values.values()))
         assert worker_health(settings, 120) == expected
+
+
+def test_required_key_file_is_never_generated(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from openreporting.config import Settings
+    from openreporting.secrets_store import SecretError, encrypt, key_path, reset_cache
+    settings = replace(Settings.from_env(), data_dir=tmp_path / 'data', database_url='', secret_key_file=str(tmp_path / 'missing.key'))
+    monkeypatch.setenv('OPENREPORTING_REQUIRE_KEY_FILE', 'true')
+    reset_cache()
+    with pytest.raises(SecretError, match='önceden sağlanmalı'):
+        encrypt(settings, {'token': 'value'})
+    assert not key_path(settings).exists()
+    reset_cache()

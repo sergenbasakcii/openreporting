@@ -4,6 +4,7 @@ Only application-owned SQL may use this adapter. Data source queries use their
 own read-only driver and must never pass through the qmark conversion below.
 """
 import re
+import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 
@@ -38,10 +39,16 @@ def assert_worker_ownership():
 
 
 @contextmanager
-def exclusive_worker(dsn, *, timeout_ms=30000):
+def exclusive_worker(dsn, *, timeout_ms=30000, standby_poll_s=None, on_standby=None):
+    """Hold the database-wide worker lock. With ``standby_poll_s`` a second worker waits as a
+    hot standby and takes over when the active worker's session ends; otherwise it fails fast."""
     with connect(dsn, timeout_ms=timeout_ms) as db:
-        if not db.execute("SELECT pg_try_advisory_lock(?)", (WORKER_LOCK,)).fetchone()[0]:
-            raise RuntimeError("A report worker is already active for this PostgreSQL database")
+        while not db.execute("SELECT pg_try_advisory_lock(?)", (WORKER_LOCK,)).fetchone()[0]:
+            if standby_poll_s is None:
+                raise RuntimeError("A report worker is already active for this PostgreSQL database")
+            if on_standby:
+                on_standby()
+            time.sleep(standby_poll_s)
         guard = WorkerGuard(db)
         token = _worker_guard.set(guard)
         try:

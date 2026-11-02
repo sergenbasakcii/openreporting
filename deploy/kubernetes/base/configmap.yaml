@@ -1,0 +1,28 @@
+# Non-secret settings. SMTP, LDAP, MFA roles and limits can also be set in the UI (Yönetim > Sistem ayarları).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openreporting-config
+data:
+  OPENREPORTING_PUBLIC_URL: https://openreporting.example.com
+  OPENREPORTING_ALLOWED_HOSTS: ""
+  OPENREPORTING_COOKIE_SECURE: "true"
+  OPENREPORTING_PROXY_HEADERS: "true"
+  # Pod network of the ingress controller (cluster pod CIDR). The NetworkPolicy only admits the
+  # ingress namespace, so no other pod can reach the app to spoof X-Forwarded-Proto.
+  OPENREPORTING_FORWARDED_ALLOW_IPS: 10.244.0.0/16
+  OPENREPORTING_DATA_DIR: /var/lib/openreporting
+  OPENREPORTING_SECRET_KEY_FILE: /run/openreporting-key/secret.key
+  OPENREPORTING_REQUIRE_KEY_FILE: "true"
+  OPENREPORTING_WEB_WORKERS: "2"
+  OPENREPORTING_SESSION_HOURS: "12"
+  OPENREPORTING_MFA_REQUIRED_ROLES: admin
+  OPENREPORTING_QUERY_TIMEOUT_MS: "30000"
+  OPENREPORTING_MAX_ROWS: "200000"
+  OPENREPORTING_QUERY_CONCURRENCY: "6"
+  OPENREPORTING_MAX_SERIES_POINTS: "2000000"
+  OPENREPORTING_REPORT_RETENTION_DAYS: "365"
+  OPENREPORTING_PROVISION_TESTDATA: "false"
+  OPENREPORTING_MAIL_ENABLED: "false"
+  OPENREPORTING_LDAP_ENABLED: "false"
+  TZ: Europe/Istanbul

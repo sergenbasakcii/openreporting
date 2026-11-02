@@ -58,6 +58,11 @@ docker compose exec web openreporting create-user yonetici --role admin
 
 Sertifika, yedekleme, yükseltme ve sorun giderme: **[docs/DOCKER.md](docs/DOCKER.md)**.
 
+## Kubernetes (yatay ölçekleme)
+
+PostgreSQL + paylaşımlı arşiv volume ile çok kopyalı web (HPA), sıcak yedekli rapor worker'ı,
+Ingress TLS ve NetworkPolicy: `deploy/kubernetes/` (kustomize). Rehber: **[docs/KUBERNETES.md](docs/KUBERNETES.md)**.
+
 ## Yerel deneme — Windows 10/11
 
 ```powershell

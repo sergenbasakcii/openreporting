@@ -1,0 +1,40 @@
+# CI-only overlay: disposable kind cluster, in-cluster PostgreSQL, single-node RWO volume.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: openreporting
+resources:
+  - ../../base
+  - postgres.yaml
+images:
+  - name: openreporting
+    newName: openreporting
+    newTag: ci
+patches:
+  - target: {kind: PersistentVolumeClaim, name: openreporting-archive}
+    patch: |
+      - op: replace
+        path: /spec/accessModes
+        value: [ReadWriteOnce]
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
+  - target: {kind: ConfigMap, name: openreporting-config}
+    patch: |
+      - op: replace
+        path: /data/OPENREPORTING_PUBLIC_URL
+        value: https://openreporting.localtest
+      - op: replace
+        path: /data/OPENREPORTING_PROVISION_TESTDATA
+        value: "true"
+      # The fixture admin exercises business APIs; mandatory enrollment is covered by the MFA browser job.
+      - op: replace
+        path: /data/OPENREPORTING_MFA_REQUIRED_ROLES
+        value: ""
+  - target: {kind: Ingress, name: openreporting}
+    patch: |
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: openreporting.localtest
+      - op: replace
+        path: /spec/rules/0/host
+        value: openreporting.localtest

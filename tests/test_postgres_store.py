@@ -204,6 +204,26 @@ def test_application_uses_postgres_for_login_dashboard_and_report_queue(postgres
         application_db.backup_database(settings, tmp_path / "wrong.sqlite3")
 
 
+def test_postgres_standby_worker_takes_over_when_active_session_ends(postgres_schema):
+    import threading
+    from openreporting import postgres_store
+    events = []
+    acquired = threading.Event()
+
+    def standby():
+        with postgres_store.exclusive_worker(postgres_schema.dsn, standby_poll_s=0.05,
+                                             on_standby=lambda: events.append('standby')):
+            acquired.set()
+
+    with postgres_store.exclusive_worker(postgres_schema.dsn):
+        thread = threading.Thread(target=standby, daemon=True)
+        thread.start()
+        assert not acquired.wait(0.4)
+        assert events  # waited instead of failing or running alongside the active worker
+    assert acquired.wait(5)
+    thread.join(5)
+
+
 def test_postgres_worker_lock_release_and_connection_loss(postgres_schema):
     from openreporting import postgres_store
     with postgres_store.exclusive_worker(postgres_schema.dsn) as guard:

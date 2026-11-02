@@ -1,6 +1,12 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Kubernetes ve yatay ölçekleme**: `deploy/kubernetes` (kustomize) — çok kopyalı web (HPA 2–10, PDB,
+  kesintisiz rolling update), 1 aktif + 1 sıcak yedek rapor worker'ı (PostgreSQL danışma kilidi,
+  bekleyen kopya devralır), paylaşımlı RWX arşiv volume, Ingress TLS, NetworkPolicy, kısıtlı güvenlik
+  bağlamı, Host başlıklı probe'lar. `OPENREPORTING_REQUIRE_KEY_FILE` pod'ların kendi anahtarını üretmesini
+  engeller. `openreporting worker-health` probe komutu. CI geçici kind kümesinde 2 web + 2 worker +
+  PostgreSQL ile oturum/ayar tutarlılığı, pod'lar arası rapor indirme, worker devri ve rolling restart'ı test eder.
 - **Docker Compose yığını üretime hazır hale getirildi**: root olmayan nginx TLS proxy (80→443,
   `/metrics` kapalı, istek sınırları), web portu dışarı kapalı, worker web sağlıklı olunca başlar,
   sabit iç IP'li proxy dışında `X-Forwarded-*` güvenilmez (`OPENREPORTING_FORWARDED_ALLOW_IPS`,

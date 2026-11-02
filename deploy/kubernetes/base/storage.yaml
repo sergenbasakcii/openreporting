@@ -1,0 +1,12 @@
+# Report archive and logos are files written by the worker and served by every web pod:
+# a ReadWriteMany volume (NFS, CephFS, EFS, Azure Files, ...) is required for replicas on several nodes.
+# The application database is PostgreSQL; never put SQLite on this volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openreporting-archive
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 50Gi
