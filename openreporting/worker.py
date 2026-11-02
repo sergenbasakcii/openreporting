@@ -84,10 +84,10 @@ def exclusive_worker(settings):
     if settings.database_url:
         from . import postgres_store
         # Extra replicas (Kubernetes) wait as hot standby instead of crash-looping.
-        last = [0.0]
+        last = [None]
 
         def standby():
-            if time.monotonic() - last[0] > 300:
+            if last[0] is None or time.monotonic() - last[0] > 300:
                 last[0] = time.monotonic()
                 log.info("Another report worker is active; waiting as standby")
         with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms,
