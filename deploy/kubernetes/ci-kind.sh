@@ -52,6 +52,12 @@ PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
 kubectl -n openreporting exec deploy/openreporting-web -- env FIXTURE_PASSWORD="$PASSWORD" python -c \
   'import os; from openreporting.config import Settings; from openreporting.security import create_user; create_user(Settings.from_env(), "k8sadmin", os.environ["FIXTURE_PASSWORD"], "admin")'
 
+# Pods can be Ready a moment before the ingress controller routes to them.
+for _ in $(seq 1 60); do
+  curl -fsS --cacert "$EVIDENCE/tls.crt" "https://$HOST/api/health" >/dev/null 2>&1 && break
+  sleep 2
+done
+curl -fsS --cacert "$EVIDENCE/tls.crt" "https://$HOST/api/health"
 export OPENREPORTING_K8S_URL="https://$HOST" OPENREPORTING_K8S_CA="$EVIDENCE/tls.crt" OPENREPORTING_K8S_PASSWORD="$PASSWORD"
 python3 deploy/kubernetes/acceptance.py phase1 | tee "$EVIDENCE/phase1.json"
 

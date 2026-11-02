@@ -529,8 +529,10 @@ def test_sqlite_store_migrates_verified_into_empty_postgres(postgres_schema, tmp
     assert token
     assert any(r['id'] == run_id and r['status'] == 'completed' for r in service.list_runs(target, None, user=user))
     with application_db.connect(target) as connection, application_db.transaction(connection):
+        latest = connection.execute('SELECT max(id) FROM audit').fetchone()[0]
+        assert latest >= before  # sign-in above appended its own audit entry
         application_db.audit(connection, 'test', 'after.migration', 'test', 'x')
-        assert connection.execute('SELECT max(id) FROM audit').fetchone()[0] == before + 1
+        assert connection.execute('SELECT max(id) FROM audit').fetchone()[0] == latest + 1  # identity continues
     with pytest.raises(pg_migrate.MigrationError, match='boş değil'):
         pg_migrate.migrate(source.db_path, postgres_schema.dsn, services_stopped=True)
 
