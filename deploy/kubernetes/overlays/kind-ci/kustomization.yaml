@@ -6,7 +6,8 @@ resources:
   - ../../base
   - postgres.yaml
 images:
-  - name: openreporting
+  # Matches the name the base already rewrote.
+  - name: registry.example.com/openreporting/openreporting
     newName: openreporting
     newTag: ci
 patches:

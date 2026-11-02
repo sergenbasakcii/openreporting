@@ -73,7 +73,7 @@ kind: Kustomization
 namespace: openreporting
 resources: [../../base]
 images:
-  - {name: openreporting, newName: registry.example.com/openreporting/openreporting, newTag: "1.2.0"}
+  - {name: registry.example.com/openreporting/openreporting, newName: registry.sirket.local/openreporting, newTag: "1.2.0"}
 patches:
   - target: {kind: ConfigMap, name: openreporting-config}
     patch: |
