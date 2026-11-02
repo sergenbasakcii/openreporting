@@ -31,6 +31,12 @@ patches:
       - op: replace
         path: /data/OPENREPORTING_MFA_REQUIRED_ROLES
         value: ""
+  # The 2-vCPU CI runner also hosts the control plane; production keeps the base requests.
+  - target: {kind: Deployment, name: openreporting-(web|worker)}
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 50m
   - target: {kind: Ingress, name: openreporting}
     patch: |
       - op: replace
