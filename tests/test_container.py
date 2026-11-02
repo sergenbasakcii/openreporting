@@ -33,3 +33,26 @@ def test_container_settings_hint_points_to_compose(monkeypatch):
     from openreporting.api.settings import _restart_hint
     monkeypatch.setenv('OPENREPORTING_CONTAINER', '1')
     assert _restart_hint()['env_file'].startswith('deploy/docker/openreporting.env')
+
+
+def test_worker_health_reflects_heartbeat_age(tmp_path):
+    from dataclasses import replace
+    from datetime import datetime, timedelta, timezone
+    from openreporting.cli import worker_health
+    from openreporting.config import Settings
+    from openreporting.db import connect, init_db, transaction
+    settings = replace(Settings.from_env(), data_dir=tmp_path / 'data', database_url='', secret_key_file='')
+    assert worker_health(settings, 120) == 1  # no store: never created by the probe
+    assert not settings.db_path.exists()
+    init_db(settings)
+    assert worker_health(settings, 120) == 1  # worker never started
+    with connect(settings) as db:
+        columns = {r[1] for r in db.execute('PRAGMA table_info(worker_runtime)')}
+    for age, expected in ((10, 0), (500, 1)):
+        tick = (datetime.now(timezone.utc) - timedelta(seconds=age)).isoformat(timespec='seconds')
+        values = {'singleton_id': 1, 'last_tick': tick}
+        values.update({c: '' for c in columns - set(values)})
+        with connect(settings) as db, transaction(db):
+            db.execute('DELETE FROM worker_runtime')
+            db.execute(f"INSERT INTO worker_runtime({','.join(values)}) VALUES({','.join('?' * len(values))})", tuple(values.values()))
+        assert worker_health(settings, 120) == expected

@@ -19,6 +19,20 @@ def backup(settings, target):
     print("Important: copy the archive/ directory independently and verify manifest hashes.")
 
 
+def worker_health(settings, max_age):
+    """Probe: never migrates or creates a store; any storage error counts as unhealthy."""
+    from .domain import parse_utc
+    try:
+        if not settings.database_url and not settings.db_path.is_file():
+            return 1
+        with connect(settings) as db:
+            row = db.execute("SELECT last_tick FROM worker_runtime WHERE singleton_id=1").fetchone()
+        age = (datetime.now(timezone.utc) - parse_utc(row["last_tick"])).total_seconds() if row else None
+    except Exception:  # noqa: BLE001 - a probe reports state, never a traceback
+        return 1
+    return 0 if age is not None and age <= max_age else 1
+
+
 def forwarded_allow_ips(value):
     """Proxies whose X-Forwarded-* headers are trusted: exact IPs/networks only, never a wildcard."""
     import ipaddress
@@ -155,6 +169,8 @@ def main(argv=None):
     p_disable.add_argument("username")
     commands.add_parser("worker", help="Run the single background worker")
     commands.add_parser("worker-once", help="Run one background worker cycle")
+    p_wh = commands.add_parser("worker-health", help="Exit 0 if the worker heartbeat is fresh (container/Kubernetes probe)")
+    p_wh.add_argument("--max-age", type=int, default=120, help="Maximum heartbeat age in seconds")
     p_serve = commands.add_parser("serve", help="Serve local API on loopback")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8810)
@@ -195,6 +211,8 @@ def main(argv=None):
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    if args.action == "worker-health":
+        raise SystemExit(worker_health(Settings.from_env(), args.max_age))
     if args.action == "verify-backup":
         import json
         from .backup_verify import BackupVerificationError, verify_backup

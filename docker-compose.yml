@@ -39,10 +39,16 @@ services:
 
   worker:
     <<: *app
+    pull_policy: never
     command: ["openreporting", "worker"]
     depends_on:
       web: {condition: service_healthy}
-    healthcheck: {disable: true}  # liveness is the worker heartbeat on the Server status page
+    healthcheck:
+      test: ["CMD", "openreporting", "worker-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   proxy:
     <<: *hardening
@@ -66,6 +72,7 @@ services:
 
   backup:
     <<: *app
+    pull_policy: never
     profiles: [backup]
     restart: "no"
     entrypoint: ["/usr/local/bin/openreporting-backup"]
