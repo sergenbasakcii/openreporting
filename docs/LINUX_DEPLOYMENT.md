@@ -246,11 +246,12 @@ yükseltilmişse veritabanını son yedekten geri yükleyin.
 
 ## 10. Docker (alternatif)
 
-```bash
-docker compose up -d --build
-docker compose exec web openreporting create-user sergen --role admin
-```
+Docker Compose yığını (nginx TLS proxy + web + worker + yedek görevi) ve adım adım kurulum,
+yedekleme, yükseltme ve sorun giderme: **[docs/DOCKER.md](DOCKER.md)**.
 
-Konteyner `127.0.0.1:8810` üzerinden yayınlanır; önüne TLS sonlandıran bir ters vekil koyun. Veri `openreporting-data`,
-şifreleme anahtarı ayrı `openreporting-key` volume’ündedir — ikisini ayrı yerlerde yedekleyin. Konteynerler salt okunur kök
-dosya sistemi, tüm yetenekler kaldırılmış ve `no-new-privileges` ile çalışır.
+```bash
+cp deploy/docker/openreporting.env.example deploy/docker/openreporting.env   # PUBLIC_URL düzenleyin
+# deploy/docker/certs/cert.pem + key.pem (bkz. DOCKER.md)
+docker compose up -d --build --wait
+docker compose exec web openreporting create-user yonetici --role admin
+```

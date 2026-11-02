@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# CI acceptance for docker-compose.yml on a disposable runner: build, TLS proxy, proxy trust,
+# secure cookie, MFA over HTTPS, worker heartbeat, restart persistence, backup + verification.
+set -euo pipefail
+[ "${OPENREPORTING_DOCKER_CI:-}" = 1 ] || { echo 'Disposable CI runner required' >&2; exit 1; }
+cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+EVIDENCE="${EVIDENCE:-build/docker}"
+mkdir -p "$EVIDENCE"
+BASE=https://localhost:8443
+
+cp deploy/docker/openreporting.env.example deploy/docker/openreporting.env
+sed -i "s#^OPENREPORTING_PUBLIC_URL=.*#OPENREPORTING_PUBLIC_URL=$BASE#" deploy/docker/openreporting.env
+printf 'OPENREPORTING_HTTP_PORT=8080\nOPENREPORTING_HTTPS_PORT=8443\nOPENREPORTING_BIND=127.0.0.1\n' > .env
+openssl req -x509 -newkey rsa:3072 -sha256 -days 1 -nodes -subj '/CN=localhost' \
+  -addext 'subjectAltName=DNS:localhost' -keyout deploy/docker/certs/key.pem -out deploy/docker/certs/cert.pem 2>/dev/null
+sudo chown root:101 deploy/docker/certs/key.pem && sudo chmod 0640 deploy/docker/certs/key.pem
+sudo install -d -o 10001 -g 10001 -m 0700 backups
+trap 'docker compose logs --no-color > "$EVIDENCE/compose.log" 2>&1 || true' EXIT
+
+docker compose up -d --build --wait
+docker compose ps
+PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
+docker compose exec -T -e FIXTURE_PASSWORD="$PASSWORD" web python -c \
+  'import os; from openreporting.config import Settings; from openreporting.security import create_user; create_user(Settings.from_env(), "dockeradmin", os.environ["FIXTURE_PASSWORD"], "admin")'
+
+CURL=(curl -fsS --cacert deploy/docker/certs/cert.pem)
+[ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/)" = 301 ]
+"${CURL[@]}" "$BASE/api/health" | grep -q '"ok"\|"status"'
+[ "$(curl -s -o /dev/null -w '%{http_code}' --cacert deploy/docker/certs/cert.pem "$BASE/metrics")" = 404 ]
+
+login() {
+  "${CURL[@]}" -D "$EVIDENCE/login-headers.txt" -c "$EVIDENCE/jar" -H 'Content-Type: application/json' -H "Origin: $BASE" \
+    -d "{\"username\":\"dockeradmin\",\"password\":\"$PASSWORD\"}" "$BASE/api/login" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf"])'
+}
+CSRF="$(login)"
+grep -qi '^set-cookie: openreporting_session=.*; *secure' "$EVIDENCE/login-headers.txt"
+# MFA setup is refused over plain HTTP; success proves the proxy's X-Forwarded-Proto is trusted.
+"${CURL[@]}" -b "$EVIDENCE/jar" -H 'Content-Type: application/json' -H "Origin: $BASE" -H "X-CSRF-Token: $CSRF" \
+  -d "{\"password\":\"$PASSWORD\"}" "$BASE/api/user/mfa/setup" | python3 -c 'import json,sys; assert json.load(sys.stdin)["qr"].startswith("data:image/svg+xml")'
+
+worker_state() {
+  "${CURL[@]}" -b "$EVIDENCE/jar" "$BASE/api/admin/stats" | python3 -c 'import json,sys; print(json.load(sys.stdin)["worker"]["state"])'
+}
+for _ in $(seq 1 30); do [ "$(worker_state)" = up ] && break; sleep 2; done
+[ "$(worker_state)" = up ]
+
+docker compose restart web worker
+docker compose up -d --wait
+CSRF="$(login)"
+[ -n "$CSRF" ]
+
+docker compose --profile backup run --rm backup | tee "$EVIDENCE/backup.txt"
+DIR="$(sed -n 's#^Backup written: /backups/##p' "$EVIDENCE/backup.txt")"
+docker compose --profile backup run --rm --entrypoint openreporting backup \
+  verify-backup "/backups/$DIR" --key-file /run/openreporting-key/secret.key | tee "$EVIDENCE/verify.json"
+grep -q '"ok": *true' "$EVIDENCE/verify.json"
+docker image inspect "openreporting:local" --format '{{.Size}}' > "$EVIDENCE/image-size-bytes.txt"
+docker compose down
+echo 'Docker compose acceptance passed'

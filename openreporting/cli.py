@@ -19,6 +19,15 @@ def backup(settings, target):
     print("Important: copy the archive/ directory independently and verify manifest hashes.")
 
 
+def forwarded_allow_ips(value):
+    """Proxies whose X-Forwarded-* headers are trusted: exact IPs/networks only, never a wildcard."""
+    import ipaddress
+    items = [item.strip() for item in (value or "127.0.0.1,::1").split(",") if item.strip()]
+    for item in items:
+        ipaddress.ip_network(item, strict=False)
+    return ",".join(items)
+
+
 def doctor(settings, *, check_integrations=False):
     """Human-readable installation check; returns a process exit code."""
     import json
@@ -152,7 +161,7 @@ def main(argv=None):
     p_serve.add_argument("--workers", type=int, default=int(os.getenv("OPENREPORTING_WEB_WORKERS", "1")),
                          help="uvicorn worker processes (Linux: 2-4 recommended behind nginx)")
     p_serve.add_argument("--proxy-headers", action="store_true", default=os.getenv("OPENREPORTING_PROXY_HEADERS", "") in ("1", "true"),
-                         help="Trust X-Forwarded-* from the local reverse proxy (127.0.0.1)")
+                         help="Trust X-Forwarded-* from the reverse proxy (127.0.0.1, or OPENREPORTING_FORWARDED_ALLOW_IPS)")
     p_serve.add_argument("--allow-remote", action="store_true",
                          help="Allow a non-loopback bind (containers only; always put TLS in front)")
     p_doctor = commands.add_parser("doctor", help="Check installation: paths, permissions, fonts, schema, worker, datasources")
@@ -280,8 +289,12 @@ def main(argv=None):
         import uvicorn
         from .http_telemetry import logging_config
         workers = max(1, min(args.workers, 16))
+        try:
+            trusted_proxies = forwarded_allow_ips(os.getenv("OPENREPORTING_FORWARDED_ALLOW_IPS", ""))
+        except ValueError:
+            raise SystemExit("OPENREPORTING_FORWARDED_ALLOW_IPS must list exact proxy IP addresses or networks") from None
         common = {"host": args.host, "port": args.port, "proxy_headers": args.proxy_headers,
-                  "forwarded_allow_ips": "127.0.0.1,::1" if args.proxy_headers else None,
+                  "forwarded_allow_ips": trusted_proxies if args.proxy_headers else None,
                   "server_header": False, "date_header": True, "timeout_keep_alive": 15, "access_log": False,
                   "log_config":logging_config()}
         if workers > 1 and os.name != "nt":

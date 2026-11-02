@@ -6,3 +6,9 @@ __pycache__/
 .pytest_cache/
 windows/Settings.local.ps1
 /data/
+# Docker Compose: local settings, certificates and backups never enter git
+deploy/docker/openreporting.env
+deploy/docker/certs/*
+!deploy/docker/certs/README.md
+/backups/
+/.env

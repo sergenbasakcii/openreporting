@@ -58,9 +58,17 @@ def _server_info(base):
 def read_settings(request: Request, user=Depends(admin_read)):
     base = request.app.state.settings
     return {"scopes": runtime_settings.admin_view(base), "server": _server_info(base),
-            "env_file": "/etc/openreporting/openreporting.env" if os.name != "nt" else "windows\Settings.local.ps1",
-            "restart": ("sudo systemctl restart openreporting-web openreporting-worker" if os.name != "nt"
-                        else "Start-OpenReporting.ps1 penceresini kapatıp yeniden çalıştırın")}
+            **_restart_hint()}
+
+
+def _restart_hint():
+    if os.getenv("OPENREPORTING_CONTAINER") == "1":
+        return {"env_file": "deploy/docker/openreporting.env (Docker Compose)",
+                "restart": "docker compose up -d   # değişen ayarla konteynerleri yeniden oluşturur"}
+    if os.name == "nt":
+        return {"env_file": "windows\Settings.local.ps1", "restart": "Start-OpenReporting.ps1 penceresini kapatıp yeniden çalıştırın"}
+    return {"env_file": "/etc/openreporting/openreporting.env",
+            "restart": "sudo systemctl restart openreporting-web openreporting-worker"}
 
 
 def _guard_self_lockout(settings, user, scope, values):

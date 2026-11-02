@@ -48,6 +48,16 @@ LDAP/Active Directory, SMTP TLS/kurum CA'sı, servis hesapları ve canlıya alma
 
 Kullanım kılavuzu: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 
+## Docker Compose
+
+```bash
+cp deploy/docker/openreporting.env.example deploy/docker/openreporting.env   # OPENREPORTING_PUBLIC_URL
+docker compose up -d --build --wait                                         # nginx TLS + web + worker
+docker compose exec web openreporting create-user yonetici --role admin
+```
+
+Sertifika, yedekleme, yükseltme ve sorun giderme: **[docs/DOCKER.md](docs/DOCKER.md)**.
+
 ## Yerel deneme — Windows 10/11
 
 ```powershell

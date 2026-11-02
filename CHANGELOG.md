@@ -1,6 +1,12 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Docker Compose yığını üretime hazır hale getirildi**: root olmayan nginx TLS proxy (80→443,
+  `/metrics` kapalı, istek sınırları), web portu dışarı kapalı, worker web sağlıklı olunca başlar,
+  sabit iç IP'li proxy dışında `X-Forwarded-*` güvenilmez (`OPENREPORTING_FORWARDED_ALLOW_IPS`,
+  joker reddedilir), yedek görevi (`--profile backup`, `verify-backup` ile uyumlu), sabit UID 10001,
+  `.dockerignore`, Docker'a özel ayar şablonu ve `docs/DOCKER.md`. CI her değişiklikte yığını kurup
+  HTTPS, güvenli çerez, HTTPS üzerinden MFA, worker, yeniden başlatma ve yedek doğrulamasını test eder.
 - **Sistem ayarları sayfası** (Yönetim → Sistem ayarları): SMTP, LDAP/AD (grup → rol eşlemesi,
   CA PEM), oturum süresi ve MFA zorunlu roller, sorgu/rapor sınırları ve veri kaynağı politikası
   arayüzden düzenlenir. Değerler sunucu dosyasının önüne geçer, yeniden başlatma olmadan 2–3 sn içinde

@@ -181,9 +181,9 @@ jobs:
         with:
           persist-credentials: false
       - name: shellcheck
-        run: shellcheck -x -s bash deploy/*.sh
+        run: shellcheck -x -s bash deploy/*.sh deploy/docker/ci-compose.sh && shellcheck -s sh deploy/docker/backup.sh
       - name: bash -n
-        run: for f in deploy/*.sh; do bash -n "$f"; done
+        run: for f in deploy/*.sh deploy/docker/ci-compose.sh; do bash -n "$f"; done && sh -n deploy/docker/backup.sh
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
@@ -274,6 +274,24 @@ jobs:
         with:
           name: kali-lab-evidence
           path: build/kali
+          retention-days: 14
+
+  docker-compose:
+    name: Docker Compose stack acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build and exercise web, worker, TLS proxy and backup
+        run: OPENREPORTING_DOCKER_CI=1 EVIDENCE=build/docker bash deploy/docker/ci-compose.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: docker-compose-evidence
+          path: |
+            build/docker
+            !build/docker/jar
           retention-days: 14
 
   ubuntu-install:

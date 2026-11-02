@@ -1,39 +1,86 @@
-# docker compose up -d   →  http://127.0.0.1:8810 (bind to localhost; terminate TLS in a reverse proxy)
-# First admin:  docker compose exec web openreporting create-user sergen --role admin
+# OpenReporting on Docker: nginx TLS proxy -> web (FastAPI) + worker (reports), SQLite on a named volume.
+# Full guide: docs/DOCKER.md
+#   cp deploy/docker/openreporting.env.example deploy/docker/openreporting.env   # then edit PUBLIC_URL
+#   (certificates in deploy/docker/certs/cert.pem + key.pem — see the guide)
+#   docker compose up -d --build
+#   docker compose exec web openreporting create-user <kullanıcı> --role admin
+#   docker compose --profile backup run --rm backup                              # nightly via host cron
 #
-# The Fernet key lives in a separate volume so it is not copied by naive volume backups of the data.
+# Optional variables in a .env file next to this file:
+#   OPENREPORTING_HTTP_PORT (80)  OPENREPORTING_HTTPS_PORT (443)  OPENREPORTING_BIND (0.0.0.0)
+#   OPENREPORTING_SUBNET (172.30.88.0/24)  OPENREPORTING_PROXY_IP (172.30.88.10)  OPENREPORTING_TAG (local)
+
 x-hardening: &hardening
   read_only: true
   cap_drop: [ALL]
   security_opt: ["no-new-privileges:true"]
-  tmpfs: ["/tmp:size=64m"]
   restart: unless-stopped
+
+x-app: &app
+  <<: *hardening
+  image: openreporting:${OPENREPORTING_TAG:-local}
+  env_file: [deploy/docker/openreporting.env]
+  environment: &app-env
+    OPENREPORTING_DATA_DIR: /var/lib/openreporting
+    OPENREPORTING_SECRET_KEY_FILE: /run/openreporting-key/secret.key
+    OPENREPORTING_PROXY_HEADERS: "true"
+    # Only the proxy container's fixed address may set X-Forwarded-Proto/For.
+    OPENREPORTING_FORWARDED_ALLOW_IPS: ${OPENREPORTING_PROXY_IP:-172.30.88.10}
+  tmpfs: ["/tmp:size=64m"]
+  networks: [app]
+  volumes:
+    - openreporting-data:/var/lib/openreporting
+    - openreporting-key:/run/openreporting-key
 
 services:
   web:
-    <<: *hardening
+    <<: *app
     build: .
-    image: openreporting:1.1.0
-    env_file: [deploy/openreporting.env.example]
-    environment:
-      OPENREPORTING_DATA_DIR: /var/lib/openreporting
-      OPENREPORTING_SECRET_KEY_FILE: /run/openreporting-key/secret.key
-    ports: ["127.0.0.1:8810:8810"]
-    volumes:
-      - openreporting-data:/var/lib/openreporting
-      - openreporting-key:/run/openreporting-key
+
   worker:
-    <<: *hardening
-    image: openreporting:1.1.0
-    depends_on: [web]
-    env_file: [deploy/openreporting.env.example]
-    environment:
-      OPENREPORTING_DATA_DIR: /var/lib/openreporting
-      OPENREPORTING_SECRET_KEY_FILE: /run/openreporting-key/secret.key
+    <<: *app
     command: ["openreporting", "worker"]
+    depends_on:
+      web: {condition: service_healthy}
+    healthcheck: {disable: true}  # liveness is the worker heartbeat on the Server status page
+
+  proxy:
+    <<: *hardening
+    image: nginxinc/nginx-unprivileged:1.28-alpine
+    depends_on:
+      web: {condition: service_healthy}
+    ports:
+      - "${OPENREPORTING_BIND:-0.0.0.0}:${OPENREPORTING_HTTP_PORT:-80}:8080"
+      - "${OPENREPORTING_BIND:-0.0.0.0}:${OPENREPORTING_HTTPS_PORT:-443}:8443"
+    tmpfs: ["/tmp:size=32m"]
+    volumes:
+      - ./deploy/docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/docker/certs:/etc/nginx/certs:ro
+    networks:
+      app: {ipv4_address: "${OPENREPORTING_PROXY_IP:-172.30.88.10}"}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backup:
+    <<: *app
+    profiles: [backup]
+    restart: "no"
+    entrypoint: ["/usr/local/bin/openreporting-backup"]
+    command: []
     volumes:
       - openreporting-data:/var/lib/openreporting
-      - openreporting-key:/run/openreporting-key
+      - openreporting-key:/run/openreporting-key:ro
+      - ./deploy/docker/openreporting.env:/run/openreporting.env:ro
+      - ./backups:/backups
+
+networks:
+  app:
+    ipam:
+      config:
+        - subnet: ${OPENREPORTING_SUBNET:-172.30.88.0/24}
 
 volumes:
   openreporting-data: {}

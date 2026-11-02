@@ -1,0 +1,16 @@
+# Only pyproject, locks and the package are copied; keep the build context small and secret-free.
+.git
+.github
+.venv
+venv
+build
+data
+backups
+dist
+*.egg-info
+**/__pycache__
+**/*.pyc
+.pytest_cache
+deploy/docker/openreporting.env
+deploy/docker/certs
+windows/Settings.local.ps1
