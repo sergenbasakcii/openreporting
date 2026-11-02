@@ -11,6 +11,9 @@ mkdir -p "$EVIDENCE"
 dump() {
   kubectl get all,pvc,ingress -n openreporting -o wide > "$EVIDENCE/resources.txt" 2>&1 || true
   kubectl describe pods -n openreporting > "$EVIDENCE/pods.txt" 2>&1 || true
+  kubectl get events -A --sort-by=.lastTimestamp > "$EVIDENCE/events.txt" 2>&1 || true
+  kubectl describe nodes > "$EVIDENCE/nodes.txt" 2>&1 || true
+  kubectl describe pvc -n openreporting > "$EVIDENCE/pvc.txt" 2>&1 || true
   for pod in $(kubectl get pods -n openreporting -o name 2>/dev/null); do
     kubectl logs -n openreporting "$pod" --all-containers > "$EVIDENCE/$(basename "$pod").log" 2>&1 || true
   done
