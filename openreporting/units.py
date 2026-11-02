@@ -38,6 +38,9 @@ UNIT_CATALOG = {
 KNOWN_UNITS = frozenset(unit for entries in UNIT_CATALOG.values() for unit, _ in entries)
 
 
+# Raw Zabbix units that collide with display time-unit ids (metres vs minutes etc.).
+AMBIGUOUS_SOURCE_UNITS = {"m", "h", "d"}
+
 def resolve_unit(unit: str | None, source_unit: str | None = None) -> str:
     """Panel unit wins; otherwise translate the Zabbix item unit."""
     if unit and unit not in ("auto",):
@@ -46,7 +49,7 @@ def resolve_unit(unit: str | None, source_unit: str | None = None) -> str:
         mapped = ZABBIX_UNITS.get(source_unit)
         if mapped:
             return mapped
-        if source_unit in KNOWN_UNITS or source_unit.startswith(("suffix:", "prefix:")):
+        if (source_unit in KNOWN_UNITS and source_unit not in AMBIGUOUS_SOURCE_UNITS) or source_unit.startswith(("suffix:", "prefix:")):
             return source_unit
         return "suffix: " + source_unit
     return "short"

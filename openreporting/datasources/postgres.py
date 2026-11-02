@@ -298,8 +298,11 @@ class PostgresDataSource(DataSource):
     HISTORY_MODES = {
         "history_avg": "AVG(value::double precision)", "history_min": "MIN(value::double precision)",
         "history_max": "MAX(value::double precision)", "history_sum": "SUM(value::double precision)",
-        "history_count": "COUNT(value)::double precision", "history_last": "AVG(value::double precision)",
-        "history_first": "AVG(value::double precision)", "history_median": "AVG(value::double precision)",
+        "history_count": "COUNT(value)::double precision",
+        # Fixed expressions (no user input): honour last/first/median instead of averaging them.
+        "history_last": "(ARRAY_AGG(value::double precision ORDER BY clock DESC))[1]",
+        "history_first": "(ARRAY_AGG(value::double precision ORDER BY clock ASC))[1]",
+        "history_median": "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY value::double precision)",
         "trend_avg": "SUM(value_avg::double precision * num) / NULLIF(SUM(num), 0)",
         "trend_min": "MIN(value_min::double precision)", "trend_max": "MAX(value_max::double precision)",
         "trend_sum": "SUM(value_avg::double precision * num)", "trend_count": "SUM(num)::double precision",

@@ -254,7 +254,8 @@ def apply_functions(frames, functions, interval_ms, anchor_ms=0):
                             seconds = (ts - previous[0]) / 1000
                             diff = None if diff < 0 or seconds <= 0 else diff / seconds
                         out.append([ts, diff])
-                    previous = [ts, value]
+                    if value is not None:
+                        previous = [ts, value]
                 updated.append(dict(f, points=out))
             current = updated
         elif name == "movingAverage":

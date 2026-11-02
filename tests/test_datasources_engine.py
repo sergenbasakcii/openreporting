@@ -241,3 +241,32 @@ def test_stored_token_is_not_kept_when_the_destination_changes(settings):
     assert datasources.get(settings, uid).api.token == "super-secret-token"
     datasources.save(settings, "tester", {**moved, "secureJsonData": {"token": "new-token-for-new-host"}}, uid=uid)
     assert datasources.get(settings, uid).api.token == "new-token-for-new-host"
+
+
+def test_repeated_row_clones_keep_their_source_panel_id(settings):
+    # Report panel selection matches clones by source id, not id % 1000.
+    model = {"title": "Repeat ids", "templating": {"list": [
+        {"name": "host", "type": "custom", "query": "a,b,c", "multi": True, "current": {"value": ["a", "b", "c"]}}]},
+        "panels": [{"type": "row", "id": 1, "title": "Host $host", "repeat": "host", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}},
+                   {"type": "stat", "id": 5, "title": "CPU $host", "gridPos": {"x": 0, "y": 1, "w": 6, "h": 4}}]}
+    variables, _ = dashboard_runtime.resolve_variables(settings, model)
+    stats = [p for p in dashboard_runtime.expand(model, variables) if p["type"] == "stat"]
+    assert len(stats) == 3
+    assert {p.get("repeatPanelId", p["id"]) for p in stats} == {5}
+
+
+def test_failed_variable_options_never_widen_a_filter_to_everything(settings):
+    model = {"templating": {"list": [{"name": "host", "type": "query", "datasource": {"uid": "missing-source"},
+                                      "query": "x", "includeAll": True, "current": {"value": "$__all"}}]}}
+    variables, warnings = dashboard_runtime.resolve_variables(settings, model)
+    assert warnings and variables["host"]["value"] == dashboard_runtime.UNRESOLVED
+    variables, _ = dashboard_runtime.resolve_variables(settings, model, {"host": "srv-01"})
+    assert variables["host"]["value"] == "srv-01"  # the requested scope is kept, not replaced
+
+
+def test_stale_variable_override_is_reported(settings):
+    model = {"templating": {"list": [{"name": "host", "type": "custom", "query": "a,b", "current": {"value": "a"}}]}}
+    variables, warnings = dashboard_runtime.resolve_variables(settings, model, {"host": "gone"})
+    assert variables["host"]["value"] == "a" and any("artık seçenekler arasında yok" in w for w in warnings)
+    _, clean = dashboard_runtime.resolve_variables(settings, model, {"host": "b"})
+    assert not clean

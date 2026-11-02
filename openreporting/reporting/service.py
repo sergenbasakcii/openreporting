@@ -586,8 +586,9 @@ def execute(settings, run_id):
         audit(db, "worker", "report_delivery.attempted", "dash_report_run", run_id)
     try:
         status = send_mail(settings, config, run, files, recipients, partial)
-    except (MailSetupError, smtplib.SMTPRecipientsRefused, smtplib.SMTPAuthenticationError, smtplib.SMTPSenderRefused,
-            smtplib.SMTPDataError, smtplib.SMTPNotSupportedError):
+    except (MailSetupError, DomainError, smtplib.SMTPRecipientsRefused, smtplib.SMTPAuthenticationError,
+            smtplib.SMTPSenderRefused, smtplib.SMTPDataError, smtplib.SMTPNotSupportedError):
+        # DomainError: size/recipient validation fails before any SMTP traffic, so the outcome is certain.
         log.warning("Report mail delivery rejected for %s", run_id)
         status = "failed"
     except Exception:  # noqa: BLE001 - SMTP may have accepted the message; never retry automatically

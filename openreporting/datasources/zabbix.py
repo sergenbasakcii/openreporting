@@ -374,7 +374,7 @@ class ZabbixDataSource(DataSource):
             for offset in range(0, len(ids), 200):
                 rows = self.api.call("history.get", {
                     "history": int(value_type), "itemids": ids[offset:offset + 200],
-                    "time_from": int(start), "time_till": int(end) - 1, "sortfield": "clock",
+                    "time_from": int(start), "time_till": math.ceil(end) - 1, "sortfield": "clock",
                     "sortorder": "ASC", "output": ["itemid", "clock", "value"], "limit": max_rows + 1})
                 fetched += len(rows)
                 if len(rows) > max_rows or fetched > max_rows:
@@ -390,7 +390,7 @@ class ZabbixDataSource(DataSource):
         fetched = 0
         for offset in range(0, len(ids), 200):
             rows = self.api.call("trend.get", {
-                "itemids": ids[offset:offset + 200], "time_from": int(start), "time_till": int(end) - 1,
+                "itemids": ids[offset:offset + 200], "time_from": int(start), "time_till": math.ceil(end) - 1,
                 "output": ["itemid", "clock", "num", "value_min", "value_avg", "value_max"], "limit": max_rows + 1})
             fetched += len(rows)
             if fetched > max_rows:
@@ -428,7 +428,7 @@ class ZabbixDataSource(DataSource):
         for value_type, ids in by_type.items():
             table = tables[(value_type, trends)]
             mode = f"trend_{column}" if trends else f"history_{consolidate}"
-            for itemid, ts, value in sql_ds.bucketed_history(table, mode, ids, int(start), int(end), bucket, anchor_s):
+            for itemid, ts, value in sql_ds.bucketed_history(table, mode, ids, int(start), math.ceil(end), bucket, anchor_s):
                 points[str(itemid)].append([int(ts) * 1000, finite(value)])
         return points
 

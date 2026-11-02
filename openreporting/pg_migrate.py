@@ -67,10 +67,28 @@ def _columns_pg(db, table):
 
 
 def _digest(rows):
-    """Order-independent content digest (collations differ between SQLite and PostgreSQL)."""
-    per_row = sorted(hashlib.sha256(json.dumps(list(row), default=str, separators=(',', ':')).encode()).hexdigest()
-                     for row in rows)
-    return hashlib.sha256('\n'.join(per_row).encode()).hexdigest()
+    """Order-independent, streaming content digest: row count plus the sum of row hashes mod 2^256.
+
+    Collations differ between SQLite and PostgreSQL, so row order cannot be compared; nothing is
+    held in memory beyond the running total.
+    """
+    count, total = 0, 0
+    for row in rows:
+        row_hash = hashlib.sha256(json.dumps(list(row), default=str, separators=(',', ':')).encode()).digest()
+        total = (total + int.from_bytes(row_hash, 'big')) % (1 << 256)
+        count += 1
+    return f'{count}:{total:064x}'
+
+
+def _target_rows(dst, table, columns):
+    """Read the copied table back through a server-side cursor (bounded memory)."""
+    cursor = dst.raw.cursor(name=f'verify_{table}')
+    cursor.itersize = BATCH
+    cursor.execute(sql.SQL('SELECT {} FROM {}').format(sql.SQL(',').join(map(sql.Identifier, columns)), sql.Identifier(table)))
+    try:
+        yield from cursor
+    finally:
+        cursor.close()
 
 
 def _target_is_empty(db):
@@ -108,9 +126,7 @@ def migrate(source_path, dsn, *, services_stopped=False, timeout_ms=300000):
                     cursor.executemany(insert, [tuple(r) for r in batch])
                     copied += len(batch)
                 source_digest = _digest(src.execute(select))
-                target_rows = cursor.execute(sql.SQL('SELECT {} FROM {}').format(
-                    sql.SQL(',').join(map(sql.Identifier, columns)), sql.Identifier(table))).fetchall()
-                if len(target_rows) != copied or _digest(target_rows) != source_digest:
+                if source_digest.split(':')[0] != str(copied) or _digest(_target_rows(dst, table, columns)) != source_digest:
                     raise MigrationError(f'{table} tablosu doğrulanamadı; taşıma geri alındı')
                 summary[table] = copied
             # Explicit ids were inserted into identity columns; continue numbering after them.

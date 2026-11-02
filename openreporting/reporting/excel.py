@@ -120,8 +120,13 @@ def render_xlsx(config, collected, title):
                     for cell in ws[ws.max_row]:
                         cell.font = head_font
                         cell.fill = head_fill
-                    for row in rows[:MAX_ROWS_PER_SHEET]:
+                    # The cap is per sheet (Excel's hard row limit), and a cut is always stated in the file.
+                    room = max(0, MAX_ROWS_PER_SHEET - ws.max_row - 1)
+                    for row in rows[:room]:
                         ws.append([_safe(v) for v in row])
+                    if len(rows) > room:
+                        ws.append([f"Tablo {room:,} satırla sınırlandı (toplam {len(rows):,}); tüm satırlar için CSV biçimini kullanın.".replace(",", ".")])
+                        ws.cell(ws.max_row, 1).font = bold
                 for col in range(1, (max(len(b[1]) for b in blocks) if blocks else 1) + 1):
                     ws.column_dimensions[get_column_letter(col)].width = 22 if col == 1 else 18
                 for row in ws.iter_rows(min_row=1, max_row=ws.max_row):

@@ -102,7 +102,8 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
         for panel in panels:
             if split and panel.get("type") == "row" and panel.get("repeat") == split:
                 continue  # the section header already names the split value
-            if wanted and panel.get("type") != "row" and int(panel.get("id", 0)) % 1000 not in wanted and panel.get("id") not in wanted:
+            source_id = panel.get("repeatPanelId", panel.get("id"))
+            if wanted and panel.get("type") != "row" and source_id not in wanted and panel.get("id") not in wanted:
                 continue
             if panel_filter and not panel_filter(panel):
                 continue
@@ -113,7 +114,7 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
                     response = query_engine.run(settings, {
                         "targets": copy.deepcopy(panel["targets"]), "datasource": panel.get("datasource"),
                         "range": _panel_range(panel, rng), "timezone": tz,
-                        "maxDataPoints": int(panel.get("maxDataPoints") or 600), "minInterval": panel.get("interval"),
+                        "maxDataPoints": max(10, min(int(panel.get("maxDataPoints") or 600), 20000)), "minInterval": panel.get("interval"),
                         "variables": local, "transformations": panel.get("transformations") or [],
                         "dashboardTitle": dashboard.get("title", "")}, user=user, trusted=trusted)
                     result.frames = response["frames"]

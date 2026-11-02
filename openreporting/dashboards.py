@@ -338,6 +338,11 @@ KEEP_FOLDER = object()
 def save(settings, user, dashboard, *, folder_uid=None, message="", overwrite=False, ds_map=None):
     """Save a dashboard; ``folder_uid=KEEP_FOLDER`` leaves an existing dashboard where it is."""
     expected_version = dashboard.get("version") if isinstance(dashboard, dict) else None
+    if expected_version is not None:
+        try:
+            expected_version = int(expected_version)
+        except (TypeError, ValueError):
+            raise DashboardError("Geçersiz dashboard sürümü") from None
     model = normalize(dashboard, ds_map)
     now = utcnow()
     with connect(settings) as db, transaction(db):
@@ -355,7 +360,7 @@ def save(settings, user, dashboard, *, folder_uid=None, message="", overwrite=Fa
         if clash and not overwrite:
             raise VersionConflict("Bu klasörde aynı adlı bir dashboard var")
         if row:
-            if expected_version is not None and int(expected_version) != row["version"] and not overwrite:
+            if expected_version is not None and expected_version != row["version"] and not overwrite:
                 raise VersionConflict("Dashboard başka biri tarafından değiştirildi; sayfayı yenileyin veya üzerine yazın")
             version = row["version"] + 1
             db.execute("""UPDATE dashboards SET title=?,folder_id=?,tags_json=?,data_json=?,version=?,updated_at=?,

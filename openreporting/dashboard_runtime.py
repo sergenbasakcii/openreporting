@@ -93,6 +93,26 @@ def variable_options(settings, var, resolved, request, *, user="", trusted=True)
     return _sort(_apply_regex(options, var.get("regex")), var.get("sort"))
 
 
+# Stands in for a variable whose options could not be loaded: matches nothing, never "everything".
+UNRESOLVED = "__openreporting_unresolved__"
+
+
+def _unresolved_value(var, override):
+    wanted = override if override is not None else (var.get("current") or {}).get("value")
+    values = wanted if isinstance(wanted, list) else [wanted]
+    # "All" needs the option list to expand; without it a filter must stay closed.
+    values = [v for v in values if v not in (None, "", ALL)] or [UNRESOLVED]
+    return values if var.get("multi") else values[0]
+
+
+def _override_missing(var, options, override, value):
+    if override in (None, "", []) or var.get("type") in ("textbox", "constant"):
+        return False
+    wanted = override if isinstance(override, list) else [override]
+    chosen = value if isinstance(value, list) else [value]
+    return any(w not in chosen for w in wanted if w != ALL)
+
+
 def _pick(var, options, override):
     multi = var.get("multi")
     include_all = var.get("includeAll")
@@ -126,12 +146,17 @@ def resolve_variables(settings, dashboard, overrides=None, request=None, *, user
     warnings = []
     for var in (dashboard.get("templating") or {}).get("list", []):
         name = var["name"]
+        override = overrides.get(name)
         try:
             options = variable_options(settings, var, resolved, request, user=user, trusted=trusted)
         except (DataSourceError, DomainError, ValueError) as exc:
             warnings.append(f"${name}: seçenekler alınamadı ({exc})")
             options = []
-        value = _pick(var, options, overrides.get(name))
+            value = _unresolved_value(var, override)
+        else:
+            value = _pick(var, options, override)
+            if _override_missing(var, options, override, value):
+                warnings.append(f"${name}: istenen değer artık seçenekler arasında yok; yerine '{value}' kullanıldı")
         values = value if isinstance(value, list) else [value]
         text = " + ".join("Tümü" if v == ALL else next((o["text"] for o in options if o["value"] == v), v)
                           for v in values)
@@ -236,6 +261,8 @@ def expand(dashboard, variables, include_collapsed=True):
                     clone["scopedVars"] = scoped
                     clone["title"] = interpolate(clone.get("title", ""), local)
                     if pv is not None and index:
+                        # Reports select panels by their source id; keep it on every clone.
+                        clone.setdefault("repeatPanelId", clone["id"])
                         clone["id"] = clone["id"] * 1000 + index
                     h = clone["gridPos"]["h"]
                     if panel.get("repeatDirection") == "v":
