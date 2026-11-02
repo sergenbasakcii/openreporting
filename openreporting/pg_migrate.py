@@ -100,7 +100,8 @@ def migrate(source_path, dsn, *, services_stopped=False, timeout_ms=300000):
                     raise MigrationError(f'{table} tablosunun kolonları iki veritabanında farklı')
                 insert = sql.SQL('INSERT INTO {} ({}) VALUES ({})').format(
                     sql.Identifier(table), sql.SQL(',').join(map(sql.Identifier, columns)),
-                    sql.SQL(',').join(sql.Placeholder() * len(columns)))
+                    # The adapter's connections use server-side $n parameters (RawCursor).
+                    sql.SQL(',').join(sql.SQL(f'${i}') for i in range(1, len(columns) + 1)))
                 select = 'SELECT {} FROM "{}"'.format(','.join(f'"{c}"' for c in columns), table)
                 copied, rows = 0, src.execute(select)
                 while batch := rows.fetchmany(BATCH):
