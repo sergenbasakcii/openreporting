@@ -522,7 +522,9 @@ def test_sqlite_store_migrates_verified_into_empty_postgres(postgres_schema, tmp
         secure = connection.execute("SELECT secure_json FROM datasources WHERE uid='testdata'").fetchone()[0]
         assert decrypt(target, secure) == {'token': 'migrated-secret'}
         before = connection.execute('SELECT max(id) FROM audit').fetchone()[0]
-    assert runtime_settings.effective(target).smtp_password == 'migrated-relay-secret'
+        sealed = connection.execute("SELECT secure_json FROM app_settings WHERE scope='mail'").fetchone()[0]
+    # The fixture DSN is a key/value conninfo (not a URL), so read the sealed scope directly.
+    assert runtime_settings.valid_payload(decrypt(target, sealed), 'mail') == {'smtp_password': 'migrated-relay-secret'}
     token, _, _ = security.login(target, 'migrator', 'isolated-migration-password')
     assert token
     assert any(r['id'] == run_id and r['status'] == 'completed' for r in service.list_runs(target, None, user=user))
