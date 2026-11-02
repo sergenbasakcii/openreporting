@@ -79,7 +79,7 @@ def _target_is_empty(db):
     return db.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema()").fetchone()[0] == 0
 
 
-def migrate(source_path, dsn, *, services_stopped=False, timeout_ms=600000):
+def migrate(source_path, dsn, *, services_stopped=False, timeout_ms=300000):
     if not services_stopped:
         raise MigrationError('Bakım gerekli: bütün web ve worker süreçlerini durdurup --services-stopped ile çalıştırın')
     if not dsn:
