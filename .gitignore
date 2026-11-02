@@ -12,3 +12,4 @@ deploy/docker/certs/*
 !deploy/docker/certs/README.md
 /backups/
 /.env
+deploy/docker/build-ca/*.crt

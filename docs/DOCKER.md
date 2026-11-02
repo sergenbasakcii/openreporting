@@ -152,6 +152,8 @@ yükleyin. Eski kod yeni şemayı açmayı reddeder.
 
 | Belirti | Kontrol |
 | --- | --- |
+| Derlemede `CERTIFICATE_VERIFY_FAILED` (pypi.org) | Antivirüs (örn. Avast Web Shield) veya kurumsal proxy HTTPS'i kendi sertifikasıyla inceliyor. O kök sertifikanın açık kısmını PEM olarak `deploy/docker/build-ca/*.crt` içine koyun; yalnız derlemede güvenilir, paketler yine özetle doğrulanır, çalışan imaja girmez |
+| Tarayıcı/araç localhost sertifikasını Avast adıyla görüyor | Antivirüsün HTTPS taraması yerel bağlantıyı yeniden imzalıyor; uygulamayla ilgisi yoktur. Sunucu kurulumunda görülmez |
 | `env file … not found` | `deploy/docker/openreporting.env` oluşturulmamış (Bölüm 2, adım 1) |
 | proxy başlamıyor, `cannot load certificate key` | `deploy/docker/certs/key.pem` yok veya uid 101 okuyamıyor: `chown root:101`, `chmod 0640` |
 | `Pool overlaps with other one on this address space` | `OPENREPORTING_SUBNET` / `OPENREPORTING_PROXY_IP` değerlerini boş bir alt ağa çevirin |

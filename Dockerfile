@@ -3,7 +3,14 @@ FROM python:3.12-slim-bookworm AS build
 WORKDIR /src
 COPY pyproject.toml README.md requirements-runtime.lock requirements-build.lock ./
 COPY openreporting ./openreporting
-RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements-build.lock \
+# Optional extra roots for TLS-inspecting proxies/antivirus during the build only (deploy/docker/build-ca/*.crt).
+# Package integrity is still enforced by --require-hashes; the runtime image never receives these roots.
+COPY deploy/docker/build-ca/ /tmp/build-ca/
+RUN if ls /tmp/build-ca/*.crt >/dev/null 2>&1; then \
+      cat "$(python -c 'import pip._vendor.certifi as c; print(c.where())')" /tmp/build-ca/*.crt > /tmp/build-ca/bundle.pem; \
+    fi
+RUN if [ -f /tmp/build-ca/bundle.pem ]; then export PIP_CERT=/tmp/build-ca/bundle.pem; fi \
+    && pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements-build.lock \
     && pip download --no-cache-dir --require-hashes --only-binary=:all: --dest /wheels -r requirements-runtime.lock \
     && pip wheel --no-cache-dir --no-deps --no-build-isolation --wheel-dir /wheels .
 
