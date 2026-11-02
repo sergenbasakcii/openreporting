@@ -1,6 +1,10 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- `openreporting migrate-to-postgres`: tek sunuculu SQLite kurulumunu boş PostgreSQL'e çevrimdışı taşır.
+  Kaynak salt okunur; bütünlük/şema/denetim zinciri ön kontrolü; şema+kopya+doğrulama tek işlemde
+  (hata olursa hedef boş kalır); tablo bazında satır sayısı ve sıradan bağımsız içerik özeti, hedefte
+  denetim zinciri doğrulaması ve kimlik sayaçlarının devamı; dolu hedef reddedilir.
 - **Kubernetes ve yatay ölçekleme**: `deploy/kubernetes` (kustomize) — çok kopyalı web (HPA 2–10, PDB,
   kesintisiz rolling update), 1 aktif + 1 sıcak yedek rapor worker'ı (PostgreSQL danışma kilidi,
   bekleyen kopya devralır), paylaşımlı RWX arşiv volume, Ingress TLS, NetworkPolicy, kısıtlı güvenlik

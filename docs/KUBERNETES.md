@@ -134,11 +134,46 @@ Web pod'ları kesintisiz sırayla yenilenir (`maxUnavailable: 0`). Şema değiş
 veritabanı yedeği alın; şema geçişleri geriye doğru uyumludur (yeni tablo/kolon eklenir), eski kod yeni
 şemayı yeni açılışta reddeder; geri dönüş için yedekten dönün.
 
-## 7. SQLite kurulumundan geçiş
+## 7. Mevcut SQLite kurulumundan PostgreSQL'e geçiş
 
-Mevcut tek sunuculu (SQLite) kurulumdan PostgreSQL'e otomatik veri taşıma aracı henüz yoktur.
-Dashboard'lar `export-dashboards` / `import-dashboards` ile taşınabilir; kullanıcılar, veri kaynakları ve
-rapor tanımları yeni kurulumda yeniden oluşturulur.
+`openreporting migrate-to-postgres` tek sunuculu kurulumun (systemd veya Docker Compose) bütün
+uygulama verisini — kullanıcılar, MFA, veri kaynakları, dashboard sürümleri, raporlar, çalışma
+geçmişi, Sistem ayarları ve denetim kaydı — **boş** bir PostgreSQL veritabanına kopyalar.
+
+- Kaynak salt okunur açılır, değiştirilmez. Önce bütünlük, şema sürümü ve denetim zinciri doğrulanır.
+- Hedefte şema kurulumu, kopyalama ve doğrulama **tek işlemde** yapılır. Hata olursa hedef boş kalır.
+- Her tablo için satır sayısı ve içerik özeti karşılaştırılır, hedefte denetim zinciri yeniden doğrulanır.
+- Dolu bir hedefe asla yazılmaz. Şifreli değerler olduğu gibi taşınır, bu yüzden **aynı şifreleme anahtarı** kullanılmalıdır.
+
+**Adımlar (bakım penceresinde):**
+
+```bash
+# 1) Yedek alın (systemd: sudo systemctl start openreporting-backup · Docker: --profile backup run --rm backup)
+
+# 2) Servisleri durdurun
+sudo systemctl stop openreporting-web openreporting-worker          # systemd
+docker compose stop web worker                                       # Docker Compose
+
+# 3) Hedef adresini parola komut satırında görünmeyecek şekilde bir dosyaya yazın
+sudo install -m 0600 /dev/null /root/pg-target.env
+sudo nano /root/pg-target.env     # OPENREPORTING_DATABASE_URL=postgresql://openreporting:...@pg.example.com:5432/openreporting?sslmode=verify-full
+
+# 4a) systemd kurulumundan taşıma
+sudo bash -c 'set -a; . /root/pg-target.env; set +a; exec setpriv --reuid=openreporting --regid=openreporting --init-groups   /opt/openreporting/venv/bin/openreporting migrate-to-postgres --source /var/lib/openreporting/state.sqlite3 --services-stopped'
+
+# 4b) Docker Compose kurulumundan taşıma (compose klasöründe; değişken kabuktan -e ile konteynere geçer)
+sudo bash -c 'set -a; . /root/pg-target.env; set +a; docker compose run --rm --no-deps -e OPENREPORTING_DATABASE_URL web openreporting migrate-to-postgres --source /var/lib/openreporting/state.sqlite3 --services-stopped'
+```
+
+Çıktı `"ok": true` ve tablo bazında satır sayılarıdır. Sonra:
+
+1. **Rapor arşivi ve logolar**: `/var/lib/openreporting/archive` ve `logos` klasörlerini yeni kurulumun
+   arşiv volume'üne kopyalayın (örn. geçici bir pod'a `kubectl cp` veya NFS üzerinden `rsync -a`).
+   Dosya sahibi uid/gid 10001 olmalıdır.
+2. **Anahtar**: eski kurulumdaki `secret.key` dosyasını `openreporting-key` Secret'ı olarak yükleyin.
+3. Yeni kurulumu başlatın, giriş yapın, eski bir raporu indirin ve `openreporting verify-audit` çalıştırın.
+4. Eski sunucuyu yedeği saklayarak kapatın. Geri dönüş gerekirse eski sunucuyu yeniden başlatmak yeterlidir
+   (kaynak hiç değiştirilmedi); geçişten sonra yeni kurulumda yapılan değişiklikler geri taşınmaz.
 
 ## 8. Sorun giderme
 

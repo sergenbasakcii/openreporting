@@ -69,3 +69,18 @@ def test_required_key_file_is_never_generated(tmp_path, monkeypatch):
         encrypt(settings, {'token': 'value'})
     assert not key_path(settings).exists()
     reset_cache()
+
+
+def test_migration_refuses_without_maintenance_target_or_current_source(tmp_path):
+    import sqlite3
+    from openreporting import pg_migrate
+    with pytest.raises(pg_migrate.MigrationError, match='--services-stopped'):
+        pg_migrate.migrate(tmp_path / 'x.sqlite3', 'postgresql://x')
+    with pytest.raises(pg_migrate.MigrationError, match='OPENREPORTING_DATABASE_URL'):
+        pg_migrate.migrate(tmp_path / 'x.sqlite3', '', services_stopped=True)
+    with pytest.raises(pg_migrate.MigrationError, match='bulunamadı'):
+        pg_migrate.migrate(tmp_path / 'x.sqlite3', 'postgresql://x', services_stopped=True)
+    old = tmp_path / 'old.sqlite3'
+    sqlite3.connect(old).execute('PRAGMA user_version=3').connection.close()
+    with pytest.raises(pg_migrate.MigrationError, match='şema sürümü'):
+        pg_migrate.migrate(old, 'postgresql://x', services_stopped=True)

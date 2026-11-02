@@ -471,3 +471,79 @@ def test_postgres_preflight_detects_privileged_membership_in_a_limited_login(pos
                            'REVOKE ALL ON SCHEMA {} FROM {}'):
                 conn.raw.execute(sql.SQL(revoke).format(sql.Identifier(schema), sql.Identifier(role)))
             conn.raw.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
+
+
+def _sqlite_state(tmp_path):
+    """A small but complete SQLite store: users, factor, sealed secrets, dashboard, report run, settings."""
+    from dataclasses import replace
+    from openreporting import dashboards, datasources, runtime_settings, security
+    from openreporting.config import Settings
+    from openreporting.reporting import service
+    from openreporting.secrets_store import encrypt, reset_cache
+    reset_cache()
+    settings = replace(Settings.from_env(), data_dir=tmp_path / 'sqlite', database_url='', secret_key_file=str(tmp_path / 'shared.key'),
+                       ldap_enabled=False, mail_enabled=False, mfa_required_roles=(), zabbix_url='', zabbix_token_file='')
+    application_db.init_db(settings)
+    datasources.provision(settings)
+    user = {'id': security.create_user(settings, 'migrator', 'isolated-migration-password', 'admin'), 'role': 'admin'}
+    with application_db.connect(settings) as connection, application_db.transaction(connection):
+        connection.execute("UPDATE datasources SET secure_json=? WHERE uid='testdata'", (encrypt(settings, {'token': 'migrated-secret'}),))
+        application_db.audit(connection, 'test', 'source.secret_seeded', 'datasource', 'testdata')
+    dashboards.save(settings, user, {'uid': 'migrated', 'title': 'Migrated dashboard', 'panels': [
+        {'id': 1, 'type': 'timeseries', 'targets': [{'refId': 'A', 'datasource': {'uid': 'testdata'}, 'scenario': 'sine'}]}]})
+    report = service.save_report(settings, user, {'name': 'Migrated report', 'dashboard_uid': 'migrated', 'formats': ['csv']})
+    run_id = service.request_run(settings, user, report['id'], {})['run_id']
+    assert service.claim(settings) == run_id
+    service.execute(settings, run_id)
+    runtime_settings.save(settings, 'mail', {'mail_enabled': True, 'smtp_host': 'smtp.example.com', 'smtp_from': 'r@example.com',
+                                             'recipient_domains': ['example.com'], 'smtp_user': 'relay'},
+                          {'smtp_password': 'migrated-relay-secret'}, 0, user['id'])
+    return settings, user, run_id
+
+
+def test_sqlite_store_migrates_verified_into_empty_postgres(postgres_schema, tmp_path):
+    from dataclasses import replace
+    from openreporting import pg_migrate, runtime_settings, security
+    from openreporting.reporting import service
+    from openreporting.secrets_store import decrypt, reset_cache
+    source, user, run_id = _sqlite_state(tmp_path)
+    with application_db.connect(source) as connection:
+        expected = {t: connection.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in pg_migrate._tables(connection)}
+    with pytest.raises(pg_migrate.MigrationError, match='--services-stopped'):
+        pg_migrate.migrate(source.db_path, postgres_schema.dsn)
+    result = pg_migrate.migrate(source.db_path, postgres_schema.dsn, services_stopped=True)
+    assert result['ok'] and result['rows'] == expected
+    target = replace(source, database_url=postgres_schema.dsn, data_dir=tmp_path / 'pg-data')
+    target.data_dir.mkdir()
+    reset_cache()
+    runtime_settings.invalidate(target)
+    with application_db.connect(target) as connection:
+        assert application_db.verify_audit(connection)[0]
+        secure = connection.execute("SELECT secure_json FROM datasources WHERE uid='testdata'").fetchone()[0]
+        assert decrypt(target, secure) == {'token': 'migrated-secret'}
+        before = connection.execute('SELECT max(id) FROM audit').fetchone()[0]
+    assert runtime_settings.effective(target).smtp_password == 'migrated-relay-secret'
+    token, _, _ = security.login(target, 'migrator', 'isolated-migration-password')
+    assert token
+    assert any(r['id'] == run_id and r['status'] == 'completed' for r in service.list_runs(target, None, user=user))
+    with application_db.connect(target) as connection, application_db.transaction(connection):
+        application_db.audit(connection, 'test', 'after.migration', 'test', 'x')
+        assert connection.execute('SELECT max(id) FROM audit').fetchone()[0] == before + 1
+    with pytest.raises(pg_migrate.MigrationError, match='boş değil'):
+        pg_migrate.migrate(source.db_path, postgres_schema.dsn, services_stopped=True)
+
+
+def test_failed_verification_leaves_postgres_target_empty(postgres_schema, tmp_path, monkeypatch):
+    from openreporting import pg_migrate
+    source, _, _ = _sqlite_state(tmp_path)
+    original = pg_migrate._digest
+    calls = []
+
+    def corrupt(rows):
+        calls.append(1)
+        return original(rows) + ('x' if len(calls) == 6 else '')
+    monkeypatch.setattr(pg_migrate, '_digest', corrupt)
+    with pytest.raises(pg_migrate.MigrationError, match='geri alındı'):
+        pg_migrate.migrate(source.db_path, postgres_schema.dsn, services_stopped=True)
+    with postgres_schema() as connection:
+        assert pg_migrate._target_is_empty(connection)

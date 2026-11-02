@@ -169,6 +169,10 @@ def main(argv=None):
     p_disable.add_argument("username")
     commands.add_parser("worker", help="Run the single background worker")
     commands.add_parser("worker-once", help="Run one background worker cycle")
+    p_mig = commands.add_parser("migrate-to-postgres",
+                                help="Offline one-way copy of a SQLite store into the empty PostgreSQL in OPENREPORTING_DATABASE_URL")
+    p_mig.add_argument("--source", required=True, help="Path of the SQLite state.sqlite3 to copy (opened read-only)")
+    p_mig.add_argument("--services-stopped", action="store_true", help="Confirm every web process and worker is stopped")
     p_wh = commands.add_parser("worker-health", help="Exit 0 if the worker heartbeat is fresh (container/Kubernetes probe)")
     p_wh.add_argument("--max-age", type=int, default=120, help="Maximum heartbeat age in seconds")
     p_serve = commands.add_parser("serve", help="Serve local API on loopback")
@@ -211,6 +215,16 @@ def main(argv=None):
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    if args.action == "migrate-to-postgres":
+        # Before init_db: the target must still be empty when the copy starts.
+        import json
+        from .pg_migrate import MigrationError, migrate
+        try:
+            result = migrate(args.source, os.getenv("OPENREPORTING_DATABASE_URL", "").strip(), services_stopped=args.services_stopped)
+        except MigrationError as exc:
+            raise SystemExit(str(exc)) from None
+        print(json.dumps(result, indent=2))
+        return
     if args.action == "worker-health":
         raise SystemExit(worker_health(Settings.from_env(), args.max_age))
     if args.action == "verify-backup":
