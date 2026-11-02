@@ -13,6 +13,7 @@ resources:
   - web.yaml
   - worker.yaml
   - ingress.yaml
+  - ingress-login.yaml
   - networkpolicy.yaml
   - autoscaling.yaml
 images:

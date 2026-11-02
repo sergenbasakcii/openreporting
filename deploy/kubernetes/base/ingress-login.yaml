@@ -1,0 +1,23 @@
+# Stricter per-client limits for sign-in, matching the bundled nginx (10/min, burst 5). ingress-nginx
+# applies rate-limit annotations per Ingress object, so the login path gets its own object.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openreporting-login
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rpm: "10"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "1"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [openreporting.example.com]
+      secretName: openreporting-tls
+  rules:
+    - host: openreporting.example.com
+      http:
+        paths:
+          - path: /api/login
+            pathType: Exact
+            backend:
+              service: {name: openreporting-web, port: {name: http}}

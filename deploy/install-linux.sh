@@ -150,13 +150,16 @@ if [ "$NGINX" -eq 1 ]; then
     [ -d "$(dirname "$KEY")" ] || install -d -m 0700 "$(dirname "$KEY")"
     if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
       [ "$SELF_SIGNED" -eq 1 ] || die "TLS sertifikası gerekli: --cert/--key verin veya geçici olarak --self-signed kullanın"
-      openssl req -x509 -newkey rsa:3072 -sha256 -days 825 -nodes -subj "/CN=$DOMAIN" \
-        -addext "subjectAltName=DNS:$DOMAIN" -keyout "$KEY" -out "$CERT" >/dev/null 2>&1
-      chmod 0600 "$KEY"
+      # umask: the private key is never readable by others, not even briefly.
+      (umask 077; openssl req -x509 -newkey rsa:3072 -sha256 -days 825 -nodes -subj "/CN=$DOMAIN" \
+        -addext "subjectAltName=DNS:$DOMAIN" -keyout "$KEY" -out "$CERT" >/dev/null 2>&1)
+      chmod 0600 "$KEY"; chmod 0644 "$CERT"
       warn "Kendinden imzalı sertifika üretildi; kurum sertifikasıyla değiştirin: $CERT"
     fi
   fi
   if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then die "Sertifika/anahtar bulunamadı: $CERT / $KEY"; fi
+  # Paths are substituted into the nginx config: only plain absolute paths are accepted.
+  [[ "$CERT" =~ ^/[A-Za-z0-9._/-]+$ && "$KEY" =~ ^/[A-Za-z0-9._/-]+$ ]] || die "Sertifika/anahtar yolu yalnız harf, rakam, . _ - / içerebilir"
   if [ -L "$NGINX_SITE" ] || { [ -e "$NGINX_SITE" ] && ! grep -q '^# OpenReporting — nginx' "$NGINX_SITE"; }; then
     die "Uygulamaya ait olmayan nginx dosyasının üzerine yazılmadı: $NGINX_SITE"
   fi

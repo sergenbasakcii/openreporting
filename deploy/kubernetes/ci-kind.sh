@@ -27,15 +27,20 @@ kubectl wait -n ingress-nginx --for=condition=ready pod -l app.kubernetes.io/com
 
 docker build -t openreporting:ci .
 kind load docker-image openreporting:ci --name openreporting
+# Pre-load the probe image so a NetworkPolicy "blocked" result can never be an image-pull timeout.
+docker pull curlimages/curl:8.11.1
+kind load docker-image curlimages/curl:8.11.1 --name openreporting
 
 kubectl create namespace openreporting
 DB_PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
 kubectl -n openreporting create secret generic postgres-ci --from-literal=password="$DB_PASSWORD"
 kubectl -n openreporting create secret generic openreporting-secrets \
   --from-literal=OPENREPORTING_DATABASE_URL="postgresql://openreporting:$DB_PASSWORD@postgres:5432/openreporting"
-docker run --rm openreporting:ci python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode(), end="")' > "$EVIDENCE/secret.key"
-kubectl -n openreporting create secret generic openreporting-key --from-file=secret.key="$EVIDENCE/secret.key"
-rm -f "$EVIDENCE/secret.key"
+# The key never touches the uploaded evidence directory.
+KEY_FILE="$(mktemp)"
+docker run --rm openreporting:ci python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode(), end="")' > "$KEY_FILE"
+kubectl -n openreporting create secret generic openreporting-key --from-file=secret.key="$KEY_FILE"
+rm -f "$KEY_FILE"
 openssl req -x509 -newkey rsa:3072 -sha256 -days 1 -nodes -subj "/CN=$HOST" -addext "subjectAltName=DNS:$HOST" \
   -keyout "$EVIDENCE/tls.key" -out "$EVIDENCE/tls.crt" 2>/dev/null
 kubectl -n openreporting create secret tls openreporting-tls --cert="$EVIDENCE/tls.crt" --key="$EVIDENCE/tls.key"
@@ -60,6 +65,16 @@ done
 curl -fsS --cacert "$EVIDENCE/tls.crt" "https://$HOST/api/health"
 export OPENREPORTING_K8S_URL="https://$HOST" OPENREPORTING_K8S_CA="$EVIDENCE/tls.crt" OPENREPORTING_K8S_PASSWORD="$PASSWORD"
 python3 deploy/kubernetes/acceptance.py phase1 | tee "$EVIDENCE/phase1.json"
+
+# NetworkPolicy: pods other than the ingress controller must not reach the app (they could forge
+# X-Forwarded-Proto). Probe from another namespace and from the app's own namespace.
+for ns in default openreporting; do
+  if kubectl -n "$ns" run "np-probe-$RANDOM" --image=curlimages/curl:8.11.1 --restart=Never --image-pull-policy=Never --rm -i --quiet --command --        curl -fsS -m 5 -H 'X-Forwarded-Proto: https' -H 'Host: 127.0.0.1' http://openreporting-web.openreporting.svc:8810/healthz; then
+    echo "NetworkPolicy did not block a pod in namespace $ns" >&2
+    exit 1
+  fi
+  echo "NetworkPolicy blocked a pod in namespace $ns" | tee -a "$EVIDENCE/networkpolicy.txt"
+done
 
 # Worker failover: delete the active worker; the standby must take over the advisory lock.
 ACTIVE="$(python3 deploy/kubernetes/acceptance.py active-worker)"

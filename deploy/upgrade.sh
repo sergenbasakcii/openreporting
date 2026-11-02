@@ -3,7 +3,8 @@
 #   sudo ./deploy/upgrade.sh                 # from the directory containing this script
 #   sudo ./deploy/upgrade.sh --wheelhouse /path/to/wheels   # offline
 # A backup is taken first; the previous code stays in /opt/openreporting/app.prev for rollback.
-set -euo pipefail
+# -E: the ERR trap must also fire for failures inside functions (sync_code, pip, migrations).
+set -eEuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=deploy/lib.sh
@@ -44,8 +45,14 @@ if [ -z "$(env_value OPENREPORTING_ALLOWED_HOSTS)" ]; then
 fi
 
 OLD="$("$OPENREPORTING_VENV/bin/python" -c 'import openreporting; print(openreporting.__version__)')"
+# Stop first so the pre-upgrade backup contains every write; a failed backup restarts the old version.
+log "Servisler durduruluyor"
+systemctl stop openreporting-worker.service openreporting-web.service
 log "Mevcut sürüm: $OLD — ön yedek alınıyor"
-"$SCRIPT_DIR/backup.sh"
+if ! "$SCRIPT_DIR/backup.sh"; then
+  systemctl start openreporting-web.service openreporting-worker.service || true
+  die "Ön yedek alınamadı; yükseltme yapılmadı ve mevcut sürüm yeniden başlatıldı"
+fi
 BACKUP_DIR="$(env_value OPENREPORTING_BACKUP_DIR)"; BACKUP_DIR="${BACKUP_DIR:-$OPENREPORTING_BACKUPS}"
 PRE_BACKUP="$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -name '20*' | sort | tail -1)"
 db_version() {
@@ -54,15 +61,15 @@ db_version() {
 }
 OLD_DB_VERSION="$(db_version)"
 
-log "Servisler durduruluyor"
-systemctl stop openreporting-worker.service openreporting-web.service
-
 rollback() {
+  trap - ERR
+  set +e
   warn "Yükseltme başarısız; önceki kod geri yükleniyor"
   systemctl stop openreporting-worker.service openreporting-web.service || true
   if [ -d "$OPENREPORTING_HOME/app.prev" ]; then
     rm -rf "$OPENREPORTING_APP"; cp -a "$OPENREPORTING_HOME/app.prev" "$OPENREPORTING_APP"
-    "$OPENREPORTING_VENV/bin/python" -m pip install --quiet --force-reinstall --no-deps "$OPENREPORTING_APP" || true
+    # Same hashed locks and flags as the original install: restores the previous dependency set too.
+    install_package "$WHEELHOUSE" || warn "Önceki bağımlılıklar geri yüklenemedi; venv'i elle kontrol edin: $OPENREPORTING_VENV"
   fi
   # The old code refuses a newer schema; if this upgrade changed it, restore the pre-upgrade database.
   if [ "$(db_version)" != "$OLD_DB_VERSION" ]; then

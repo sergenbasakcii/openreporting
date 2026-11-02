@@ -74,6 +74,8 @@ sync_code() {
   rsync -a --delete \
     --exclude '.git/' --exclude '.venv/' --exclude 'venv/' --exclude 'build/' --exclude '__pycache__/' \
     --exclude '*.pyc' --exclude '.pytest_cache/' --exclude '*.egg-info/' --exclude 'windows/Settings.local.ps1' \
+    --exclude '/deploy/docker/certs/*.pem' --exclude '/deploy/docker/openreporting.env' --exclude '/deploy/docker/build-ca/*.crt' \
+    --exclude '/.env' --exclude '/backups/' --exclude '/data/' \
     "$src/" "$OPENREPORTING_APP/"
   chown -R root:root "$OPENREPORTING_APP"
   chmod -R u=rwX,go=rX "$OPENREPORTING_APP"

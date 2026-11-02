@@ -114,10 +114,10 @@ docker compose --profile backup run --rm backup     # backups/YYYYMMDD-HHMMSS/ o
 
 Klasörde `state.sqlite3`, `archive.tar.gz`, `openreporting.env`, `SHA256SUMS` bulunur;
 14 günden eski yedekler silinir (`OPENREPORTING_BACKUP_KEEP_DAYS`). Her gece çalıştırmak için
-sunucu cron'u (`crontab -e`):
+root cron'u (`sudo crontab -e`); `-T` cron altında terminal ayırmaz, günlük `backups/` dışında tutulur:
 
 ```cron
-30 2 * * * cd /home/<kullanıcı>/openreporting && docker compose --profile backup run --rm backup >> backups/backup.log 2>&1
+30 2 * * * cd /home/<kullanıcı>/openreporting && docker compose --profile backup run --rm -T backup >> /var/log/openreporting-backup.log 2>&1
 ```
 
 **Şifreleme anahtarı** ayrı volume'dedir ve varsayılan olarak yedeğe girmez. Kurulumdan hemen sonra

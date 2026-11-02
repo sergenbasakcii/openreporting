@@ -176,6 +176,10 @@ veya erişilemeyen DB başarılı readiness sayılmaz. Bu kontroller harici veri
 > çevrimdışı ortam) saklayın; anahtar olmadan veri kaynağı kimlik bilgileri yeniden girilmelidir.
 > Anahtarı yedeğe katmak için `/etc/openreporting/openreporting.env` içine `OPENREPORTING_BACKUP_INCLUDE_KEY=true` ekleyin.
 > Yedekleri bir GPG açık anahtarıyla şifrelemek için: `OPENREPORTING_BACKUP_GPG_RECIPIENT=yedek@sirket.local` (`apt install gnupg`).
+> Zamanlayıcı servisi `/etc/openreporting/gnupg` anahtar deposunu kullanır; alıcının açık anahtarını oraya alın:
+> `sudo install -d -m 0700 /etc/openreporting/gnupg && sudo GNUPGHOME=/etc/openreporting/gnupg gpg --import yedek-acik-anahtar.asc`
+> Yedek klasörünü (`OPENREPORTING_BACKUP_DIR`) değiştirirseniz servise yazma izni de verin:
+> `sudo systemctl edit openreporting-backup.service` → `[Service]` altına `ReadWritePaths=/yeni/yol`.
 
 Geri yükleme:
 

@@ -17,7 +17,7 @@ Secret: openreporting-secrets (veritabanı adresi) · openreporting-key (şifrel
 | Rapor worker'ı | PostgreSQL danışma kilidi: yalnız biri çalışır, diğeri bekler; aktif pod ölünce saniyeler içinde devralır |
 | Rapor arşivi / logolar | Paylaşımlı ReadWriteMany volume; worker yazar, her web pod'u indirir |
 | Şifreleme anahtarı | Tek Secret; `OPENREPORTING_REQUIRE_KEY_FILE=true` pod'un kendi anahtarını üretmesini engeller |
-| HTTPS tespiti | Yalnız Ingress controller'ın pod ağından gelen `X-Forwarded-*` güvenilir; NetworkPolicy başka pod'ları engeller |
+| HTTPS tespiti | Yalnız Ingress controller'ın pod ağından gelen `X-Forwarded-*` güvenilir; NetworkPolicy web pod'larına yalnız controller pod'larını alır (CI'da başka pod'ların engellendiği test edilir). **CNI'nız NetworkPolicy uygulamalıdır** (Calico, Cilium, kindnet ≥ kind 0.24…); uygulamayan bir CNI'da bu koruma yoktur |
 
 CI her değişiklikte geçici bir **kind** kümesinde bu yapıyı kurar: Ingress TLS, 2 web + 2 worker +
 PostgreSQL, güvenli çerez, HTTPS üzerinden MFA, oturum ve ayarların pod'lar arası tutarlılığı,
@@ -78,7 +78,7 @@ patches:
   - target: {kind: ConfigMap, name: openreporting-config}
     patch: |
       - {op: replace, path: /data/OPENREPORTING_PUBLIC_URL, value: "https://openreporting.sirket.local"}
-      - {op: replace, path: /data/OPENREPORTING_FORWARDED_ALLOW_IPS, value: "10.42.0.0/16"}   # kümenin pod CIDR'ı
+      - {op: replace, path: /data/OPENREPORTING_FORWARDED_ALLOW_IPS, value: "10.42.0.0/16"}   # ZORUNLU: kümenin pod CIDR'ı (varsayılan 10.244.0.0/16 yalnız kind içindir)
   - target: {kind: Ingress, name: openreporting}
     patch: |
       - {op: replace, path: /spec/rules/0/host, value: openreporting.sirket.local}
@@ -156,7 +156,7 @@ docker compose stop web worker                                       # Docker Co
 
 # 3) Hedef adresini parola komut satırında görünmeyecek şekilde bir dosyaya yazın
 sudo install -m 0600 /dev/null /root/pg-target.env
-sudo nano /root/pg-target.env     # OPENREPORTING_DATABASE_URL=postgresql://openreporting:...@pg.example.com:5432/openreporting?sslmode=verify-full
+sudo nano /root/pg-target.env     # OPENREPORTING_DATABASE_URL='postgresql://openreporting:...@pg.example.com:5432/openreporting?sslmode=verify-full'  (tek tırnak şart: & ve ? kabukta özel)
 
 # 4a) systemd kurulumundan taşıma
 sudo bash -c 'set -a; . /root/pg-target.env; set +a; exec setpriv --reuid=openreporting --regid=openreporting --init-groups   /opt/openreporting/venv/bin/openreporting migrate-to-postgres --source /var/lib/openreporting/state.sqlite3 --services-stopped'

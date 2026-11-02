@@ -3,7 +3,8 @@ kind: Deployment
 metadata:
   name: openreporting-web
 spec:
-  replicas: 2
+  # No replicas field: the HorizontalPodAutoscaler owns the count (minReplicas 2), so `kubectl apply`
+  # never scales a busy deployment back down.
   revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate

@@ -14,6 +14,8 @@ case "$KEEP_DAYS" in ''|*[!0-9]*) echo "OPENREPORTING_BACKUP_KEEP_DAYS must be a
 
 DEST="$ROOT/$(date -u +%Y%m%d-%H%M%S)"
 mkdir "$DEST"
+# A failed run must not leave a dated directory that looks like a complete backup.
+trap 'rc=$?; [ "$rc" -eq 0 ] || rm -rf "$DEST"' EXIT
 openreporting backup "$DEST/state.sqlite3"
 set --
 for asset in archive logos; do

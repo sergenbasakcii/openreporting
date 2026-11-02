@@ -25,6 +25,8 @@ DEST="$BACKUP_DIR/$STAMP"
 
 install -d -m 0700 "$BACKUP_DIR"
 install -d -m 0700 "$DEST"
+# A failed run must not leave a dated directory that looks like a complete backup.
+trap 'rc=$?; [ "$rc" -eq 0 ] || rm -rf "$DEST"' EXIT
 
 # 1) SQLite: online, transactionally consistent copy made by the service user into a
 #    private temporary file, integrity-checked, then streamed to stdout.

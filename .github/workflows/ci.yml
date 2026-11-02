@@ -279,6 +279,7 @@ jobs:
   docker-compose:
     name: Docker Compose stack acceptance
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -297,6 +298,7 @@ jobs:
   kubernetes:
     name: Kubernetes multi-replica acceptance (kind)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

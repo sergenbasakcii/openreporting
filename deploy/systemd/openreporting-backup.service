@@ -7,6 +7,8 @@ Type=oneshot
 EnvironmentFile=/etc/openreporting/openreporting.env
 Environment=OPENREPORTING_BACKUP_DIR=/var/backups/openreporting
 Environment=OPENREPORTING_BACKUP_KEEP_DAYS=14
+# Optional GPG encryption uses this keyring (ProtectHome hides /root/.gnupg from the unit).
+Environment=GNUPGHOME=/etc/openreporting/gnupg
 ExecStart=/opt/openreporting/app/deploy/backup.sh
 Nice=10
 IOSchedulingClass=idle
@@ -14,7 +16,7 @@ UMask=0077
 # Root only writes the backup directory; database files are read by the service user.
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/backups/openreporting
+ReadWritePaths=/var/backups/openreporting -/etc/openreporting/gnupg
 ProtectHome=true
 PrivateTmp=true
 ProtectKernelTunables=true

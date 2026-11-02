@@ -31,13 +31,19 @@ patches:
       - op: replace
         path: /data/OPENREPORTING_MFA_REQUIRED_ROLES
         value: ""
+  # Without metrics-server the HPA cannot act; pin the CI replica count.
+  - target: {kind: Deployment, name: openreporting-web}
+    patch: |
+      - op: add
+        path: /spec/replicas
+        value: 2
   # The 2-vCPU CI runner also hosts the control plane; production keeps the base requests.
   - target: {kind: Deployment, name: openreporting-(web|worker)}
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/cpu
         value: 50m
-  - target: {kind: Ingress, name: openreporting}
+  - target: {kind: Ingress, name: openreporting(-login)?}
     patch: |
       - op: replace
         path: /spec/tls/0/hosts/0
