@@ -27,6 +27,18 @@ sudo apt-get install -y docker.io docker-compose-v2
 sudo usermod -aG docker "$USER"   # oturumu kapatıp açın
 ```
 
+### Platform desteği
+
+| Ortam | Durum |
+| --- | --- |
+| Linux + Docker Engine 24+ / Compose v2, x86_64 (Ubuntu, Debian, Kali, Oracle Linux, RHEL, Rocky…) | Desteklenir; Ubuntu 24.04 ile CI'da her değişiklikte test edilir. SELinux açık sistemler için bağlanan dosyalar `:z` ile etiketlenir |
+| Windows 10/11 + Docker Desktop (WSL 2) | Çalışır (Windows 11 + Docker Desktop 4.97 üzerinde denendi); deneme/geliştirme içindir |
+| macOS + Docker Desktop | Çalışması beklenir; düzenli test edilmiyor |
+| ARM64 (Apple Silicon, Graviton, Ampere) | İmaj çok mimarili tabanlar ve kilitteki ARM paketleriyle derlenebilir; CI'da test edilmiyor |
+| Windows Server'ın yerel Windows konteynerleri | Desteklenmez; Linux konteyneri gerekir |
+| Rootless Docker / Podman | 80/443 için ayrıcalıksız port ayarı gerekir (`OPENREPORTING_HTTPS_PORT=8443`); Podman Compose ayrıca doğrulanmalı |
+| Kubernetes | [KUBERNETES.md](KUBERNETES.md) (PostgreSQL ile yatay ölçekleme) |
+
 ## 2. İlk kurulum
 
 ```bash
