@@ -56,19 +56,49 @@ def create_user(settings, username, password, role="admin"):
     return uid
 
 
-def _login_gate(db, username):
-    failures = db.execute("SELECT count,last_at FROM login_failures WHERE username=?", (username,)).fetchone()
-    if failures and failures["count"] >= 5:
-        if datetime.now(timezone.utc) - datetime.fromisoformat(failures["last_at"]) < timedelta(minutes=15):
+# Failure counters (login_failures.username holds the counter key):
+#  - username + client: 5 attempts per 15 minutes. An attacker can only lock out their own address.
+#  - username alone: 50 attempts, slowing distributed guessing without letting one client lock a user out.
+#  - username + "step-up": re-authentication inside a session; only the session holder can trip it.
+PAIR_LIMIT = 5
+USER_LIMIT = 50
+LOCK_WINDOW = timedelta(minutes=15)
+_SEP = ""
+
+
+def failure_keys(username, client=None, *, step_up=False):
+    if step_up:
+        return ((f"{username}{_SEP}step-up", PAIR_LIMIT),)
+    return ((f"{username}{_SEP}{client or 'unknown'}", PAIR_LIMIT), (username, USER_LIMIT))
+
+
+def _login_gate(db, keys):
+    for key, limit in keys:
+        failures = db.execute("SELECT count,last_at FROM login_failures WHERE username=?", (key,)).fetchone()
+        if not failures:
+            continue
+        if datetime.now(timezone.utc) - datetime.fromisoformat(failures["last_at"]) >= LOCK_WINDOW:
+            db.execute("DELETE FROM login_failures WHERE username=?", (key,))
+        elif failures["count"] >= limit:
             raise HTTPException(429, "Too many attempts; retry after 15 minutes")
-        db.execute("DELETE FROM login_failures WHERE username=?", (username,))
 
 
-def record_failure(db,username):
+def record_failure(db, keys, client=None):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     db.execute("DELETE FROM login_failures WHERE last_at < ?", (cutoff,))
-    db.execute("INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at", (username, utcnow()))
-    audit(db, "anonymous", "auth.failed", "login", "redacted")
+    for key, _ in keys:
+        db.execute("INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at", (key, utcnow()))
+    # Audit failures in aggregate per client: the first one, then every 50th, bounds audit growth.
+    source = f"{_SEP}client{_SEP}{client or 'unknown'}"
+    db.execute("INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at", (source, utcnow()))
+    count = db.execute("SELECT count FROM login_failures WHERE username=?", (source,)).fetchone()[0]
+    if count == 1 or count % 50 == 0:
+        audit(db, "anonymous", "auth.failed", "login", "redacted", {"failures_from_client": count})
+
+
+def clear_failures(db, keys):
+    for key, _ in keys:
+        db.execute("DELETE FROM login_failures WHERE username=?", (key,))
 
 
 def reauthenticate(settings,user,password):
@@ -78,7 +108,7 @@ def reauthenticate(settings,user,password):
         raise HTTPException(429,'Authentication busy; retry shortly',headers={'Retry-After':'1'})
     try:
         with connect(settings) as db,transaction(db):
-            _login_gate(db,user['username'])
+            _login_gate(db,failure_keys(user['username'],step_up=True))
             row = db.execute('''SELECT u.id,u.username,u.active,u.role,u.password_hash,e.subject FROM users u
                 LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.id=?''',(user['id'],)).fetchone()
             snapshot = dict(row) if row else None
@@ -93,8 +123,9 @@ def reauthenticate(settings,user,password):
             valid = bool(identity and identity.subject==snapshot['subject'] and identity.role==snapshot['role'])
         if not valid:
             with connect(settings) as db,transaction(db):
-                _login_gate(db,user['username'])
-                record_failure(db,user['username'])
+                keys = failure_keys(user['username'],step_up=True)
+                _login_gate(db,keys)
+                record_failure(db,keys)
             raise HTTPException(403,'Reauthentication failed')
         return snapshot
     except (sqlite3.Error,PostgresError,OSError):
@@ -103,23 +134,24 @@ def reauthenticate(settings,user,password):
         _auth_slots.release()
 
 
-def login(settings, username: str, password: str, otp: str | None = None):
+def login(settings, username: str, password: str, otp: str | None = None, client: str | None = None):
     if not _auth_slots.acquire(timeout=AUTH_SLOT_WAIT_S):
         raise HTTPException(429,'Authentication busy; retry shortly',headers={'Retry-After':'1'})
     try:
-        return _login(settings,username,password,otp)
+        return _login(settings,username,password,otp,client)
     except (sqlite3.Error,PostgresError,OSError):
         raise HTTPException(503,'Authentication storage unavailable') from None
     finally:
         _auth_slots.release()
 
 
-def _login(settings, username: str, password: str, otp: str | None = None):
+def _login(settings, username: str, password: str, otp: str | None = None, client: str | None = None):
     from . import directory_auth,mfa
     username = username.strip().lower()
+    keys = failure_keys(username, client)
     # Do not hold the application write lock during directory/network operations.
     with connect(settings) as db, transaction(db):
-        _login_gate(db, username)
+        _login_gate(db, keys)
         existing = db.execute("SELECT u.*,e.subject FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.username=?", (username,)).fetchone()
         existing = dict(existing) if existing else None
     identity = None
@@ -141,7 +173,7 @@ def _login(settings, username: str, password: str, otp: str | None = None):
     failure = False
     challenge = False
     with connect(settings) as db, transaction(db):
-        _login_gate(db, username)
+        _login_gate(db, keys)
         user = db.execute("SELECT u.*,e.subject FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.username=?", (username,)).fetchone()
         if is_local:
             valid = valid and user is not None and user["active"] and user["subject"] is None and user["password_hash"] == existing["password_hash"]
@@ -177,10 +209,10 @@ def _login(settings, username: str, password: str, otp: str | None = None):
         if challenge:
             pass  # Commit verified directory role reductions/revocations, but never mint a session.
         elif not valid:
-            record_failure(db,username)
+            record_failure(db,keys,client)
             failure = True
         else:
-            db.execute("DELETE FROM login_failures WHERE username=?", (username,))
+            clear_failures(db, keys)
             token = secrets.token_urlsafe(48)
             csrf = secrets.token_urlsafe(32)
             minutes = settings.session_hours * 60

@@ -201,9 +201,13 @@ def change_password(body: PasswordChange, request: Request, user=Depends(viewer_
     with connect(settings) as db:
         if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user["id"],)).fetchone():
             raise HTTPException(409, "LDAP parolası dizin hizmetinde değiştirilmelidir")
-        row = db.execute("SELECT password_hash FROM users WHERE id=?", (user["id"],)).fetchone()
-    if not row or not check_password(body.old_password, row["password_hash"]):
-        raise HTTPException(403, "Mevcut parola hatalı")
+    # Shared step-up path: lockout counter and scrypt concurrency cap, never an unthrottled oracle.
+    try:
+        reauthenticate(settings, user, body.old_password)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            raise HTTPException(403, "Mevcut parola hatalı") from None
+        raise
     try:
         hashed = password_hash(body.new_password)
     except ValueError as exc:

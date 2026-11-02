@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { formatValue, resolveUnit } from '../units.js';
 import { fieldConfigFor, color, alpha, contrastText, thresholdColor, applyMappings, readableColor, cssVar } from '../colors.js';
 import { reducedValues, display, noData, timeSeries, tables, reduce, REDUCERS, fitText, chartTheme, minOf, maxOf } from './common.js';
-import { renderMarkdown } from '../markdown.js';
+import { escapeMarkdown, renderMarkdown } from '../markdown.js';
 import { fmtDateTime } from '../dom.js';
 
 const nothing = { resize() {}, destroy() {} };
@@ -227,6 +227,6 @@ export function renderStatusGrid(container, frames, panel) {
 
 export function renderText(container, frames, panel, ctx) {
   const content = (panel.options && panel.options.content) || '';
-  container.replaceChildren(renderMarkdown(content, ctx.interpolate || ((s) => s)));
+  container.replaceChildren(renderMarkdown(content, ctx.interpolate ? (s) => ctx.interpolate(s, escapeMarkdown) : (s) => s));
   return nothing;
 }

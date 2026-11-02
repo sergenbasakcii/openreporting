@@ -107,11 +107,12 @@ export class PanelView {
   async refresh() {
     const panel = withDefaults(this.panel);
     const p = plugin(panel.type);
-    if (p.noQueries) { this.render(); return; }
-    if (!(panel.targets || []).length) { this.frames = []; this.render(); return; }
     if (this.destroyed) return;
+    // Invalidate any in-flight request first, so it cannot repaint a panel that no longer queries.
     const seq = ++this.seq;
     if (this.abort) this.abort.abort();
+    if (p.noQueries) { this.render(); return; }
+    if (!(panel.targets || []).length) { this.frames = []; this.render(); return; }
     const abort = new AbortController();
     this.abort = abort;
     this.loader.hidden = false;
@@ -164,7 +165,7 @@ export class PanelView {
     const range = this.response && this.response.request ? { from: this.response.request.from, to: this.response.request.to } : this.ctx.resolvedRange;
     try {
       this.viz = p.render(this.vizEl, this.frames, panel, { ...this.vizState, timeRange: range, timezone: this.ctx.timezone, group: this.ctx.group,
-        onZoom: p.zoom && this.ctx.onZoom ? this.ctx.onZoom : null, interpolate: (s) => interpolate(s, this.ctx.variables, this.ctx.scopedVars),
+        onZoom: p.zoom && this.ctx.onZoom ? this.ctx.onZoom : null, interpolate: (s, escape) => interpolate(s, this.ctx.variables, this.ctx.scopedVars, escape),
         hiddenSeries: this.vizState.hiddenSeries || (this.vizState.hiddenSeries = new Set()), tableSort: this.vizState.tableSort || (this.vizState.tableSort = { col: null, desc: false }) });
     } catch (err) {
       console.error(err); // eslint-disable-line no-console

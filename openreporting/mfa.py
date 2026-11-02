@@ -122,7 +122,7 @@ def start_setup(settings,user,password):
     expires = (datetime.now(timezone.utc)+timedelta(minutes=10)).isoformat(timespec='seconds')
     with connect(settings) as db,transaction(db):
         _snapshot_matches(db,snapshot)
-        security._login_gate(db,user['username'])
+        security._login_gate(db,security.failure_keys(user['username'],step_up=True))
         row = factor(db,user['id'])
         if row and row['enabled']:
             raise HTTPException(409,'Second factor is already enabled')
@@ -150,18 +150,18 @@ def confirm_setup(settings,user,password,code,setup_token):
     codes = None
     with connect(settings) as db,transaction(db):
         _snapshot_matches(db,snapshot)
-        security._login_gate(db,user['username'])
+        security._login_gate(db,security.failure_keys(user['username'],step_up=True))
         row = factor(db,user['id'])
         if not row or row['enabled'] or not hmac.compare_digest(row['setup_hash'],security.digest(setup_token)) or parse_utc(row['pending_expires_at'])<=datetime.now(timezone.utc):
             raise HTTPException(409,'Setup expired or replaced; start again')
         if not consume(db,settings,user['id'],code,pending=True):
-            security.record_failure(db,user['username']);failed=True
+            security.record_failure(db,security.failure_keys(user['username'],step_up=True));failed=True
         else:
             codes,hashes = new_recovery(user['id'])
             db.execute("UPDATE user_mfa SET enabled=1,pending_expires_at='',setup_hash='',recovery_hashes=?,updated_at=? WHERE user_id=?",
                        (hashes,utcnow(),user['id']))
             db.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],))
-            db.execute('DELETE FROM login_failures WHERE username=?',(user['username'],))
+            security.clear_failures(db,security.failure_keys(user['username'],step_up=True))
             audit(db,user['id'],'mfa.enabled','user',user['id'])
     if failed:
         raise HTTPException(403,'Verification failed; use a fresh code')
@@ -175,12 +175,12 @@ def manage(settings,user,password,code,*,disable=False):
     codes = None
     with connect(settings) as db,transaction(db):
         _snapshot_matches(db,snapshot)
-        security._login_gate(db,user['username'])
+        security._login_gate(db,security.failure_keys(user['username'],step_up=True))
         row = factor(db,user['id'])
         if not row or not row['enabled']:
             raise HTTPException(409,'Second factor is not enabled')
         if not consume(db,settings,user['id'],code):
-            security.record_failure(db,user['username']);failed=True
+            security.record_failure(db,security.failure_keys(user['username'],step_up=True));failed=True
         else:
             if disable:
                 db.execute('DELETE FROM user_mfa WHERE user_id=?',(user['id'],))
@@ -188,7 +188,7 @@ def manage(settings,user,password,code,*,disable=False):
                 codes,hashes = new_recovery(user['id'])
                 db.execute('UPDATE user_mfa SET recovery_hashes=?,updated_at=? WHERE user_id=?',(hashes,utcnow(),user['id']))
             db.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],))
-            db.execute('DELETE FROM login_failures WHERE username=?',(user['username'],))
+            security.clear_failures(db,security.failure_keys(user['username'],step_up=True))
             audit(db,user['id'],'mfa.disabled' if disable else 'mfa.recovery_rotated','user',user['id'])
     if failed:
         raise HTTPException(403,'Verification failed; use a fresh code or recovery code')

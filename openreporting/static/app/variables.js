@@ -18,9 +18,14 @@ function valuesOf(v) {
   return list.filter((x) => x !== undefined && x !== null && x !== '');
 }
 
-export function interpolate(text, variables, scoped = {}) {
+// `escape` (optional) is applied to every substituted value, e.g. Markdown escaping for text panels.
+export function interpolate(text, variables, scoped = {}, escape = null) {
   if (typeof text !== 'string' || (!text.includes('$') && !text.includes('[['))) return text;
   const merged = { ...variables, ...scoped };
+  if (escape) return text.replace(PATTERN, (match, ...groups) => {
+    const value = interpolate(match, variables, scoped);
+    return value === match ? match : escape(value);
+  });
   return text.replace(PATTERN, (match, a, b, fmtB, c, fmtC) => {
     const name = a || b || c;
     const fmt = fmtB || fmtC;

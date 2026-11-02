@@ -281,14 +281,14 @@ export async function dashboardPage(root, { uid, query, app }) {
         }
       };
       const up = () => {
-        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
         placeholder.remove(); wrapper.classList.remove('dragging');
         if (!moved) return;
         compact(items, { prefer: item });
         syncPositions(items);
         markDirty(); layout(false);
       };
-      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
     });
   }
 
@@ -316,11 +316,11 @@ export async function dashboardPage(root, { uid, query, app }) {
       }
     };
     const up = () => {
-      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
       wrapper.classList.remove('resizing');
       compact(items, { prefer: item }); syncPositions(items); markDirty(); layout(false);
     };
-    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
   }
 
   function toggleRow(row) {
@@ -535,7 +535,7 @@ export async function dashboardPage(root, { uid, query, app }) {
 
   const onResize = () => layout(false);
   const onKey = (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && canEdit && !document.querySelector('.editor-shell')) { e.preventDefault(); saveDashboard(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && canEdit && !document.querySelector('.editor-shell')) { e.preventDefault(); if (!document.querySelector('[role=dialog]')) saveDashboard(); }
     if (e.key === 'Escape' && !document.querySelector('.modal-backdrop,.menu,.editor-shell')) {
       if (state.kiosk) { state.kiosk = false; document.body.classList.remove('kiosk'); updateUrl(); }
       else if (state.viewPanel) { state.viewPanel = null; updateUrl(); rerenderAll(); }

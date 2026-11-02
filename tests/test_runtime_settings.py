@@ -64,10 +64,10 @@ def test_smtp_password_is_sealed_never_returned_and_kept_on_later_saves(state):
         assert body['fields']['smtp_password'] == {'set': True, 'source': 'ui', 'env': 'OPENREPORTING_SMTP_PASSWORD'}
         assert 'relay-secret-value' not in json.dumps(client.get('/api/admin/settings').json())
         # A later save without the secret keeps it.
-        again = save(client, 'mail', {'smtp_port': 465, 'smtp_security': 'tls'}, {'smtp_password': None}, revision=body['revision'])
+        again = save(client, 'mail', {'smtp_timeout': 45}, {'smtp_password': None}, revision=body['revision'])
         assert again.status_code == 200, again.text
     current = runtime_settings.effective(settings)
-    assert (current.mail_enabled, current.smtp_port, current.smtp_password) == (True, 465, 'relay-secret-value')
+    assert (current.mail_enabled, current.smtp_timeout, current.smtp_password) == (True, 45, 'relay-secret-value')
     with connect(settings) as db:
         row = db.execute("SELECT values_json,secure_json FROM app_settings WHERE scope='mail'").fetchone()
         audit_rows = [r[0] for r in db.execute("SELECT details FROM audit WHERE action='settings.updated'")]
@@ -129,10 +129,11 @@ def test_connection_test_uses_unsaved_values_and_stores_nothing(state, monkeypat
     from openreporting import mail_transport
     monkeypatch.setattr(mail_transport, 'check_connection', lambda s: seen.setdefault('s', s) and 'ok')
     with client_for(app) as client:
+        assert client.post('/api/admin/settings/mail/test', json={'values': MAIL, 'secrets': {}, 'password': 'wrong-password-value'}).status_code == 403
         response = client.post('/api/admin/settings/mail/test', json={'values': {**MAIL, 'mail_enabled': False},
-                                                                      'secrets': {'smtp_password': 'try-only'}})
+                                                                      'secrets': {'smtp_password': 'try-only'}, 'password': PASSWORD})
         assert response.json()['ok'] is True
-        assert client.post('/api/admin/settings/security/test', json={}).status_code == 404
+        assert client.post('/api/admin/settings/security/test', json={'password': PASSWORD}).status_code == 404
     assert seen['s'].mail_enabled and seen['s'].smtp_password == 'try-only'
     with connect(settings) as db:
         assert db.execute('SELECT COUNT(*) FROM app_settings').fetchone()[0] == 0
@@ -186,3 +187,26 @@ def test_sealed_settings_are_rekeyed_and_verified_in_backups(state, tmp_path):
     lines = [hashlib.sha256(p.read_bytes()).hexdigest() + '  ./' + p.name for p in sorted(target.iterdir())]
     (target / 'SHA256SUMS').write_text('\n'.join(lines) + '\n', encoding='ascii')
     assert verify_backup(target, key_file=key_path(settings))['encrypted_settings'] == 1
+
+
+def test_stored_password_is_never_sent_to_a_changed_destination(state):
+    # Pointing SMTP/LDAP at another host must not reuse the stored secret (credential exfiltration).
+    settings, app = state
+    with client_for(app) as client:
+        saved = save(client, 'mail', MAIL, {'smtp_password': 'relay-secret-value'}).json()
+        moved = {**MAIL, 'smtp_host': 'attacker.example.net'}
+        test = client.post('/api/admin/settings/mail/test', json={'values': moved, 'secrets': {}, 'password': PASSWORD})
+        assert test.status_code == 422 and 'yeniden girilmeli' in test.json()['detail']
+        assert save(client, 'mail', {'smtp_host': 'attacker.example.net'}, revision=saved['revision']).status_code == 422
+        # Unchanged destination keeps the stored secret; a new destination with a new secret is fine.
+        assert save(client, 'mail', {'smtp_port': 465, 'smtp_security': 'tls'}, {'smtp_password': 'new-relay-secret'},
+                    revision=saved['revision']).status_code == 200
+
+
+def test_password_change_uses_the_shared_lockout(state):
+    settings, app = state
+    with client_for(app) as client:
+        body = {'old_password': 'wrong-password-value', 'new_password': 'another-strong-password'}
+        for _ in range(security.PAIR_LIMIT):
+            assert client.put('/api/user/password', json=body).status_code == 403
+        assert client.put('/api/user/password', json={**body, 'old_password': PASSWORD}).status_code == 429

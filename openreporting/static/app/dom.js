@@ -38,7 +38,18 @@ export const $ = (sel, root = document) => root.querySelector(sel);
 
 export function button(label, opts = {}) {
   const cls = ['btn', opts.variant, opts.size, !label && opts.icon ? 'icon' : null, opts.class].filter(Boolean).join(' ');
-  const b = h('button', { type: opts.type || 'button', class: cls, title: opts.title, disabled: opts.disabled, onclick: opts.onClick,
+  // An async handler makes the button busy until it settles: double clicks never send a second request.
+  const onclick = opts.onClick && ((e) => {
+    if (b.dataset.busy) return undefined;
+    const result = opts.onClick(e);
+    if (result && typeof result.then === 'function') {
+      b.dataset.busy = '1';
+      b.setAttribute('aria-busy', 'true');
+      Promise.resolve(result).catch(() => {}).finally(() => { delete b.dataset.busy; b.removeAttribute('aria-busy'); });
+    }
+    return result;
+  });
+  const b = h('button', { type: opts.type || 'button', class: cls, title: opts.title, disabled: opts.disabled, onclick,
     'aria-label': opts.title || label || undefined });
   if (opts.icon) b.append(icon(opts.icon));
   if (label) b.append(h('span', { text: label }));

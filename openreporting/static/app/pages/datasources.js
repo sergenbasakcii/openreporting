@@ -59,7 +59,7 @@ export async function datasourceEditPage(root, { uid }) {
     form.replaceChildren();
     form.append(h('div', { class: 'card' }, h('div', { class: 'form-grid' },
       field('Ad', input({ value: model.name, onChange: (e) => { model.name = e.target.value; } })),
-      field('Tür', existing ? input({ value: model.type, readonly: true }) : select(types.types.map((t) => ({ value: t.type, label: t.name })), model.type, (v) => { model.type = v; model.jsonData = v === 'postgres' ? { port: 5432, sslmode: 'verify-full', timeout_ms: 30000, max_rows: 200000 } : v === 'zabbix' ? { auth_mode: 'bearer', trends_from: '7d', trends_range: '4d', cache_ttl: 60, timeout: 30, max_items: 500 } : {}; draw(); })),
+      field('Tür', existing ? input({ value: model.type, readonly: true }) : select(types.types.map((t) => ({ value: t.type, label: t.name })), model.type, (v) => { model.type = v; model.url = ''; model.secureJsonData = {}; model.jsonData = v === 'postgres' ? { port: 5432, sslmode: 'verify-full', timeout_ms: 30000, max_rows: 200000 } : v === 'zabbix' ? { auth_mode: 'bearer', trends_from: '7d', trends_range: '4d', cache_ttl: 60, timeout: 30, max_items: 500 } : {}; draw(); })),
       field(null, toggle('Varsayılan veri kaynağı', model.isDefault, (v) => { model.isDefault = v; }))),
     h('p', { class: 'hint', text: (types.types.find((t) => t.type === model.type) || {}).description || '' })));
     if (model.type === 'zabbix') {

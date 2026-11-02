@@ -125,8 +125,10 @@ export async function reportsPage(root, { app }) {
     page.append(h('div', { class: 'toolbar', style: { justifyContent: 'space-between' } }, h('h2', { class: 'section-heading', text: 'Son çalıştırmalar ve arşiv', style: { margin: '0' } }), button('Yenile', { icon: 'refresh', size: 'sm', onClick: draw })),
       h('div', { class: 'card', style: { marginTop: '10px' } }, runsTable(runs)));
     clearTimeout(timer);
-    if (runs.some((r) => r.status === 'queued' || r.status === 'running')) timer = setTimeout(() => draw().catch(() => {}), 4000);
+    if (runs.some((r) => r.status === 'queued' || r.status === 'running')) timer = setTimeout(poll, 4000);
   };
+  // A transient error must not stop status polling for good; retry with a longer delay.
+  function poll() { draw().catch(() => { if (!stopped) timer = setTimeout(poll, 10000); }); }
   await draw();
   return () => { stopped = true; clearTimeout(timer); };
 }
@@ -152,17 +154,23 @@ export async function reportEditPage(root, { id, query, app }) {
   let dashboard = null;
   let timer = null;
 
+  let loadSeq = 0;
   const loadDashboard = async () => {
+    const seq = ++loadSeq;
+    const current = () => seq === loadSeq;
     clear(dashHost);
     if (!cfg.dashboard_uid) { dashHost.append(h('p', { class: 'muted', text: 'Önce bir dashboard seçin.' })); return; }
     dashHost.append(loading('Dashboard ve değişkenler yükleniyor…'));
     try {
-      dashboard = (await get(`/api/dashboards/uid/${encodeURIComponent(cfg.dashboard_uid)}`)).dashboard;
-    } catch (err) { clear(dashHost); dashHost.append(h('div', { class: 'alert error', text: err.message })); return; }
+      const loaded = (await get(`/api/dashboards/uid/${encodeURIComponent(cfg.dashboard_uid)}`)).dashboard;
+      if (!current()) return;
+      dashboard = loaded;
+    } catch (err) { if (current()) { clear(dashHost); dashHost.append(h('div', { class: 'alert error', text: err.message })); } return; }
     const vars = (dashboard.templating || {}).list || [];
     let resolved = {};
     if (vars.length) {
-      try { resolved = (await resolveVariables(dashboard, cfg.variables, cfg.time_range, cfg.timezone, cfg.dashboard_uid)).variables; } catch (err) { toast(err.message, 'error'); }
+      try { resolved = (await resolveVariables(dashboard, cfg.variables, cfg.time_range, cfg.timezone, cfg.dashboard_uid)).variables; } catch (err) { if (current()) toast(err.message, 'error'); }
+      if (!current()) return;
     }
     clear(dashHost);
     const varFields = vars.filter((v) => v.type !== 'constant').map((v) => {
@@ -334,8 +342,9 @@ export async function reportEditPage(root, { id, query, app }) {
     clear(runsHost);
     runsHost.append(runsTable(runs, { showReport: false }));
     clearTimeout(timer);
-    if (runs.some((r) => r.status === 'queued' || r.status === 'running')) timer = setTimeout(() => drawRuns().catch(() => {}), 3000);
+    if (runs.some((r) => r.status === 'queued' || r.status === 'running')) timer = setTimeout(pollRuns, 3000);
   };
+  function pollRuns() { drawRuns().catch(() => { if (!stopped) timer = setTimeout(pollRuns, 10000); }); }
   await Promise.all([drawSchedules(), drawRuns()]);
   return () => { stopped = true; clearTimeout(timer); };
 }

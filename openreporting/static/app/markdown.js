@@ -9,17 +9,22 @@ function safeHref(url) {
   return null;
 }
 
+// Backslash-escaped markup characters stay literal (used for interpolated variable values).
+const ESCAPABLE = /[\\`*_[\]()]/g;
+export function escapeMarkdown(value) { return String(value).replace(ESCAPABLE, (c) => '\\' + c); }
+
 function inline(text) {
   const nodes = [];
-  const pattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)\s]+\))/g;
+  const pattern = /(\\[\\`*_[\]()])|(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)\s]+\))/g;
   let last = 0;
   let m;
   while ((m = pattern.exec(text))) {
     if (m.index > last) nodes.push(text.slice(last, m.index));
     const token = m[0];
-    if (m[1]) nodes.push(h('code', { text: token.slice(1, -1) }));
-    else if (m[2]) nodes.push(h('strong', inline(token.slice(2, -2))));
-    else if (m[3]) nodes.push(h('em', inline(token.slice(1, -1))));
+    if (m[1]) nodes.push(token.slice(1));
+    else if (m[2]) nodes.push(h('code', { text: token.slice(1, -1) }));
+    else if (m[3]) nodes.push(h('strong', inline(token.slice(2, -2))));
+    else if (m[4]) nodes.push(h('em', inline(token.slice(1, -1))));
     else {
       const lm = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(token);
       const href = safeHref(lm[2]);

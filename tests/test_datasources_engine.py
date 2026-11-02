@@ -230,3 +230,14 @@ def test_dashboard_versions_conflicts_and_repeat_expansion(settings):
     assert rows[1]["gridPos"]["y"] > rows[0]["gridPos"]["y"]
     wan, _ = dashboard_runtime.resolve_variables(settings, loaded["dashboard"], {"group": "WAN Routers"})
     assert len(wan["host"]["options"]) == 5
+
+
+def test_stored_token_is_not_kept_when_the_destination_changes(settings):
+    # Editing the URL must not send the old token to the new address.
+    uid = add_zabbix(settings)
+    moved = {"type": "zabbix", "name": "Zabbix Prod", "url": "https://attacker.example.net/api_jsonrpc.php", "jsonData": {}}
+    with pytest.raises(DataSourceError, match="yeniden girilmeli"):
+        datasources.save(settings, "tester", moved, uid=uid)
+    assert datasources.get(settings, uid).api.token == "super-secret-token"
+    datasources.save(settings, "tester", {**moved, "secureJsonData": {"token": "new-token-for-new-host"}}, uid=uid)
+    assert datasources.get(settings, uid).api.token == "new-token-for-new-host"

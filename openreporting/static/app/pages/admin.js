@@ -128,8 +128,11 @@ export async function auditPage(root) {
   let offset = 0;
   let action = '';
   const tableHost = h('div', { class: 'card' });
+  let drawSeq = 0;
   const draw = async () => {
+    const seq = ++drawSeq;
     const rows = await get(`/api/audit?limit=200&offset=${offset}&action=${encodeURIComponent(action)}`);
+    if (seq !== drawSeq) return;  // a newer page request won
     clear(tableHost);
     const table = h('table', { class: 'list' }, h('tr', ['#', 'Zaman', 'Kullanıcı', 'İşlem', 'Nesne', 'Ayrıntı'].map((t) => h('th', { text: t }))));
     for (const r of rows) table.append(h('tr', h('td', { text: r.id }), h('td', { class: 'nowrap', text: fmtDateTime(r.happened_at) }), h('td', { class: 'mono', text: r.actor.slice(0, 13) }),
@@ -138,7 +141,7 @@ export async function auditPage(root) {
       button('Önceki', { disabled: offset === 0, onClick: () => { offset = Math.max(0, offset - 200); draw(); } }), button('Sonraki', { disabled: rows.length < 200, onClick: () => { offset += 200; draw(); } })));
   };
   page.append(h('div', { class: 'page-header' }, h('div', h('h1', icon('shield'), 'Denetim kaydı'), h('p', { class: 'sub', text: 'Tüm değişiklikler SHA-256 hash zinciriyle kayıt altındadır.' })),
-    h('div', { style: { width: '280px' } }, input({ placeholder: 'İşlem filtresi (ör. dashboard.)', onKeydown: (e) => { if (e.key === 'Enter') { action = e.target.value; offset = 0; draw(); } } }))), tableHost);
+    h('div', { style: { width: '280px' } }, input({ label: 'İşlem filtresi', placeholder: 'İşlem filtresi (ör. dashboard.)', onKeydown: (e) => { if (e.key === 'Enter') { action = e.target.value; offset = 0; draw(); } } }))), tableHost);
   await draw();
 }
 

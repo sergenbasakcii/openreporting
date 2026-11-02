@@ -154,6 +154,10 @@ def list_all(settings):
     return [public(_row(r), settings) for r in rows]
 
 
+# Connection target fields; changing any of them invalidates stored credentials.
+DESTINATION_KEYS = ("host", "port", "sslmode", "ca_pem", "auth_mode")
+
+
 def save(settings, actor, body, uid=None):
     kind = body.get("type")
     name = str(body.get("name", "")).strip()
@@ -175,6 +179,13 @@ def save(settings, actor, body, uid=None):
             secure = decrypt(settings, row["secure_json"])
             for key in body.get("secureJsonReset") or []:
                 secure.pop(key, None)
+            # Stored credentials are bound to their destination: a new address needs them re-entered,
+            # otherwise an edited URL/host would send the old token or password to that address.
+            old_data = json.loads(row["json_data"] or "{}")
+            moved = url != row["url"] or any(json_data.get(k) != old_data.get(k) for k in DESTINATION_KEYS)
+            kept = [k for k in secure if not secure_in.get(k)]
+            if moved and kept:
+                raise DataSourceError("Adres değiştiği için kayıtlı kimlik bilgisi (token/parola) yeniden girilmeli")
             secure.update({k: v for k, v in secure_in.items() if v})
             if db.execute("SELECT 1 FROM datasources WHERE name=? AND uid<>?", (name, uid)).fetchone():
                 raise DataSourceError("Bu adla başka bir veri kaynağı var")

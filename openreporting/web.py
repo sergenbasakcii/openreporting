@@ -106,7 +106,7 @@ def create_app(settings: Settings | None = None):
         if body.otp:
             mfa_api.ensure_transport(request)
         settings = settings_of(request)
-        token, csrf, expiry = login(settings, body.username, body.password,body.otp)
+        token, csrf, expiry = login(settings, body.username, body.password, body.otp, request.client.host if request.client else None)
         response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=settings.secure_cookie,
                             samesite="strict", max_age=settings.session_hours * 3600, path="/")
         return {"csrf": csrf, "expires_at": expiry}

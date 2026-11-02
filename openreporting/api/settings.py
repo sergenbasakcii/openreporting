@@ -27,6 +27,7 @@ class ScopeReset(BaseModel):
 class ScopeTest(BaseModel):
     values: dict = Field(default_factory=dict)
     secrets: dict = Field(default_factory=dict)
+    password: str = Field(min_length=1, max_length=1024)
 
 
 def _scope(scope):
@@ -116,6 +117,8 @@ def test_settings(scope: str, body: ScopeTest, request: Request, user=Depends(ad
     from .. import directory_auth, mail_transport
     if _scope(scope) not in runtime_settings.FAIL_CLOSED:
         raise HTTPException(404, "Bu bölüm için bağlantı testi yok")
+    # The test authenticates with stored service credentials: same step-up as saving them.
+    reauthenticate(settings_of(request), user, body.password)
     try:
         candidate = runtime_settings.test_candidate(request.app.state.settings, scope, body.values, body.secrets)
     except ValueError as exc:

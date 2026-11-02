@@ -109,6 +109,13 @@ def message(exc):
     return next((tr for key, tr in MESSAGES.items() if text.startswith(key)), text)
 
 
+# Changing any of these sends the stored password somewhere new: the password must be entered again.
+DESTINATION_FIELDS = {
+    'smtp_password': ('smtp_host', 'smtp_port', 'smtp_security', 'smtp_user', 'smtp_ca_pem'),
+    'ldap_bind_password': ('ldap_url', 'ldap_bind_dn', 'ldap_ca_pem'),
+}
+
+
 class SettingsConflict(Exception):
     """The scope changed since the caller read it."""
 
@@ -329,11 +336,28 @@ def _candidate(base, rows, scope, values, secrets, *, current_row):
         else:  # explicit empty secret (e.g. TLS relay without authentication)
             sealed.pop(name, None)
             stored[name] = ''
+    # Undecryptable sealed secrets are never silently dropped by a save of other fields.
+    if current_row and current_row.get('secure_json') and not sealed:
+        unresolved = [n for n in SECRETS & set(scope_fields(scope)) if secrets.get(n) is None]
+        if unresolved:
+            raise ValueError('Kayıtlı parola çözülemedi; parolayı yeniden girin')
+    current, _ = build(base, rows)
+    for secret_name, destination in DESTINATION_FIELDS.items():
+        if FIELDS[secret_name][0] != scope or secrets.get(secret_name) is not None:
+            continue
+        moved = [f for f in destination if f in values and clean_value(f, values[f]) != _stored_view(current, f)]
+        if moved and getattr(current, secret_name):
+            raise ValueError(f'{LABELS[moved[0]]} değiştiği için {LABELS[secret_name].lower()} yeniden girilmeli')
     others = {k: v for k, v in rows.items() if k != scope}
     effective_others, _ = build(base, others)
     changes = {k: _to_settings(k, v) for k, v in stored.items()}
     changes.update(sealed)
     return replace(effective_others, **changes).validate(), stored, sealed
+
+
+def _stored_view(settings, name):
+    value = _to_view(settings, name)
+    return clean_value(name, value) if value is not None else value
 
 
 def save(base, scope, values, secrets, expected_revision, actor):

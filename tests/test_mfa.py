@@ -326,7 +326,8 @@ def test_active_factor_failures_cannot_be_reset_by_password_only_challenges(stat
             assert challenge.status_code==401 and challenge.json()['detail']['code']=='mfa_required'
             assert signin(client,'invalid-factor-proof').status_code==401
             with db.connect(settings) as conn:
-                assert conn.execute('SELECT count FROM login_failures').fetchone()[0]==attempt+1
+                pair,user_key = (key for key,_ in security.failure_keys('factoruser','testclient'))
+                assert conn.execute('SELECT count FROM login_failures WHERE username=?',(pair,)).fetchone()[0]==attempt+1
                 assert conn.execute('SELECT count(*) FROM sessions WHERE user_id=?',(uid,)).fetchone()[0]==0
         assert signin(client).status_code==429
         assert signin(client,codes[0]).status_code==429
@@ -335,7 +336,8 @@ def test_active_factor_failures_cannot_be_reset_by_password_only_challenges(stat
             conn.execute('UPDATE login_failures SET last_at=?',((datetime.now(timezone.utc)-timedelta(minutes=16)).isoformat(),))
         assert signin(client,codes[0]).status_code==200
         with db.connect(settings) as conn:
-            assert conn.execute('SELECT count(*) FROM login_failures').fetchone()[0]==0
+            # Success clears this user's counters (the per-client audit aggregate stays).
+            assert conn.execute('SELECT count(*) FROM login_failures WHERE username IN (?,?)',(pair,user_key)).fetchone()[0]==0
             assert len(mfa.recovery_hashes(mfa.factor(conn,uid)))==9
 
 
@@ -366,3 +368,17 @@ def test_enrollment_tolerates_one_step_clock_skew_but_rejects_drift_and_setup_ke
         for wrong in (otp.at(NOW-90),otp.at(NOW+90),data['secret']):
             assert confirm(wrong).status_code==403
         assert confirm(otp.at(NOW-30)).status_code==200
+
+
+def test_failed_logins_from_one_client_cannot_lock_out_other_clients(state):
+    # Lockout is per username+client; an attacker exhausting attempts does not block the owner elsewhere.
+    settings,app,uid = state
+    with TestClient(app,base_url='https://localhost',client=('203.0.113.9',5000)) as attacker:
+        for _ in range(security.PAIR_LIMIT):
+            assert attacker.post('/api/login',json={'username':'factoruser','password':'wrong-password-123'}).status_code==401
+        assert attacker.post('/api/login',json={'username':'factoruser','password':PASSWORD}).status_code==429
+    with TestClient(app,base_url='https://localhost',client=('198.51.100.7',5000)) as owner:
+        assert owner.post('/api/login',json={'username':'factoruser','password':PASSWORD}).status_code==200
+    with db.connect(settings) as conn:
+        # Failures are audited in aggregate per client, not one row per attempt.
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='auth.failed'").fetchone()[0]==1
