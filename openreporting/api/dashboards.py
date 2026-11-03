@@ -221,7 +221,7 @@ def list_annotations(request: Request, dashboardUID: str = "", start: int = 0, e
 @router.post("/api/annotations", status_code=201)
 def create_annotation(body: AnnotationIn, request: Request, user=Depends(editor)):
     if body.timeEnd is not None and body.timeEnd < body.time:
-        raise HTTPException(422, "Annotation end precedes start")
+        raise HTTPException(422, "Not bitişi başlangıçtan önce olamaz")
     annotation_id = identity()
     with connect(settings_of(request)) as db, transaction(db):
         if body.dashboardUID:
@@ -241,7 +241,7 @@ def delete_annotation(annotation_id: str, request: Request, user=Depends(editor)
         if row and row["dashboard_uid"]:
             folder_access.require_dashboard(db, user, row["dashboard_uid"], edit=True)
         if not db.execute("DELETE FROM annotations WHERE id=?", (annotation_id,)).rowcount:
-            raise HTTPException(404, "Annotation not found")
+            raise HTTPException(404, "Not bulunamadı")
         audit(db, user["id"], "annotation.deleted", "annotation", annotation_id)
     return {"deleted": annotation_id}
 

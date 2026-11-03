@@ -126,10 +126,6 @@ def reduce_values(values, calc):
     raise ValueError(f"Unknown reducer: {calc}")
 
 
-def reduce_points(points, calc):
-    return reduce_values([p[1] for p in points], calc)
-
-
 def display_name(frame):
     meta = frame.get("meta") or {}
     return meta.get("displayName") or frame.get("name") or frame.get("refId") or "seri"

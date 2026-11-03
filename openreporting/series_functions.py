@@ -13,7 +13,6 @@ from .frames import finite, reduce_values, ts_frame
 from .safe_regex import RegexError, compile_slashed
 from .timerange import parse_duration
 
-AGG_FUNCS = ("avg", "min", "max", "sum", "count", "median", "first", "last")
 
 CATALOG = [
     {

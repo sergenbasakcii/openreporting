@@ -3,7 +3,7 @@
 import copy
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 
 from .. import dashboard_runtime, query_engine
 from ..domain import DomainError
@@ -161,7 +161,3 @@ def _panel_range(panel, rng):
             frm, to = str(int(frm) - shift), str(int(to) - shift)
         return {"from": frm, "to": to}
     return rng
-
-
-def now_utc():
-    return datetime.now(timezone.utc)

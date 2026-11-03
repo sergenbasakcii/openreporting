@@ -213,31 +213,3 @@ def calculate_interval(start: datetime, end: datetime, max_points: int, min_inte
     if min_interval:
         interval = max(interval, parse_duration(min_interval))
     return interval
-
-
-def describe(frm: str, to: str) -> str:
-    """Short Turkish label for common quick ranges, used on PDF covers."""
-    labels = {
-        ("now-5m", "now"): "Son 5 dakika",
-        ("now-15m", "now"): "Son 15 dakika",
-        ("now-30m", "now"): "Son 30 dakika",
-        ("now-1h", "now"): "Son 1 saat",
-        ("now-3h", "now"): "Son 3 saat",
-        ("now-6h", "now"): "Son 6 saat",
-        ("now-12h", "now"): "Son 12 saat",
-        ("now-24h", "now"): "Son 24 saat",
-        ("now-2d", "now"): "Son 2 gün",
-        ("now-7d", "now"): "Son 7 gün",
-        ("now-30d", "now"): "Son 30 gün",
-        ("now-90d", "now"): "Son 90 gün",
-        ("now-1y", "now"): "Son 1 yıl",
-        ("now/d", "now/d"): "Bugün",
-        ("now-1d/d", "now-1d/d"): "Dün",
-        ("now/w", "now/w"): "Bu hafta",
-        ("now-1w/w", "now-1w/w"): "Geçen hafta",
-        ("now/M", "now/M"): "Bu ay",
-        ("now-1M/M", "now-1M/M"): "Geçen ay",
-        ("now/y", "now/y"): "Bu yıl",
-        ("now-1y/y", "now-1y/y"): "Geçen yıl",
-    }
-    return labels.get((str(frm), str(to)), f"{frm} → {to}")

@@ -169,9 +169,3 @@ def builtin_variables(start, end, interval_s, *, dashboard="", user="", timezone
         "__timezone": timezone_name,
         "__rate_interval": format_duration(max(interval_s * 4, 60)),
     }
-
-
-def used_variables(text):
-    if not isinstance(text, str):
-        return set()
-    return {m.group(1) or m.group(2) or m.group(4) for m in _PATTERN.finditer(text)}

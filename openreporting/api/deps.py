@@ -1,9 +1,16 @@
 """Shared FastAPI dependencies: authentication, CSRF and role gates."""
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Request
+from pydantic import BaseModel, Field
 
 from ..runtime_settings import effective
 from ..security import authenticate, require_csrf, require_role
+
+
+class ReauthBody(BaseModel):
+    """Request body carrying the caller's current password for a step-up check."""
+
+    password: str = Field(min_length=1, max_length=1024)
 
 
 def settings_of(request: Request):
@@ -32,7 +39,3 @@ def admin(request: Request, user=Depends(authenticate)):
 def admin_read(user=Depends(authenticate)):
     require_role(user, "admin")
     return user
-
-
-def domain_errors(exc):
-    raise HTTPException(422, str(exc)) from exc

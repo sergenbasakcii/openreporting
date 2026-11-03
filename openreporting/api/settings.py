@@ -3,32 +3,29 @@
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from .. import runtime_settings
 from ..db import audit, connect, transaction
 from ..security import reauthenticate
-from .deps import admin, admin_read, settings_of
+from .deps import ReauthBody, admin, admin_read, settings_of
 
 router = APIRouter()
 
 
-class ScopeSave(BaseModel):
+class ScopeSave(ReauthBody):
     revision: int = Field(ge=0)
     values: dict = Field(default_factory=dict)
     secrets: dict = Field(default_factory=dict)
-    password: str = Field(min_length=1, max_length=1024)
 
 
-class ScopeReset(BaseModel):
+class ScopeReset(ReauthBody):
     revision: int = Field(ge=0)
-    password: str = Field(min_length=1, max_length=1024)
 
 
-class ScopeTest(BaseModel):
+class ScopeTest(ReauthBody):
     values: dict = Field(default_factory=dict)
     secrets: dict = Field(default_factory=dict)
-    password: str = Field(min_length=1, max_length=1024)
 
 
 def _scope(scope):

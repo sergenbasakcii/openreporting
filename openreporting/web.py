@@ -17,6 +17,7 @@ from .http_security import OriginValidationMiddleware, trusted_hosts
 from .http_telemetry import HttpMetrics, HttpTelemetryMiddleware
 from .security import authenticate, digest, login, logout, require_csrf, require_role
 from .api.deps import settings_of
+from . import messages
 
 log = logging.getLogger(__name__)
 
@@ -141,7 +142,7 @@ def create_app(settings: Settings | None = None):
         # Require same-origin browser signal; no CSRF-bearing mutation is made here
         # other than rotating a token for an already authenticated session.
         if request.headers.get("Sec-Fetch-Site") not in ("same-origin", "none"):
-            raise HTTPException(403, "Same-origin request required")
+            raise HTTPException(403, "Yalnız aynı kaynaktan gelen isteklere izin verilir")
         csrf = secrets.token_urlsafe(32)
         token = request.cookies.get(SESSION_COOKIE)
         with connect(settings_of(request)) as db, transaction(db):
@@ -166,7 +167,7 @@ def create_app(settings: Settings | None = None):
         # Client-side routes of the single page application; API paths stay 404.
         if full_path.startswith(SPA_PREFIXES):
             return (static / "index.html").read_text(encoding="utf8")
-        raise HTTPException(404, "Not found")
+        raise HTTPException(404, messages.NOT_FOUND)
 
     app.add_middleware(HttpTelemetryMiddleware, metrics=app.state.http_metrics)
     return app

@@ -17,9 +17,15 @@ import segno
 
 from .db import audit, connect, transaction, utcnow, schema_version, CURRENT_VERSION, verify_audit
 from .domain import parse_utc
+from . import lockout
 from .secrets_store import decrypt, encrypt, SecretError
+from .security import digest, reauthenticate
 
 ENROLLMENT_PATHS = frozenset({"/api/session", "/api/session/csrf", "/api/logout", "/api/user/mfa", "/api/user/mfa/setup", "/api/user/mfa/confirm"})
+
+
+MSG_CODE_REJECTED = "Doğrulama kodu kabul edilmedi; yeni bir kodla tekrar deneyin"
+MSG_CODE_OR_RECOVERY_REJECTED = "Doğrulama kodu kabul edilmedi; yeni bir kod veya kullanılmamış kurtarma kodu deneyin"
 
 
 class Unavailable(RuntimeError):
@@ -119,28 +125,56 @@ def _snapshot_matches(db, snapshot):
         (snapshot["id"],),
     ).fetchone()
     if not row or not row["active"] or any(row[key] != snapshot[key] for key in ("username", "role", "password_hash", "subject")):
-        raise HTTPException(409, "Account changed; sign in again")
+        raise HTTPException(409, "Hesap bilgileri değişti; yeniden giriş yapın")
+
+
+class _Attempt:
+    """Outcome of a proof checked inside :func:`_step_up`."""
+
+    def __init__(self):
+        self.failed = None  # None: no proof checked; True/False after verify()
+
+    def verify(self, ok):
+        self.failed = not ok
+        return ok
+
+
+@contextmanager
+def _step_up(settings, user, password, failure_message):
+    """Re-authenticated, lockout-gated write transaction for changes to the user's own factor.
+
+    The body reports a checked code with ``attempt.verify(ok)``. A failure is counted in the same
+    transaction and the 403 is raised only after it commits, so the counter always persists.
+    """
+    snapshot = reauthenticate(settings, user, password)
+    keys = lockout.failure_keys(user["username"], step_up=True)
+    attempt = _Attempt()
+    with connect(settings) as db, transaction(db):
+        _snapshot_matches(db, snapshot)
+        lockout.gate(db, keys)
+        yield db, attempt
+        if attempt.failed:
+            lockout.record_failure(db, keys)
+        elif attempt.failed is False:
+            lockout.clear_failures(db, keys)
+    if attempt.failed:
+        raise HTTPException(403, failure_message)
 
 
 def start_setup(settings, user, password):
-    from . import security
-
-    snapshot = security.reauthenticate(settings, user, password)
     secret = base64.b32encode(secrets.token_bytes(20)).decode("ascii")
     setup_token = secrets.token_urlsafe(32)
     sealed = encrypt(settings, {"type": "mfa-totp-v1", "user_id": user["id"], "secret": secret})
     expires = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(timespec="seconds")
-    with connect(settings) as db, transaction(db):
-        _snapshot_matches(db, snapshot)
-        security._login_gate(db, security.failure_keys(user["username"], step_up=True))
+    with _step_up(settings, user, password, MSG_CODE_REJECTED) as (db, _):
         row = factor(db, user["id"])
         if row and row["enabled"]:
-            raise HTTPException(409, "Second factor is already enabled")
+            raise HTTPException(409, "İki adımlı giriş zaten etkin")
         db.execute(
             """INSERT INTO user_mfa(user_id,secret_json,pending_expires_at,setup_hash,updated_at) VALUES(?,?,?,?,?)
             ON CONFLICT(user_id) DO UPDATE SET secret_json=excluded.secret_json,pending_expires_at=excluded.pending_expires_at,
             setup_hash=excluded.setup_hash,last_counter=-1,recovery_hashes='[]',updated_at=excluded.updated_at""",
-            (user["id"], sealed, expires, security.digest(setup_token), utcnow()),
+            (user["id"], sealed, expires, digest(setup_token), utcnow()),
         )
         audit(db, user["id"], "mfa.setup_started", "user", user["id"])
     uri = pyotp.TOTP(secret).provisioning_uri(name=user["username"], issuer_name="OpenReporting")
@@ -156,65 +190,41 @@ def qr_data_uri(uri):
 
 
 def confirm_setup(settings, user, password, code, setup_token):
-    from . import security
-
-    snapshot = security.reauthenticate(settings, user, password)
-    failed = False
     codes = None
-    with connect(settings) as db, transaction(db):
-        _snapshot_matches(db, snapshot)
-        security._login_gate(db, security.failure_keys(user["username"], step_up=True))
+    with _step_up(settings, user, password, MSG_CODE_REJECTED) as (db, attempt):
         row = factor(db, user["id"])
         if (
             not row
             or row["enabled"]
-            or not hmac.compare_digest(row["setup_hash"], security.digest(setup_token))
+            or not hmac.compare_digest(row["setup_hash"], digest(setup_token))
             or parse_utc(row["pending_expires_at"]) <= datetime.now(timezone.utc)
         ):
-            raise HTTPException(409, "Setup expired or replaced; start again")
-        if not consume(db, settings, user["id"], code, pending=True):
-            security.record_failure(db, security.failure_keys(user["username"], step_up=True))
-            failed = True
-        else:
+            raise HTTPException(409, "Kurulum süresi doldu veya değişti; baştan başlayın")
+        if attempt.verify(consume(db, settings, user["id"], code, pending=True)):
             codes, hashes = new_recovery(user["id"])
             db.execute(
                 "UPDATE user_mfa SET enabled=1,pending_expires_at='',setup_hash='',recovery_hashes=?,updated_at=? WHERE user_id=?",
                 (hashes, utcnow(), user["id"]),
             )
             db.execute("DELETE FROM sessions WHERE user_id=?", (user["id"],))
-            security.clear_failures(db, security.failure_keys(user["username"], step_up=True))
             audit(db, user["id"], "mfa.enabled", "user", user["id"])
-    if failed:
-        raise HTTPException(403, "Verification failed; use a fresh code")
     return {"enabled": True, "recovery_codes": codes, "sign_in_required": True}
 
 
 def manage(settings, user, password, code, *, disable=False):
-    from . import security
-
-    snapshot = security.reauthenticate(settings, user, password)
-    failed = False
     codes = None
-    with connect(settings) as db, transaction(db):
-        _snapshot_matches(db, snapshot)
-        security._login_gate(db, security.failure_keys(user["username"], step_up=True))
+    with _step_up(settings, user, password, MSG_CODE_OR_RECOVERY_REJECTED) as (db, attempt):
         row = factor(db, user["id"])
         if not row or not row["enabled"]:
-            raise HTTPException(409, "Second factor is not enabled")
-        if not consume(db, settings, user["id"], code):
-            security.record_failure(db, security.failure_keys(user["username"], step_up=True))
-            failed = True
-        else:
+            raise HTTPException(409, "İki adımlı giriş etkin değil")
+        if attempt.verify(consume(db, settings, user["id"], code)):
             if disable:
                 db.execute("DELETE FROM user_mfa WHERE user_id=?", (user["id"],))
             else:
                 codes, hashes = new_recovery(user["id"])
                 db.execute("UPDATE user_mfa SET recovery_hashes=?,updated_at=? WHERE user_id=?", (hashes, utcnow(), user["id"]))
             db.execute("DELETE FROM sessions WHERE user_id=?", (user["id"],))
-            security.clear_failures(db, security.failure_keys(user["username"], step_up=True))
             audit(db, user["id"], "mfa.disabled" if disable else "mfa.recovery_rotated", "user", user["id"])
-    if failed:
-        raise HTTPException(403, "Verification failed; use a fresh code or recovery code")
     return {"enabled": not disable, "recovery_codes": codes, "sign_in_required": True}
 
 

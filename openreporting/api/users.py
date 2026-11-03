@@ -9,7 +9,7 @@ from .. import folder_access
 from ..db import audit, connect, transaction, utcnow
 from ..security import authenticate, create_user, password_hash, reauthenticate
 from ..timerange import TimeRangeError, zone
-from .deps import admin, admin_read, settings_of, viewer_write
+from .deps import ReauthBody, admin, admin_read, settings_of, viewer_write
 
 router = APIRouter()
 ROLES = ("admin", "editor", "viewer")
@@ -40,9 +40,8 @@ class PasswordChange(BaseModel):
     new_password: str = Field(min_length=14, max_length=256)
 
 
-class MfaReset(BaseModel):
+class MfaReset(ReauthBody):
     reason: str
-    password: str = Field(min_length=1, max_length=1024)
 
 
 class PreferencesIn(BaseModel):

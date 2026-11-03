@@ -4,12 +4,13 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from psycopg import Error as PostgresError
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from .. import mfa
 from ..security import authenticate
 from ..secrets_store import SecretError
-from .deps import settings_of, viewer_write
+from .deps import ReauthBody, settings_of, viewer_write
+from .. import messages
 
 router = APIRouter()
 
@@ -19,11 +20,11 @@ def ensure_transport(request):
     # exempt on local HTTP setups; otherwise a proxy that drops the header would look like localhost.
     local_http = not settings_of(request).secure_cookie and request.client and request.client.host in {"127.0.0.1", "::1"}
     if request.scope["scheme"] != "https" and not local_http:
-        raise HTTPException(400, "HTTPS is required for second-factor operations")
+        raise HTTPException(400, "İki adımlı giriş işlemleri yalnız HTTPS üzerinden yapılabilir")
 
 
-class Primary(BaseModel):
-    password: str = Field(min_length=1, max_length=1024)
+class Primary(ReauthBody):
+    pass
 
 
 class Proof(Primary):
@@ -38,7 +39,7 @@ def run(operation, *args, **kwargs):
     try:
         return operation(*args, **kwargs)
     except (mfa.Unavailable, SecretError, sqlite3.Error, PostgresError, OSError):
-        raise HTTPException(503, "Second-factor storage unavailable") from None
+        raise HTTPException(503, messages.FACTOR_STORAGE_UNAVAILABLE) from None
 
 
 @router.get("/api/user/mfa")

@@ -57,55 +57,10 @@ def create_user(settings, username, password, role="admin"):
     return uid
 
 
-# Failure counters (login_failures.username holds the counter key):
-#  - username + client: 5 attempts per 15 minutes. An attacker can only lock out their own address.
-#  - username alone: 50 attempts, slowing distributed guessing without letting one client lock a user out.
-#  - username + "step-up": re-authentication inside a session; only the session holder can trip it.
-PAIR_LIMIT = 5
-USER_LIMIT = 50
-LOCK_WINDOW = timedelta(minutes=15)
-_SEP = ""
-
-
-def failure_keys(username, client=None, *, step_up=False):
-    if step_up:
-        return ((f"{username}{_SEP}step-up", PAIR_LIMIT),)
-    return ((f"{username}{_SEP}{client or 'unknown'}", PAIR_LIMIT), (username, USER_LIMIT))
-
-
-def _login_gate(db, keys):
-    for key, limit in keys:
-        failures = db.execute("SELECT count,last_at FROM login_failures WHERE username=?", (key,)).fetchone()
-        if not failures:
-            continue
-        if datetime.now(timezone.utc) - datetime.fromisoformat(failures["last_at"]) >= LOCK_WINDOW:
-            db.execute("DELETE FROM login_failures WHERE username=?", (key,))
-        elif failures["count"] >= limit:
-            raise HTTPException(429, "Too many attempts; retry after 15 minutes")
-
-
-def record_failure(db, keys, client=None):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
-    db.execute("DELETE FROM login_failures WHERE last_at < ?", (cutoff,))
-    for key, _ in keys:
-        db.execute(
-            "INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at",
-            (key, utcnow()),
-        )
-    # Audit failures in aggregate per client: the first one, then every 50th, bounds audit growth.
-    source = f"{_SEP}client{_SEP}{client or 'unknown'}"
-    db.execute(
-        "INSERT INTO login_failures(username,count,last_at) VALUES(?,1,?) ON CONFLICT(username) DO UPDATE SET count=login_failures.count+1,last_at=excluded.last_at",
-        (source, utcnow()),
-    )
-    count = db.execute("SELECT count FROM login_failures WHERE username=?", (source,)).fetchone()[0]
-    if count == 1 or count % 50 == 0:
-        audit(db, "anonymous", "auth.failed", "login", "redacted", {"failures_from_client": count})
-
-
-def clear_failures(db, keys):
-    for key, _ in keys:
-        db.execute("DELETE FROM login_failures WHERE username=?", (key,))
+# Lockout policy lives in its own module; names re-exported for existing callers.
+from .lockout import LOCK_WINDOW, PAIR_LIMIT, USER_LIMIT, clear_failures, failure_keys, record_failure  # noqa: E402,F401
+from .lockout import gate as _login_gate  # noqa: E402
+from . import messages
 
 
 def reauthenticate(settings, user, password):
@@ -113,7 +68,7 @@ def reauthenticate(settings, user, password):
     from . import directory_auth
 
     if not _auth_slots.acquire(timeout=AUTH_SLOT_WAIT_S):
-        raise HTTPException(429, "Authentication busy; retry shortly", headers={"Retry-After": "1"})
+        raise HTTPException(429, messages.AUTH_BUSY, headers={"Retry-After": "1"})
     try:
         with connect(settings) as db, transaction(db):
             _login_gate(db, failure_keys(user["username"], step_up=True))
@@ -130,28 +85,28 @@ def reauthenticate(settings, user, password):
             try:
                 identity = directory_auth.authenticate(settings, snapshot["username"], password)
             except directory_auth.DirectoryUnavailable:
-                raise HTTPException(503, "Directory authentication unavailable") from None
+                raise HTTPException(503, messages.DIRECTORY_UNAVAILABLE) from None
             valid = bool(identity and identity.subject == snapshot["subject"] and identity.role == snapshot["role"])
         if not valid:
             with connect(settings) as db, transaction(db):
                 keys = failure_keys(user["username"], step_up=True)
                 _login_gate(db, keys)
                 record_failure(db, keys)
-            raise HTTPException(403, "Reauthentication failed")
+            raise HTTPException(403, "Parola doğrulanamadı")
         return snapshot
     except (sqlite3.Error, PostgresError, OSError):
-        raise HTTPException(503, "Authentication storage unavailable") from None
+        raise HTTPException(503, messages.AUTH_STORAGE_UNAVAILABLE) from None
     finally:
         _auth_slots.release()
 
 
 def login(settings, username: str, password: str, otp: str | None = None, client: str | None = None):
     if not _auth_slots.acquire(timeout=AUTH_SLOT_WAIT_S):
-        raise HTTPException(429, "Authentication busy; retry shortly", headers={"Retry-After": "1"})
+        raise HTTPException(429, messages.AUTH_BUSY, headers={"Retry-After": "1"})
     try:
         return _login(settings, username, password, otp, client)
     except (sqlite3.Error, PostgresError, OSError):
-        raise HTTPException(503, "Authentication storage unavailable") from None
+        raise HTTPException(503, messages.AUTH_STORAGE_UNAVAILABLE) from None
     finally:
         _auth_slots.release()
 
@@ -178,7 +133,7 @@ def _login(settings, username: str, password: str, otp: str | None = None, clien
         try:
             identity = directory_auth.authenticate(settings, username, password)
         except directory_auth.DirectoryUnavailable:
-            raise HTTPException(503, "Directory authentication unavailable; contact your administrator") from None
+            raise HTTPException(503, messages.DIRECTORY_UNAVAILABLE) from None
         valid = identity is not None
         if not settings.ldap_enabled:
             check_password(password, DUMMY_HASH)
@@ -218,7 +173,7 @@ def _login(settings, username: str, password: str, otp: str | None = None, clien
                 try:
                     factor_verified = mfa.consume(db, settings, user["id"], otp)
                 except mfa.Unavailable:
-                    raise HTTPException(503, "Second-factor storage unavailable") from None
+                    raise HTTPException(503, messages.FACTOR_STORAGE_UNAVAILABLE) from None
                 valid = valid and factor_verified
         if challenge:
             pass  # Commit verified directory role reductions/revocations, but never mint a session.
@@ -243,16 +198,16 @@ def _login(settings, username: str, password: str, otp: str | None = None, clien
             db.execute("DELETE FROM sessions WHERE expires_at<?", (utcnow(),))
             audit(db, user["id"], "auth.login", "session", "redacted", {"provider": "ldap" if identity else "local"})
     if challenge:
-        raise HTTPException(401, {"code": "mfa_required", "message": "Additional verification required"})
+        raise HTTPException(401, {"code": "mfa_required", "message": "Ek doğrulama gerekli"})
     if failure:
-        raise HTTPException(401, "Invalid credentials")
+        raise HTTPException(401, "Kullanıcı adı veya parola hatalı")
     return token, csrf, expiry
 
 
 def authenticate(request: Request):
     token = request.cookies.get("openreporting_session")
     if not token:
-        raise HTTPException(401, "Login required")
+        raise HTTPException(401, "Giriş yapmanız gerekiyor")
     from .runtime_settings import effective
 
     settings = effective(request.app.state.settings)
@@ -267,20 +222,20 @@ def authenticate(request: Request):
                 (digest(token),),
             ).fetchone()
     except (sqlite3.Error, PostgresError, OSError):
-        raise HTTPException(503, "Authentication storage unavailable") from None
+        raise HTTPException(503, messages.AUTH_STORAGE_UNAVAILABLE) from None
     if (
         not row
         or not row["active"]
         or (row["provider"] == "ldap" and not settings.ldap_enabled)
         or datetime.fromisoformat(row["expires_at"]) <= datetime.now(timezone.utc)
     ):
-        raise HTTPException(401, "Session expired")
+        raise HTTPException(401, "Oturum süresi doldu; tekrar giriş yapın")
     if row["mfa_enabled"] and not row["factor_session"]:
-        raise HTTPException(401, "Additional verification required")
+        raise HTTPException(401, "Ek doğrulama gerekli")
     required = row["role"] in settings.mfa_required_roles and not row["mfa_enabled"]
     if required:
         if datetime.fromisoformat(row["created_at"]) <= datetime.now(timezone.utc) - timedelta(minutes=10):
-            raise HTTPException(401, "Enrollment session expired")
+            raise HTTPException(401, "Kurulum oturumunun süresi doldu; tekrar giriş yapın")
         from .mfa import ENROLLMENT_PATHS
 
         if request.scope["path"] not in ENROLLMENT_PATHS:
@@ -290,13 +245,13 @@ def authenticate(request: Request):
 
 def require_role(user, *roles):
     if user["role"] not in roles:
-        raise HTTPException(403, "Insufficient permissions")
+        raise HTTPException(403, "Bu işlem için yetkiniz yok")
 
 
 def require_csrf(request: Request, user):
     header = request.headers.get("X-CSRF-Token", "")
     if not header or not hmac.compare_digest(digest(header), user["csrf_hash"]):
-        raise HTTPException(403, "CSRF validation failed")
+        raise HTTPException(403, messages.CSRF_FAILED)
     # X-CSRF-Token is non-simple; CORS is deliberately not enabled.
 
 

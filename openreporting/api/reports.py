@@ -12,6 +12,7 @@ from ..reporting import logos, service
 from ..security import authenticate
 from ..timerange import TimeRangeError, resolve_range
 from .deps import editor, settings_of, viewer_write
+from .. import messages
 
 router = APIRouter()
 TURKISH_ASCII = str.maketrans("çğıöşüÇĞİÖŞÜâîû", "cgiosuCGIOSUaiu")
@@ -266,7 +267,7 @@ def all_runs(request: Request, limit: int = 200, user=Depends(authenticate)):
 @router.get("/api/report-runs/{run_id}/files/{kind}")
 def download(run_id: str, kind: str, request: Request, user=Depends(authenticate)):
     if kind not in MEDIA:
-        raise HTTPException(404, "Not found")
+        raise HTTPException(404, messages.NOT_FOUND)
     try:
         path, filename = service.verified_file(settings_of(request), run_id, kind, user)
     except DomainError as exc:

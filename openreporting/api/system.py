@@ -14,6 +14,7 @@ from ..domain import parse_utc
 from ..healthchecks import database_ready
 from ..security import authenticate
 from .deps import admin, admin_read, settings_of
+from .. import messages
 
 router = APIRouter()
 
@@ -144,7 +145,7 @@ def metrics(request: Request):
     """Prometheus exposition; loopback-only (scrape locally or through an authenticated proxy)."""
     client = request.client.host if request.client else ""
     if client not in ("127.0.0.1", "::1"):
-        raise HTTPException(404, "Not found")
+        raise HTTPException(404, messages.NOT_FOUND)
     settings = settings_of(request)
     lines = ["# HELP openreporting_up Application is serving requests", "# TYPE openreporting_up gauge", "openreporting_up 1"]
     with connect(settings) as db:
