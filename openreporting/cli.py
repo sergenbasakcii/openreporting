@@ -172,7 +172,7 @@ def import_dashboards(settings, directory):
     print(f"{count} dashboard içe aktarıldı")
 
 
-def main(argv=None):
+def build_parser():
     parser = argparse.ArgumentParser(prog="openreporting", description="OpenReporting report management")
     commands = parser.add_subparsers(dest="action", required=True)
     commands.add_parser("init", help="Initialize empty application state")
@@ -230,172 +230,250 @@ def main(argv=None):
     p_mfa = commands.add_parser("reset-mfa", help="OS-operator factor recovery; revoke sessions without changing password")
     p_mfa.add_argument("username")
     p_mfa.add_argument("--reason", required=True, choices=["lost-device", "compromise", "recovery"])
-    args = parser.parse_args(argv)
+    return parser
+
+
+def _print_json(result, **kwargs):
+    import json
+
+    print(json.dumps(result, **kwargs))
+
+
+# --- commands that run before any settings are loaded ---------------------------------------
+
+
+def _cmd_migrate_to_postgres(args):
+    # The target must still be empty when the copy starts: never initialise it first.
+    from .pg_migrate import MigrationError, migrate
+
+    try:
+        result = migrate(args.source, os.getenv("OPENREPORTING_DATABASE_URL", "").strip(), services_stopped=args.services_stopped)
+    except MigrationError as exc:
+        raise SystemExit(str(exc)) from None
+    _print_json(result, indent=2)
+
+
+def _cmd_worker_health(args):
+    raise SystemExit(worker_health(Settings.from_env(), args.max_age))
+
+
+def _cmd_verify_backup(args):
+    # Never initialise, migrate, replace or connect to the live application state.
+    from .backup_verify import BackupVerificationError, verify_backup
+
+    try:
+        result = verify_backup(args.directory, key_file=args.key_file, max_unpacked_bytes=args.max_unpacked_mb * 1024**2, require_logos=args.require_logos)
+    except BackupVerificationError as exc:
+        raise SystemExit(str(exc)) from None
+    _print_json(result)
+
+
+# --- maintenance commands: settings, but never an implicit migration ------------------------
+
+
+def _cmd_check_postgres(args, settings):
+    from .postgres_check import check
+
+    result = check(settings)
+    _print_json(result)
+    raise SystemExit(0 if result["ok"] else 2)
+
+
+def _cmd_reset_mfa(args, settings):
+    import sqlite3
+
+    from psycopg import Error as PostgresError
+
+    from .mfa import admin_reset
+
+    try:
+        result = admin_reset(settings, args.username, args.reason)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
+    except (sqlite3.Error, PostgresError, OSError):
+        raise SystemExit("Factor recovery storage unavailable; no implicit migration or replacement performed") from None
+    _print_json(result)
+
+
+def _cmd_key_maintenance(args, settings):
+    from .key_rotation import prepare_retirement, prepare_rotation, rekey_secrets
+    from .secrets_store import SecretError
+
+    operations = {
+        "prepare-key-rotation": lambda: prepare_rotation(settings, args.output),
+        "prepare-key-retirement": lambda: prepare_retirement(settings, args.output, services_stopped=args.services_stopped),
+        "rekey-secrets": lambda: rekey_secrets(settings, services_stopped=args.services_stopped),
+    }
+    try:
+        result = operations[args.action]()
+    except SecretError as exc:
+        raise SystemExit(str(exc)) from None
+    _print_json(result)
+
+
+# --- application commands: the schema is initialised/upgraded first -------------------------
+
+
+def _cmd_init(args, settings):
+    print("Empty application initialized. No report templates were added.")
+
+
+def _new_password(prompt):
+    password = getpass.getpass(f"{prompt} (at least 14 chars): ")
+    if getpass.getpass("Confirm password: ") != password:
+        raise SystemExit("Passwords do not match")
+    return password
+
+
+def _cmd_create_user(args, settings):
+    print("Created user:", create_user(settings, args.username, _new_password("Password"), args.role))
+
+
+def _find_user(db, username, columns="id"):
+    target = db.execute(f"SELECT {columns} FROM users WHERE username=?", (username.strip().lower(),)).fetchone()
+    if not target:
+        raise SystemExit("User not found")
+    return target
+
+
+def _is_external(db, user_id):
+    return db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user_id,)).fetchone() is not None
+
+
+def _cmd_reset_password(args, settings):
+    hashed = password_hash(_new_password("New password"))
+    with connect(settings) as db, transaction(db):
+        target = _find_user(db, args.username)
+        if _is_external(db, target["id"]):
+            raise SystemExit("LDAP passwords must be changed in the directory")
+        db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, target["id"]))
+        db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
+        audit(db, "os-admin", "user.password_rotated", "user", target["id"])
+    print("Password rotated; sessions invalidated")
+
+
+def _cmd_disable_user(args, settings):
+    with connect(settings) as db, transaction(db):
+        target = _find_user(db, args.username, "id,role,active")
+        if target["role"] == "admin" and target["active"]:
+            if db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0] <= 1:
+                raise SystemExit("Cannot disable the last active admin")
+            if not _is_external(db, target["id"]):
+                remaining_local = db.execute(
+                    """SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
+                    AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)"""
+                ).fetchone()[0]
+                if remaining_local <= 1:
+                    raise SystemExit("Cannot disable the last local recovery admin")
+        db.execute("UPDATE users SET active=0 WHERE id=?", (target["id"],))
+        db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
+        audit(db, "os-admin", "user.disabled", "user", target["id"])
+    print("User disabled and sessions invalidated")
+
+
+def _cmd_worker(args, settings):
+    from .worker import run_forever
+
+    run_forever(settings, once=args.action == "worker-once")
+
+
+def _cmd_serve(args, settings):
+    if args.host not in ("127.0.0.1", "::1") and not args.allow_remote:
+        raise SystemExit("API must bind to loopback; use an approved HTTPS reverse proxy for remote access")
+    import uvicorn
+
+    from .http_telemetry import logging_config
+
+    workers = max(1, min(args.workers, 16))
+    try:
+        trusted_proxies = forwarded_allow_ips(os.getenv("OPENREPORTING_FORWARDED_ALLOW_IPS", ""))
+    except ValueError:
+        raise SystemExit("OPENREPORTING_FORWARDED_ALLOW_IPS must list exact proxy IP addresses or networks") from None
+    common = {
+        "host": args.host,
+        "port": args.port,
+        "proxy_headers": args.proxy_headers,
+        "forwarded_allow_ips": trusted_proxies if args.proxy_headers else None,
+        "server_header": False,
+        "date_header": True,
+        "timeout_keep_alive": 15,
+        "access_log": False,
+        "log_config": logging_config(),
+    }
+    if workers > 1 and os.name != "nt":
+        # Each worker builds its own app from the same environment.
+        uvicorn.run("openreporting.web:create_app", factory=True, workers=workers, **common)
+    else:
+        from .web import create_app
+
+        uvicorn.run(create_app(settings), workers=1, **common)
+
+
+def _cmd_doctor(args, settings):
+    raise SystemExit(doctor(effective(settings), check_integrations=args.check_integrations))
+
+
+def _cmd_check_ldap(args, settings):
+    from .directory_auth import DirectoryUnavailable
+    from .directory_auth import authenticate as directory_login
+
+    try:
+        result = directory_login(effective(settings), args.username.strip().lower(), getpass.getpass("Directory password: "))
+    except DirectoryUnavailable as exc:
+        raise SystemExit(str(exc)) from None
+    if result is None:
+        raise SystemExit("LDAP authentication or group admission failed")
+    print(f"LDAP authentication and group mapping verified; role={result.role}. No account or session created.")
+
+
+def _cmd_verify_audit(args, settings):
+    with connect(settings) as db:
+        valid, corrupt = verify_audit(db)
+    print("PASS" if valid else f"FAIL at audit ID {corrupt}")
+    if not valid:
+        raise SystemExit(1)
+
+
+# The stage decides what runs before a command: "raw" loads nothing, "maintenance" loads settings
+# without touching the schema, "app" initialises/upgrades the schema first.
+COMMANDS = {
+    "migrate-to-postgres": ("raw", _cmd_migrate_to_postgres),
+    "worker-health": ("raw", _cmd_worker_health),
+    "verify-backup": ("raw", _cmd_verify_backup),
+    "check-postgres": ("maintenance", _cmd_check_postgres),
+    "reset-mfa": ("maintenance", _cmd_reset_mfa),
+    "prepare-key-rotation": ("maintenance", _cmd_key_maintenance),
+    "rekey-secrets": ("maintenance", _cmd_key_maintenance),
+    "prepare-key-retirement": ("maintenance", _cmd_key_maintenance),
+    "init": ("app", _cmd_init),
+    "create-user": ("app", _cmd_create_user),
+    "reset-password": ("app", _cmd_reset_password),
+    "disable-user": ("app", _cmd_disable_user),
+    "worker": ("app", _cmd_worker),
+    "worker-once": ("app", _cmd_worker),
+    "serve": ("app", _cmd_serve),
+    "doctor": ("app", _cmd_doctor),
+    "check-ldap": ("app", _cmd_check_ldap),
+    "export-dashboards": ("app", lambda args, settings: export_dashboards(settings, args.directory)),
+    "import-dashboards": ("app", lambda args, settings: import_dashboards(settings, args.directory)),
+    "verify-audit": ("app", _cmd_verify_audit),
+    "backup": ("app", lambda args, settings: backup(settings, args.target)),
+}
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
-    if args.action == "migrate-to-postgres":
-        # Before init_db: the target must still be empty when the copy starts.
-        import json
-        from .pg_migrate import MigrationError, migrate
-
-        try:
-            result = migrate(args.source, os.getenv("OPENREPORTING_DATABASE_URL", "").strip(), services_stopped=args.services_stopped)
-        except MigrationError as exc:
-            raise SystemExit(str(exc)) from None
-        print(json.dumps(result, indent=2))
-        return
-    if args.action == "worker-health":
-        raise SystemExit(worker_health(Settings.from_env(), args.max_age))
-    if args.action == "verify-backup":
-        import json
-        from .backup_verify import BackupVerificationError, verify_backup
-
-        try:
-            result = verify_backup(args.directory, key_file=args.key_file, max_unpacked_bytes=args.max_unpacked_mb * 1024**2, require_logos=args.require_logos)
-        except BackupVerificationError as exc:
-            raise SystemExit(str(exc)) from None
-        print(json.dumps(result))
-        return  # Never initialize, migrate, replace or connect to the live application state.
+    stage, command = COMMANDS[args.action]
+    if stage == "raw":
+        return command(args)
     settings = Settings.from_env()
-    if args.action == "check-postgres":
-        import json
-        from .postgres_check import check
-
-        result = check(settings)
-        print(json.dumps(result))
-        raise SystemExit(0 if result["ok"] else 2)
-    if args.action == "reset-mfa":
-        import json
-        import sqlite3
-        from psycopg import Error as PostgresError
-        from .mfa import admin_reset
-
-        try:
-            result = admin_reset(settings, args.username, args.reason)
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from None
-        except (sqlite3.Error, PostgresError, OSError):
-            raise SystemExit("Factor recovery storage unavailable; no implicit migration or replacement performed") from None
-        print(json.dumps(result))
-        return  # Recovery must not migrate a live/older store implicitly.
-    if args.action in {"prepare-key-rotation", "rekey-secrets", "prepare-key-retirement"}:
-        import json
-        from .key_rotation import prepare_rotation, prepare_retirement, rekey_secrets
-        from .secrets_store import SecretError
-
-        try:
-            result = (
-                prepare_rotation(settings, args.output)
-                if args.action == "prepare-key-rotation"
-                else prepare_retirement(settings, args.output, services_stopped=args.services_stopped)
-                if args.action == "prepare-key-retirement"
-                else rekey_secrets(settings, services_stopped=args.services_stopped)
-            )
-        except SecretError as exc:
-            raise SystemExit(str(exc)) from None
-        print(json.dumps(result))
-        return  # Never initialize/migrate a store or change active key configuration.
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    init_db(settings)
-    if args.action == "init":
-        print("Empty application initialized. No report templates were added.")
-    elif args.action == "create-user":
-        password = getpass.getpass("Password (at least 14 chars): ")
-        confirm = getpass.getpass("Confirm password: ")
-        if password != confirm:
-            raise SystemExit("Passwords do not match")
-        print("Created user:", create_user(settings, args.username, password, args.role))
-    elif args.action == "reset-password":
-        new_password = getpass.getpass("New password (at least 14 chars): ")
-        if getpass.getpass("Confirm new password: ") != new_password:
-            raise SystemExit("Passwords do not match")
-        hashed = password_hash(new_password)
-        with connect(settings) as db, transaction(db):
-            target = db.execute("SELECT id FROM users WHERE username=?", (args.username.strip().lower(),)).fetchone()
-            if not target:
-                raise SystemExit("User not found")
-            if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (target["id"],)).fetchone():
-                raise SystemExit("LDAP passwords must be changed in the directory")
-            db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, target["id"]))
-            db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
-            audit(db, "os-admin", "user.password_rotated", "user", target["id"])
-        print("Password rotated; sessions invalidated")
-    elif args.action == "disable-user":
-        with connect(settings) as db, transaction(db):
-            target = db.execute("SELECT id,role,active FROM users WHERE username=?", (args.username.strip().lower(),)).fetchone()
-            if not target:
-                raise SystemExit("User not found")
-            if target["role"] == "admin" and target["active"]:
-                remaining = db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND active=1").fetchone()[0]
-                if remaining <= 1:
-                    raise SystemExit("Cannot disable the last active admin")
-                if not db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (target["id"],)).fetchone():
-                    remaining_local = db.execute("""SELECT COUNT(*) FROM users u WHERE role='admin' AND active=1
-                        AND NOT EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id)""").fetchone()[0]
-                    if remaining_local <= 1:
-                        raise SystemExit("Cannot disable the last local recovery admin")
-            db.execute("UPDATE users SET active=0 WHERE id=?", (target["id"],))
-            db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
-            audit(db, "os-admin", "user.disabled", "user", target["id"])
-        print("User disabled and sessions invalidated")
-    elif args.action in ("worker", "worker-once"):
-        from .worker import run_forever
-
-        run_forever(settings, once=args.action == "worker-once")
-    elif args.action == "serve":
-        if args.host not in ("127.0.0.1", "::1") and not args.allow_remote:
-            raise SystemExit("API must bind to loopback; use an approved HTTPS reverse proxy for remote access")
-        import uvicorn
-        from .http_telemetry import logging_config
-
-        workers = max(1, min(args.workers, 16))
-        try:
-            trusted_proxies = forwarded_allow_ips(os.getenv("OPENREPORTING_FORWARDED_ALLOW_IPS", ""))
-        except ValueError:
-            raise SystemExit("OPENREPORTING_FORWARDED_ALLOW_IPS must list exact proxy IP addresses or networks") from None
-        common = {
-            "host": args.host,
-            "port": args.port,
-            "proxy_headers": args.proxy_headers,
-            "forwarded_allow_ips": trusted_proxies if args.proxy_headers else None,
-            "server_header": False,
-            "date_header": True,
-            "timeout_keep_alive": 15,
-            "access_log": False,
-            "log_config": logging_config(),
-        }
-        if workers > 1 and os.name != "nt":
-            # Each worker builds its own app from the same environment.
-            uvicorn.run("openreporting.web:create_app", factory=True, workers=workers, **common)
-        else:
-            from .web import create_app
-
-            uvicorn.run(create_app(settings), workers=1, **common)
-    elif args.action == "doctor":
-        raise SystemExit(doctor(effective(settings), check_integrations=args.check_integrations))
-    elif args.action == "check-ldap":
-        from .directory_auth import authenticate as directory_login, DirectoryUnavailable
-
-        try:
-            result = directory_login(effective(settings), args.username.strip().lower(), getpass.getpass("Directory password: "))
-        except DirectoryUnavailable as exc:
-            raise SystemExit(str(exc)) from None
-        if result is None:
-            raise SystemExit("LDAP authentication or group admission failed")
-        print(f"LDAP authentication and group mapping verified; role={result.role}. No account or session created.")
-    elif args.action == "export-dashboards":
-        export_dashboards(settings, args.directory)
-    elif args.action == "import-dashboards":
-        import_dashboards(settings, args.directory)
-    elif args.action == "verify-audit":
-        with connect(settings) as db:
-            valid, corrupt = verify_audit(db)
-        print("PASS" if valid else f"FAIL at audit ID {corrupt}")
-        if not valid:
-            raise SystemExit(1)
-    elif args.action == "backup":
-        backup(settings, args.target)
+    if stage == "app":
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+        init_db(settings)
+    return command(args, settings)
 
 
 if __name__ == "__main__":

@@ -89,3 +89,19 @@ def test_migration_refuses_without_maintenance_target_or_current_source(tmp_path
     sqlite3.connect(old).execute("PRAGMA user_version=3").connection.close()
     with pytest.raises(pg_migrate.MigrationError, match="şema sürümü"):
         pg_migrate.migrate(old, "postgresql://x", services_stopped=True)
+
+
+def test_every_cli_command_is_dispatched_with_a_safe_stage():
+    # Stage order is a safety property: these commands must never trigger an implicit migration.
+    from openreporting.cli import COMMANDS, build_parser
+
+    assert set(build_parser()._subparsers._group_actions[0].choices) == set(COMMANDS)
+    stages = {name: stage for name, (stage, _) in COMMANDS.items()}
+    assert {n for n, s in stages.items() if s == "raw"} == {"migrate-to-postgres", "worker-health", "verify-backup"}
+    assert {n for n, s in stages.items() if s == "maintenance"} == {
+        "check-postgres",
+        "reset-mfa",
+        "prepare-key-rotation",
+        "rekey-secrets",
+        "prepare-key-retirement",
+    }
