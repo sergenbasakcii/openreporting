@@ -1,6 +1,15 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Rapor hatası bildirimleri**: başarısız çalışma, gönderilemeyen/belirsiz e-posta ve kendini kapatan
+  zamanlamalar (değişiklik, yetki kaybı, hata, kaçırılan pencere) için olay, durumu değiştiren işlemle
+  aynı veritabanı işleminde bir giden kutusuna yazılır; worker rapor sahibine ve zamanlamayı
+  oluşturan/onaylayan yöneticiye e-posta gönderir (etkin, e-postalı, izinli alan adında, bildirimi
+  açık ve raporu görebilen kullanıcılar; sınırlı yeniden deneme; 90 gün saklama). Olaylar Raporlar
+  sayfasında da görünür; Profil'den kapatılabilir. Şema 7.
+- Kalite: ruff lint/biçim kapısı ve dal kapsamı alt sınırı CI'da; tüm Python kodu tek biçimde;
+  kilitleme `lockout.py`'de, MFA onay akışı tek yardımcıda, CLI aşamalı komut tablosunda; kullanıcıya
+  dönen hata mesajları Türkçe; kullanılmayan kod kaldırıldı.
 - `openreporting migrate-to-postgres`: tek sunuculu SQLite kurulumunu boş PostgreSQL'e çevrimdışı taşır.
   Kaynak salt okunur; bütünlük/şema/denetim zinciri ön kontrolü; şema+kopya+doğrulama tek işlemde
   (hata olursa hedef boş kalır); tablo bazında satır sayısı ve sıradan bağımsız içerik özeti, hedefte

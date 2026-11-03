@@ -152,6 +152,7 @@ class _Heartbeat:
 
 
 def _run_locked(settings, once, interval):
+    from .reporting import notifications
     from .reporting import service as dash_reports
     from .runtime_settings import effective
 
@@ -186,6 +187,7 @@ def _run_locked(settings, once, interval):
             if run_id:
                 ran.append(run_id)
                 phase("execute", dash_reports.execute, current, run_id)
+            phase("notifications", notifications.deliver_pending, current)
             if time.monotonic() - last_retention > 3600:
                 last_retention = time.monotonic()
                 phase("retention", dash_reports.apply_retention, current)

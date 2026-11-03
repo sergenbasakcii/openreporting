@@ -110,6 +110,16 @@ uyarı kutusu çıkar ve (rapor ayarında aksi belirtilmedikçe) e-posta gönder
 
 Arşivdeki her dosya indirilirken manifest SHA-256 özeti ve denetim zinciriyle doğrulanır.
 
+### Rapor hatası bildirimleri
+
+Bir rapor çalışması başarısız olduğunda, e-postası gönderilemediğinde veya teslimi belirsiz kaldığında,
+ya da zamanlama kendini kapattığında (rapor/dashboard onaydan sonra değişti, onaylayan yöneticinin
+yetkisi kalmadı, hata, servis kesintisi nedeniyle atlanan çalışma) ilgili kişilere e-posta gider:
+raporun sahibi ile zamanlamayı oluşturan ve onaylayan yönetici. Yalnız etkin, e-posta adresi tanımlı,
+izinli alan adında olan ve raporu hâlâ açabilen kullanıcılar bildirim alır; e-postada rapor verisi
+bulunmaz, yalnız rapor adı, olay ve bağlantı vardır. **Profil → Tercihler** bölümünden kapatılabilir.
+Son 30 günün olayları SMTP kapalı olsa da **Raporlar** sayfasının üstünde listelenir.
+
 ## 7. Yönetim ayarları (yönetici)
 
 - **Sistem ayarları**: E-posta (SMTP), LDAP / Active Directory, Güvenlik, Sorgu ve rapor sınırları,

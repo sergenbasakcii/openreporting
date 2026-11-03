@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .. import dashboards, folder_access
 from ..db import audit, connect, transaction, utcnow
+from . import notifications
 from ..domain import DomainError, canonical, identity, parse_utc, sha, validate_emails
 from ..postgres_store import assert_worker_ownership
 from ..mail_transport import connection as smtp_connection
@@ -93,6 +94,9 @@ def _block_authorization(db, run_id):
         ("Rapor çalıştırma veya zamanlama onay yetkisi artık geçerli değil", utcnow(), run_id),
     )
     audit(db, "worker", "report_run.blocked_authorization", "dash_report_run", run_id)
+    run = db.execute("SELECT report_id,schedule_id FROM dash_report_runs WHERE id=?", (run_id,)).fetchone()
+    if run:
+        notifications.notify(db, "run_blocked", run["report_id"], schedule_id=run["schedule_id"], run_id=run_id)
 
 
 def validate_config(body, settings, principal=None):
@@ -210,6 +214,8 @@ def save_report(settings, user, body, report_id=None):
             )
             disabled = db.execute("UPDATE dash_report_schedules SET enabled=0,updated_at=? WHERE report_id=? AND enabled=1", (now, report_id)).rowcount
             audit(db, user["id"], "report.updated", "dash_report", report_id, {"revision": revision, "schedules_disabled": disabled})
+            if disabled:
+                notifications.notify(db, "schedules_disabled_report_changed", report_id, detail=f"{disabled} zamanlama kapatıldı")
         else:
             report_id = identity()
             revision = 1
@@ -459,6 +465,9 @@ def tick_schedules(settings):
             with connect(settings) as db, transaction(db):
                 db.execute("UPDATE dash_report_schedules SET enabled=0,updated_at=? WHERE id=?", (utcnow(), schedule_id))
                 audit(db, "scheduler", "report_schedule.failed_disabled", "dash_report_schedule", schedule_id, {"error": str(exc)[:300]})
+                owner = db.execute("SELECT report_id FROM dash_report_schedules WHERE id=?", (schedule_id,)).fetchone()
+                if owner:
+                    notifications.notify(db, "schedule_failed_disabled", owner["report_id"], schedule_id=schedule_id)
 
 
 def _tick_one(settings, schedule_id, now):
@@ -471,6 +480,7 @@ def _tick_one(settings, schedule_id, now):
         if now - parse_utc(sched["next_due"]) > timedelta(hours=2):
             # No catch-up storms after downtime: record and move on.
             audit(db, "scheduler", "report_schedule.missed_window", "dash_report_schedule", sched["id"])
+            notifications.notify(db, "schedule_missed_window", sched["report_id"], schedule_id=sched["id"])
             return
         report = db.execute("SELECT * FROM dash_reports WHERE id=?", (sched["report_id"],)).fetchone()
         if report is None:
@@ -478,6 +488,7 @@ def _tick_one(settings, schedule_id, now):
         if not _actor_authorized(db, settings, sched["approved_by"], admin=True):
             db.execute("UPDATE dash_report_schedules SET enabled=0,updated_at=? WHERE id=?", (utcnow(), sched["id"]))
             audit(db, "scheduler", "report_schedule.disabled_authorization", "dash_report_schedule", sched["id"])
+            notifications.notify(db, "schedule_disabled_authorization", sched["report_id"], schedule_id=sched["id"])
             return
         dash = db.execute("SELECT version FROM dashboards WHERE uid=?", (report["dashboard_uid"],)).fetchone()
         if sched["approved_config_sha256"] != report["config_sha256"] or sched["approved_dashboard_version"] != (dash["version"] if dash else None):
@@ -491,6 +502,7 @@ def _tick_one(settings, schedule_id, now):
                 sched["id"],
                 {"report_revision": report["revision"], "dashboard_version": dash["version"] if dash else None},
             )
+            notifications.notify(db, "schedule_disabled_changed", report["id"], schedule_id=sched["id"])
             return
         config = json.loads(report["config_json"])
         start, end = schedule_period(sched["cadence"], sched["timezone"], sched["next_due"], sched["range_mode"], config)
@@ -633,6 +645,7 @@ def execute(settings, run_id):
                 return
             db.execute("UPDATE dash_report_runs SET status='failed',error=?,finished_at=? WHERE id=?", (str(exc)[:500], utcnow(), run_id))
             audit(db, "worker", "report_run.failed", "dash_report_run", run_id)
+            notifications.notify(db, "run_failed", run["report_id"], schedule_id=run["schedule_id"], run_id=run_id, detail=str(exc)[:200])
         return
     recipients = json.loads(run["recipients_json"])
     partial = collected.partial
@@ -694,6 +707,8 @@ def execute(settings, run_id):
     with connect(settings) as db, transaction(db):
         db.execute("UPDATE dash_report_runs SET delivery_status=? WHERE id=?", (status, run_id))
         audit(db, "worker", f"report_delivery.{status}", "dash_report_run", run_id)
+        if status in ("failed", "unknown"):
+            notifications.notify(db, f"delivery_{status}", run["report_id"], schedule_id=run["schedule_id"], run_id=run_id)
 
 
 def send_mail(settings, config, run, files, recipients, partial):

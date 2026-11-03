@@ -259,6 +259,14 @@ def report_runs(report_id: str, request: Request, user=Depends(authenticate)):
     return _visible_deliveries(service.list_runs(settings_of(request), report_id, user=user), user)
 
 
+@router.get("/api/report-notifications")
+def report_notifications(request: Request, limit: int = 50, user=Depends(authenticate)):
+    """Recent pipeline events (failures, disabled schedules) for reports the caller may open."""
+    from ..reporting import notifications
+
+    return notifications.recent_for(settings_of(request), user, limit)
+
+
 @router.get("/api/report-runs")
 def all_runs(request: Request, limit: int = 200, user=Depends(authenticate)):
     return _visible_deliveries(service.list_runs(settings_of(request), None, limit, user=user), user)

@@ -48,6 +48,7 @@ class PreferencesIn(BaseModel):
     theme: str = "dark"
     timezone: str = "browser"
     home_dashboard_uid: str | None = None
+    notify_report_failures: bool = True
 
 
 def _email(value):
@@ -163,12 +164,15 @@ def current_user(request: Request, user=Depends(authenticate)):
                             FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.id=?""",
             (user["id"],),
         ).fetchone()
-        prefs = db.execute("SELECT theme,timezone,home_dashboard_uid FROM user_prefs WHERE user_id=?", (user["id"],)).fetchone()
+        prefs = db.execute("SELECT theme,timezone,home_dashboard_uid,notify_report_failures FROM user_prefs WHERE user_id=?", (user["id"],)).fetchone()
         if prefs and prefs["home_dashboard_uid"]:
             target = db.execute("SELECT folder_id FROM dashboards WHERE uid=?", (prefs["home_dashboard_uid"],)).fetchone()
             if not target or not folder_access.allowed(db, user, target["folder_id"]):
                 prefs = {**dict(prefs), "home_dashboard_uid": None}
-    return {**dict(row), "preferences": dict(prefs) if prefs else {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None}}
+    defaults = {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None, "notify_report_failures": True}
+    preferences = {**defaults, **dict(prefs)} if prefs else defaults
+    preferences["notify_report_failures"] = bool(preferences["notify_report_failures"])
+    return {**dict(row), "preferences": preferences}
 
 
 @router.put("/api/user/preferences")
@@ -189,10 +193,11 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
             except HTTPException:
                 raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı") from None
         db.execute(
-            """INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,updated_at) VALUES(?,?,?,?,?)
-                      ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
-                      home_dashboard_uid=excluded.home_dashboard_uid,updated_at=excluded.updated_at""",
-            (user["id"], body.theme, body.timezone, body.home_dashboard_uid, utcnow()),
+            """INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,notify_report_failures,updated_at)
+                      VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
+                      home_dashboard_uid=excluded.home_dashboard_uid,notify_report_failures=excluded.notify_report_failures,
+                      updated_at=excluded.updated_at""",
+            (user["id"], body.theme, body.timezone, body.home_dashboard_uid, int(body.notify_report_failures), utcnow()),
         )
     return body.model_dump()
 

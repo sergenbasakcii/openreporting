@@ -83,6 +83,17 @@ export function runsTable(runs, { showReport = true } = {}) {
   return table;
 }
 
+// Pipeline problems of the last 30 days (failed runs, disabled schedules); also shown without SMTP.
+function notificationCard(events) {
+  const since = Date.now() - 30 * 86400000;
+  const recent = (events || []).filter((e) => Date.parse(e.created_at) >= since);
+  if (!recent.length) return [];
+  const list = h('ul', { class: 'notification-list' }, recent.map((e) => h('li',
+    h('span', { class: 'badge warn', text: fmtDateTime(e.created_at) }), ' ',
+    h('a', { href: `/reports/${encodeURIComponent(e.report_id)}`, 'data-link': '', text: e.report_name }), ` — ${e.title}`)));
+  return [h('div', { class: 'alert warn', role: 'status' }, h('b', { text: 'Dikkat gerektiren rapor olayları' }), list)];
+}
+
 export async function reportsPage(root, { app }) {
   setBreadcrumbs([{ label: 'Raporlar' }]);
   const canEdit = ['admin', 'editor'].includes(app.user.role);
@@ -91,12 +102,14 @@ export async function reportsPage(root, { app }) {
   let timer = null;
   let stopped = false;
   const draw = async () => {
-    const [reports, runs, schedules] = await Promise.all([get('/api/dash-reports'), get('/api/report-runs?limit=50'), get('/api/report-schedules')]);
+    const [reports, runs, schedules, events] = await Promise.all([get('/api/dash-reports'), get('/api/report-runs?limit=50'), get('/api/report-schedules'),
+      get('/api/report-notifications?limit=10').catch(() => [])]);
     if (stopped) return;
     clear(page);
     page.append(h('div', { class: 'page-header' }, h('div', h('h1', icon('report'), 'Raporlar'),
       h('p', { class: 'sub', text: 'Dashboard’ları PDF / Excel / CSV rapora dönüştürün; host grubu değişkenine göre her host için ayrı bölüm üretin, zamanlayın ve e-postayla gönderin.' })),
     canEdit ? button('Yeni rapor', { icon: 'plus', variant: 'primary', onClick: () => navigate('/reports/new') }) : null));
+    page.append(...notificationCard(events));
     if (!reports.length) {
       page.append(h('div', { class: 'empty-state' }, h('h2', { class: 'section-heading', text: 'Henüz rapor yok' }),
         h('p', { text: 'Bir dashboard seçip rapor tanımı oluşturun. Örnek: "Ağ Operasyon Özeti" dashboard’u, $host değişkenine göre bölümlenmiş haftalık PDF.' }),
