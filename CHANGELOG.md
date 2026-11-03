@@ -1,6 +1,10 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Özgün tema sistemi**: Grafana görünümü yerine OpenReporting görsel dili; Aurora (varsayılan koyu),
+  Porselen (varsayılan açık), Grafit, Kum ve Yüksek kontrast temaları + Sistem. Temaya özgü seri paletleri,
+  profil sayfasında renk örnekli seçici, eski `dark`/`light` tercihleri otomatik dönüştürülür, PDF raporları
+  marka seri renklerini kullanır, her tema CI'da WCAG AA kontrastla test edilir. Teknik belge: `docs/technical/06-themes.md`.
 - **Eklenti sistemi**: izin listeli (`OPENREPORTING_PLUGINS`) veri kaynağı eklentileri (Python giriş noktası
   `openreporting.datasources`) ve panel eklentileri (aynı kökenden ES modülü + isteğe bağlı CSS); `x-` ad alanı,
   hata yalıtımı, Yönetim → Eklentiler durum sayfası, kapatılan eklentinin panelleri korunur; iki örnek eklenti.

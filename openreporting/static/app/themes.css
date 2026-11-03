@@ -1,0 +1,97 @@
+/* OpenReporting design tokens. One block per curated theme; the id lives in static/app/themes.js and
+   openreporting/themes.py. Components only read tokens, so a new theme is one block here + one entry there.
+   data-theme = theme id, data-scheme = dark | light (native controls, charts, print). */
+
+/* ---- shared shape & motion (the "OpenReporting" look: soft radii, layered surfaces) ---- */
+:root {
+  --radius: 6px; --radius-lg: 12px; --radius-pill: 999px;
+  --nav-width: 236px; --topbar-height: 52px;
+  --font-ui: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, "Roboto Mono", monospace;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+/* Aurora — default. Deep ink navy surfaces, teal signal colour, indigo secondary. */
+:root, [data-theme="aurora"] {
+  --bg: #0b1020; --bg-canvas: #0b1020; --bg-panel: #121a2e; --bg-elevated: #18223a; --bg-input: #0e1528;
+  --bg-hover: rgba(148, 178, 255, .07); --bg-active: rgba(45, 212, 191, .13);
+  --border: rgba(148, 178, 255, .11); --border-strong: rgba(148, 178, 255, .22);
+  --text: #d5def0; --text-strong: #f5f8ff; --text-muted: rgba(213, 222, 240, .68); --text-faint: rgba(213, 222, 240, .62);
+  --primary: #0d7d71; --primary-text: #2dd4bf; --primary-hover: #0a675d; --on-primary: #ffffff;
+  --accent: #2dd4bf; --accent-soft: rgba(45, 212, 191, .14); --brand-a: #2dd4bf; --brand-b: #6366f1;
+  --success: #15803d; --success-text: #4ade80; --warning: #fbbf24; --error: #be123c; --error-text: #fb7185;
+  --shadow: 0 12px 32px rgba(2, 6, 23, .6); --panel-shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 6px 18px rgba(2, 6, 23, .35);
+  --scroll: rgba(148, 178, 255, .22); --grid-line: rgba(148, 178, 255, .09);
+  --login-glow: radial-gradient(60% 50% at 20% 0%, rgba(45, 212, 191, .18), transparent 70%), radial-gradient(50% 45% at 90% 10%, rgba(99, 102, 241, .2), transparent 70%);
+  --focus: 0 0 0 2px #0b1020, 0 0 0 4px #2dd4bf;
+  --series: #2dd4bf, #818cf8, #fbbf24, #f472b6, #60a5fa, #a3e635, #fb923c, #c084fc, #22d3ee, #f87171;
+  color-scheme: dark;
+}
+
+/* Porcelain — light companion of Aurora. Warm off-white, ink text, deep teal. */
+[data-theme="porcelain"] {
+  --bg: #f4f3ef; --bg-canvas: #f4f3ef; --bg-panel: #ffffff; --bg-elevated: #ffffff; --bg-input: #ffffff;
+  --bg-hover: rgba(15, 23, 42, .05); --bg-active: rgba(13, 148, 136, .1);
+  --border: rgba(15, 23, 42, .1); --border-strong: rgba(15, 23, 42, .24);
+  --text: #1e2533; --text-strong: #0b1020; --text-muted: rgba(30, 37, 51, .72); --text-faint: rgba(30, 37, 51, .66);
+  --primary: #0f766e; --primary-text: #0f766e; --primary-hover: #115e59; --on-primary: #ffffff;
+  --accent: #0d9488; --accent-soft: rgba(13, 148, 136, .1); --brand-a: #0d9488; --brand-b: #4f46e5;
+  --success: #15803d; --success-text: #15803d; --warning: #b45309; --error: #be123c; --error-text: #be123c;
+  --shadow: 0 12px 30px rgba(15, 23, 42, .14); --panel-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 4px 14px rgba(15, 23, 42, .05);
+  --scroll: rgba(15, 23, 42, .22); --grid-line: rgba(15, 23, 42, .08);
+  --login-glow: radial-gradient(60% 50% at 20% 0%, rgba(13, 148, 136, .14), transparent 70%), radial-gradient(50% 45% at 90% 10%, rgba(79, 70, 229, .12), transparent 70%);
+  --focus: 0 0 0 2px #ffffff, 0 0 0 4px #0d9488;
+  --series: #0d9488, #4f46e5, #d97706, #db2777, #2563eb, #65a30d, #ea580c, #9333ea, #0891b2, #dc2626;
+  color-scheme: light;
+}
+
+/* Graphite — neutral charcoal for control rooms / wall screens, amber signal colour. */
+[data-theme="graphite"] {
+  --bg: #121315; --bg-canvas: #121315; --bg-panel: #1a1c1f; --bg-elevated: #222529; --bg-input: #15171a;
+  --bg-hover: rgba(255, 255, 255, .05); --bg-active: rgba(245, 158, 11, .14);
+  --border: rgba(255, 255, 255, .09); --border-strong: rgba(255, 255, 255, .19);
+  --text: #d9d7d2; --text-strong: #fbfaf7; --text-muted: rgba(217, 215, 210, .68); --text-faint: rgba(217, 215, 210, .62);
+  --primary: #b45309; --primary-text: #fbbf24; --primary-hover: #92400e; --on-primary: #ffffff;
+  --accent: #f59e0b; --accent-soft: rgba(245, 158, 11, .14); --brand-a: #f59e0b; --brand-b: #ef4444;
+  --success: #15803d; --success-text: #4ade80; --warning: #facc15; --error: #b91c1c; --error-text: #f87171;
+  --shadow: 0 12px 32px rgba(0, 0, 0, .6); --panel-shadow: 0 6px 16px rgba(0, 0, 0, .3);
+  --scroll: rgba(255, 255, 255, .2); --grid-line: rgba(255, 255, 255, .08);
+  --login-glow: radial-gradient(60% 50% at 20% 0%, rgba(245, 158, 11, .14), transparent 70%);
+  --focus: 0 0 0 2px #121315, 0 0 0 4px #f59e0b;
+  --series: #f59e0b, #38bdf8, #34d399, #f472b6, #a78bfa, #fb7185, #facc15, #2dd4bf, #e879f9, #94a3b8;
+  color-scheme: dark;
+}
+
+/* Dune — warm light theme for print-like report reading, terracotta signal colour. */
+[data-theme="dune"] {
+  --bg: #f6f0e6; --bg-canvas: #f6f0e6; --bg-panel: #fffbf5; --bg-elevated: #fffdf9; --bg-input: #fffdf9;
+  --bg-hover: rgba(68, 42, 20, .05); --bg-active: rgba(194, 65, 12, .1);
+  --border: rgba(68, 42, 20, .12); --border-strong: rgba(68, 42, 20, .26);
+  --text: #2f2419; --text-strong: #1a120a; --text-muted: rgba(47, 36, 25, .74); --text-faint: rgba(47, 36, 25, .66);
+  --primary: #b3400f; --primary-text: #a33a0c; --primary-hover: #9a3412; --on-primary: #ffffff;
+  --accent: #c2410c; --accent-soft: rgba(194, 65, 12, .1); --brand-a: #ea580c; --brand-b: #0f766e;
+  --success: #3f6212; --success-text: #3f6212; --warning: #a16207; --error: #9f1239; --error-text: #9f1239;
+  --shadow: 0 12px 30px rgba(68, 42, 20, .15); --panel-shadow: 0 1px 2px rgba(68, 42, 20, .07), 0 4px 14px rgba(68, 42, 20, .05);
+  --scroll: rgba(68, 42, 20, .22); --grid-line: rgba(68, 42, 20, .09);
+  --login-glow: radial-gradient(60% 50% at 20% 0%, rgba(234, 88, 12, .13), transparent 70%), radial-gradient(50% 45% at 90% 10%, rgba(15, 118, 110, .1), transparent 70%);
+  --focus: 0 0 0 2px #fffbf5, 0 0 0 4px #c2410c;
+  --series: #c2410c, #0f766e, #7c3aed, #b45309, #be185d, #1d4ed8, #4d7c0f, #a16207, #0e7490, #9f1239;
+  color-scheme: light;
+}
+
+/* Contrast — WCAG AAA-leaning high-contrast dark for accessibility and bright rooms. */
+[data-theme="contrast"] {
+  --bg: #000000; --bg-canvas: #000000; --bg-panel: #0a0a0a; --bg-elevated: #141414; --bg-input: #000000;
+  --bg-hover: rgba(255, 255, 255, .1); --bg-active: rgba(255, 214, 10, .2);
+  --border: rgba(255, 255, 255, .45); --border-strong: rgba(255, 255, 255, .8);
+  --text: #ffffff; --text-strong: #ffffff; --text-muted: #e6e6e6; --text-faint: #d0d0d0;
+  --primary: #ffd60a; --primary-text: #ffd60a; --primary-hover: #ffe347; --on-primary: #000000;
+  --accent: #ffd60a; --accent-soft: rgba(255, 214, 10, .2); --brand-a: #ffd60a; --brand-b: #00e5ff;
+  --success: #00a86b; --success-text: #5cff9d; --warning: #ffd60a; --error: #d00000; --error-text: #ff6b6b;
+  --shadow: 0 0 0 1px #ffffff; --panel-shadow: none;
+  --scroll: rgba(255, 255, 255, .55); --grid-line: rgba(255, 255, 255, .22);
+  --login-glow: none;
+  --focus: 0 0 0 2px #000000, 0 0 0 4px #ffd60a;
+  --series: #ffd60a, #00e5ff, #ff4fd8, #7cff4f, #ff8a00, #b18cff, #ffffff, #ff6b6b, #4fa3ff, #00ffa3;
+  color-scheme: dark;
+}

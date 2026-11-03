@@ -1,4 +1,4 @@
-// Grafana color names, classic palette, thresholds and field config resolution.
+// Named colours (dashboard-JSON compatible), the theme series palette, thresholds and field config resolution.
 export const NAMED = {
   green: '#73BF69', 'dark-green': '#37872D', 'semi-dark-green': '#56A64B', 'light-green': '#96D98D', 'super-light-green': '#C8F2C2',
   yellow: '#FADE2A', 'dark-yellow': '#E0B400', 'semi-dark-yellow': '#F2CC0C', 'light-yellow': '#FFEE52',
@@ -8,9 +8,18 @@ export const NAMED = {
   purple: '#B877D9', 'dark-purple': '#8F3BB8', 'semi-dark-purple': '#A352CC', 'light-purple': '#CA95E5',
   transparent: 'rgba(0,0,0,0)', text: '#ccccdc', white: '#ffffff', black: '#000000',
 };
-export const PALETTE = ['#73BF69', '#F2CC0C', '#8AB8FF', '#FF780A', '#F2495C', '#5794F2', '#B877D9', '#705DA0', '#37872D', '#FADE2A',
+// Extra colours used after the active theme's own series colours run out.
+const CLASSIC = Object.freeze(['#73BF69', '#F2CC0C', '#8AB8FF', '#FF780A', '#F2495C', '#5794F2', '#B877D9', '#705DA0', '#37872D', '#FADE2A',
   '#447EBC', '#C15C17', '#890F02', '#0A437C', '#6D1F62', '#584477', '#B7DBAB', '#F4D598', '#70DBED', '#F9BA8F', '#F29191', '#82B5D8',
-  '#E5A8E2', '#AEA2E0', '#629E51', '#E5AC0E', '#64B0C8', '#E0752D', '#BF1B00', '#0A50A1', '#962D82', '#614D93'];
+  '#E5A8E2', '#AEA2E0', '#629E51', '#E5AC0E', '#64B0C8', '#E0752D', '#BF1B00', '#0A50A1', '#962D82', '#614D93']);
+
+// Live binding: importers always read the active theme's palette (see themes.js syncSeriesPalette).
+export let PALETTE = CLASSIC;
+const SERIES_COLOR = /^#[0-9a-f]{6}$/i;
+export function setPalette(themeColours) {
+  const own = (themeColours || []).filter((c) => SERIES_COLOR.test(c));
+  PALETTE = Object.freeze([...own, ...CLASSIC.filter((c) => !own.includes(c))]);
+}
 
 // Colours come from dashboard JSON and end up in chart options and tooltip markup: only named
 // colours, #hex and rgb()/rgba() are accepted, anything else falls back to the first palette colour.

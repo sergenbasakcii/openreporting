@@ -5,6 +5,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from .. import themes
 from .. import folder_access
 from ..db import audit, connect, transaction, utcnow
 from ..security import authenticate, create_user, password_hash, reauthenticate
@@ -45,7 +46,7 @@ class MfaReset(ReauthBody):
 
 
 class PreferencesIn(BaseModel):
-    theme: str = "dark"
+    theme: str = themes.DEFAULT_PREFERENCE
     timezone: str = "browser"
     home_dashboard_uid: str | None = None
     notify_report_failures: bool = True
@@ -173,15 +174,17 @@ def current_user(request: Request, user=Depends(authenticate)):
             target = db.execute("SELECT folder_id FROM dashboards WHERE uid=?", (prefs["home_dashboard_uid"],)).fetchone()
             if not target or not folder_access.allowed(db, user, target["folder_id"]):
                 prefs = {**dict(prefs), "home_dashboard_uid": None}
-    defaults = {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None, "notify_report_failures": True}
+    defaults = {"theme": themes.DEFAULT_PREFERENCE, "timezone": "browser", "home_dashboard_uid": None, "notify_report_failures": True}
     preferences = {**defaults, **dict(prefs)} if prefs else defaults
+    preferences["theme"] = themes.normalise(preferences["theme"]) or themes.DEFAULT_PREFERENCE
     preferences["notify_report_failures"] = bool(preferences["notify_report_failures"])
     return {**dict(row), "preferences": preferences}
 
 
 @router.put("/api/user/preferences")
 def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewer_write)):
-    if body.theme not in ("dark", "light", "system"):
+    theme = themes.normalise(body.theme)
+    if theme is None:
         raise HTTPException(422, "Geçersiz tema")
     if body.timezone not in ("browser", "utc"):
         try:
@@ -201,9 +204,9 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
                       VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
                       home_dashboard_uid=excluded.home_dashboard_uid,notify_report_failures=excluded.notify_report_failures,
                       updated_at=excluded.updated_at""",
-            (user["id"], body.theme, body.timezone, body.home_dashboard_uid, int(body.notify_report_failures), utcnow()),
+            (user["id"], theme, body.timezone, body.home_dashboard_uid, int(body.notify_report_failures), utcnow()),
         )
-    return body.model_dump()
+    return {**body.model_dump(), "theme": theme}
 
 
 @router.put("/api/user/password")

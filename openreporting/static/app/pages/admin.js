@@ -3,6 +3,7 @@ import { h, button, input, select, field, toggle, toast, modal, confirmDialog, f
 import { icon } from '../icons.js';
 import { get, post, put, patch } from '../api.js';
 import { setBreadcrumbs } from '../router.js';
+import { THEMES, SYSTEM, normalisePreference, resolveTheme, themeSwatch } from '../themes.js';
 
 const ROLE_LABELS = { admin: 'Yönetici', editor: 'Editör', viewer: 'İzleyici' };
 const roleOptions = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -145,6 +146,29 @@ export async function auditPage(root) {
   await draw();
 }
 
+// Radio group of theme cards (arrow keys move between options, like native radios).
+function themePicker(current, onPick) {
+  const options = [...THEMES.map((t) => ({ ...t, value: t.id })),
+    { value: SYSTEM, name: 'Sistem', description: 'İşletim sisteminin açık/koyu ayarına göre Aurora veya Porselen.', swatch: [...resolveTheme('aurora').swatch.slice(0, 2), ...resolveTheme('porcelain').swatch.slice(0, 2)] }];
+  let selected = current;
+  const cards = options.map((t) => h('button', { type: 'button', class: 'theme-option', role: 'radio', 'aria-checked': String(t.value === selected), tabindex: t.value === selected ? '0' : '-1',
+    onClick: () => pick(t.value) }, themeSwatch(t, h), h('b', { text: t.name }), h('span', { class: 'hint', text: t.description })));
+  function pick(value) {
+    selected = value;
+    cards.forEach((card, i) => { const on = options[i].value === value; card.setAttribute('aria-checked', String(on)); card.tabIndex = on ? 0 : -1; });
+    onPick(value);
+  }
+  const group = h('div', { class: 'theme-grid', role: 'radiogroup', 'aria-label': 'Tema', onKeydown: (e) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const next = (options.findIndex((t) => t.value === selected) + step + options.length) % options.length;
+    pick(options[next].value);
+    cards[next].focus();
+  } }, cards);
+  return h('div', { class: 'field' }, h('span', { class: 'field-label', text: 'Tema' }), group);
+}
+
 export async function profilePage(root, { app, applyTheme }) {
   setBreadcrumbs([{ label: 'Profil' }]);
   const me = await get('/api/user');
@@ -156,7 +180,7 @@ export async function profilePage(root, { app, applyTheme }) {
   root.append(h('div', { class: 'page' }, h('div', { class: 'page-header' }, h('div', h('h1', icon('user'), me.display_name || me.username), h('p', { class: 'sub', text: `${ROLE_LABELS[me.role] || me.role} · son giriş ${fmtDateTime(me.last_login_at)}` }))),
     h('div', { class: 'split-2' },
       h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Tercihler' }),
-        field('Tema', select([{ value: 'dark', label: 'Koyu' }, { value: 'light', label: 'Açık' }, { value: 'system', label: 'Sistem' }], prefs.theme || 'dark', (v) => { prefs.theme = v; applyTheme(v); })),
+        themePicker(normalisePreference(prefs.theme), (v) => { prefs.theme = v; applyTheme(v); }),
         field('Saat dilimi', select([{ value: 'browser', label: 'Tarayıcı' }, { value: 'utc', label: 'UTC' }, { value: 'Europe/Istanbul', label: 'Europe/Istanbul' }], prefs.timezone || 'browser', (v) => { prefs.timezone = v; })),
         field('Ana sayfa dashboard’u', select([{ value: '', label: 'Varsayılan ana sayfa' }, ...dashboards.map((d) => ({ value: d.uid, label: d.title }))], prefs.home_dashboard_uid || '', (v) => { prefs.home_dashboard_uid = v || null; })),
         h('div', { class: 'field' }, toggle('Raporlarım başarısız olunca veya zamanlaması kapanınca e-posta al', prefs.notify_report_failures !== false, (on) => { prefs.notify_report_failures = on; }),

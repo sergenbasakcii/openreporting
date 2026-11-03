@@ -5,20 +5,25 @@ import { get, post, setCsrf, onUnauthorized, refreshCsrf } from './api.js';
 import { route, startRouter, navigate, setCrumbHost, render, teardown } from './router.js';
 import { enrollmentPage } from './mfa.js';
 import { loadPlugins } from './plugins.js';
+import { applyThemeToDocument, resolveTheme, oppositeTheme, normalisePreference, SYSTEM } from './themes.js';
 
 const app = { user: null, prefs: null, settings: null, pendingDashboard: null };
 const NAV_KEY = 'openreporting.nav.collapsed';
 const THEME_KEY = 'openreporting.theme';
 
-function applyTheme(theme) {
-  const resolved = theme === 'system' ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : (theme || 'dark');
-  document.documentElement.dataset.theme = resolved;
-  try { localStorage.setItem(THEME_KEY, theme || 'dark'); } catch { /* ignore */ }
-  window.dispatchEvent(new CustomEvent('openreporting:themechange', { detail: resolved }));
+// A preference is a theme id or 'system' (follows the OS light/dark setting).
+function applyTheme(preference) {
+  const pref = normalisePreference(preference);
+  const theme = applyThemeToDocument(resolveTheme(pref).id);
+  try { localStorage.setItem(THEME_KEY, pref); } catch { /* storage may be blocked */ }
+  window.dispatchEvent(new CustomEvent('openreporting:themechange', { detail: theme.id }));
 }
-try { applyTheme(localStorage.getItem(THEME_KEY) || 'dark'); } catch { applyTheme('dark'); }
+function storedTheme() {
+  try { return localStorage.getItem(THEME_KEY); } catch { return null; }
+}
+applyTheme(storedTheme() || SYSTEM);
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
-  try { if (localStorage.getItem(THEME_KEY) === 'system') applyTheme('system'); } catch { /* ignore */ }
+  if (normalisePreference(storedTheme() || SYSTEM) === SYSTEM) applyTheme(SYSTEM);
 });
 
 function loginPage(root) {
@@ -86,8 +91,8 @@ function shell(root) {
     h('div', { class: 'who' }, h('b', { text: app.user.display_name || app.user.username }), h('span', { text: { admin: 'Yönetici', editor: 'Editör', viewer: 'İzleyici' }[app.user.role] || app.user.role })),
     button('', { icon: 'dots', variant: 'ghost', size: 'sm', title: 'Hesap', onClick: (e) => menu(e.currentTarget, [
       { label: 'Profil ve tercihler', icon: 'user', onClick: () => navigate('/profile') },
-      { label: document.documentElement.dataset.theme === 'dark' ? 'Açık tema' : 'Koyu tema', icon: document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',
-        onClick: () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark') },
+      { label: document.documentElement.dataset.scheme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç', icon: document.documentElement.dataset.scheme === 'dark' ? 'sun' : 'moon',
+        onClick: () => applyTheme(oppositeTheme(document.documentElement.dataset.theme)) },
       { sep: true },
       { label: 'Çıkış yap', icon: 'logout', onClick: async () => { try { await post('/api/logout'); } finally { setCsrf(''); location.href = '/'; } } },
     ]) }));

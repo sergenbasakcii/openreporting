@@ -2,13 +2,15 @@
 export function preparePreviewWindow(win) {
   if (!win) return;
   const rootStyle = getComputedStyle(document.documentElement);
-  const theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  const theme = document.documentElement.dataset.theme || 'aurora';
+  const scheme = document.documentElement.dataset.scheme === 'light' ? 'light' : 'dark';
   win.opener = null;
   const doc = win.document;
   doc.title = 'Önizleme hazırlanıyor…';
   doc.documentElement.lang = 'tr';
   doc.documentElement.dataset.theme = theme;
-  doc.documentElement.style.colorScheme = theme;
+  doc.documentElement.dataset.scheme = scheme;
+  doc.documentElement.style.colorScheme = scheme;
   doc.documentElement.style.backgroundColor = rootStyle.getPropertyValue('--bg').trim();
   doc.body.style.backgroundColor = rootStyle.getPropertyValue('--bg').trim();
   doc.body.style.color = rootStyle.getPropertyValue('--text').trim();

@@ -6,10 +6,10 @@ from collections import OrderedDict
 from reportlab.lib.colors import HexColor
 
 from .extended_pdf import numeric, table_data
-from .fieldcfg import reduced_items, contrast
+from .fieldcfg import SERIES as PALETTE  # same brand series as the other report charts
+from .fieldcfg import contrast, reduced_items
 
 TYPES = {"waterfall", "funnel", "treemap", "sunburst", "rosepie", "parallel"}
-PALETTE = ("#5794f2", "#73bf69", "#ff9830", "#b877d9", "#f2495c")
 
 
 def waterfall_steps(values):

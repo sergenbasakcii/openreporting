@@ -38,7 +38,10 @@ NAMED = {
     "black": "#000000",
     "transparent": "#FFFFFF",
 }
-PALETTE = [
+# Reports are printed on white: the Porcelain theme's series colours first (see static/app/themes.css),
+# then the classic colours for long legends.
+SERIES = ["#0d9488", "#4f46e5", "#d97706", "#db2777", "#2563eb", "#65a30d", "#ea580c", "#9333ea", "#0891b2", "#dc2626"]
+CLASSIC = [
     "#73BF69",
     "#F2CC0C",
     "#8AB8FF",
@@ -60,6 +63,7 @@ PALETTE = [
     "#70DBED",
     "#F9BA8F",
 ]
+PALETTE = SERIES + [c for c in CLASSIC if c not in SERIES]
 DEFAULT_THRESHOLDS = {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "red", "value": 80}]}
 
 PANEL_DEFAULTS = {

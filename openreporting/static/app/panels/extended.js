@@ -2,6 +2,7 @@
 import { chartTheme, initChart, noData, reducedValues, reduce, minOf, maxOf, timeAxisLabel } from './common.js';
 import { formatValue, resolveUnit } from '../units.js';
 import { render as renderTimeSeries } from './timeseries.js';
+import { PALETTE, cssVar } from '../colors.js';
 
 const finite = v => typeof v === 'number' && Number.isFinite(v);
 // Dates follow the dashboard time zone like the other panels ('browser' = local).
@@ -92,7 +93,7 @@ export function extendedOption(frames, panel, tz) {
  }
  if(type==='waterfall') {
   if(!items.length)return null;let total=0;const steps=items.map((i,index)=>{const from=total;total+=i.value;return[index,from,total];});
-  return {...axis,yAxis:{type:'value',min:Math.min(0,minOf(steps.flatMap(s=>s.slice(1)))),max:Math.max(0,maxOf(steps.flatMap(s=>s.slice(1))))},series:[{type:'custom',data:steps,renderItem:(params,api)=>{const start=api.coord([api.value(0),api.value(1)]),end=api.coord([api.value(0),api.value(2)]),width=api.size([1,0])[0]*.6;return{type:'rect',shape:{x:start[0]-width/2,y:Math.min(start[1],end[1]),width,height:Math.max(1,Math.abs(end[1]-start[1]))},style:{fill:api.value(2)>=api.value(1)?'#73bf69':'#f2495c'}};}}]};
+  return {...axis,yAxis:{type:'value',min:Math.min(0,minOf(steps.flatMap(s=>s.slice(1)))),max:Math.max(0,maxOf(steps.flatMap(s=>s.slice(1))))},series:[{type:'custom',data:steps,renderItem:(params,api)=>{const start=api.coord([api.value(0),api.value(1)]),end=api.coord([api.value(0),api.value(2)]),width=api.size([1,0])[0]*.6;return{type:'rect',shape:{x:start[0]-width/2,y:Math.min(start[1],end[1]),width,height:Math.max(1,Math.abs(end[1]-start[1]))},style:{fill:api.value(2)>=api.value(1)?(cssVar('--success-text')||'#4ade80'):(cssVar('--error-text')||'#fb7185')}};}}]};
  }
  return null;
 }
@@ -121,6 +122,6 @@ export function renderExtended(container,frames,panel,ctx={}){
  if(option.calendar)option.calendar={...option.calendar,dayLabel:{color:theme.text},monthLabel:{color:theme.text},yearLabel:{color:theme.text}};
  option.series=option.series.map(s=>({...s,label:{...s.label,color:theme.text}}));
  const box=document.createElement('div');box.className='viz-chart';box.style.height='100%';container.replaceChildren(box);const chart=initChart(box);
- chart.setOption({animation:false,color:['#5794f2','#73bf69','#ff9830','#b877d9','#f2495c'],textStyle:{color:theme.text},grid:{left:50,right:25,top:30,bottom:50,containLabel:true},tooltip:{trigger:'item',confine:true,renderMode:'richText',backgroundColor:theme.tooltipBg,borderColor:theme.border,textStyle:{color:theme.text},valueFormatter:fmt},...option},true);
+ chart.setOption({animation:false,color:PALETTE.slice(0,10),textStyle:{color:theme.text},grid:{left:50,right:25,top:30,bottom:50,containLabel:true},tooltip:{trigger:'item',confine:true,renderMode:'richText',backgroundColor:theme.tooltipBg,borderColor:theme.border,textStyle:{color:theme.text},valueFormatter:fmt},...option},true);
  return{chart,resize(){chart.resize();},destroy(){chart.dispose();},png(){return chart.getDataURL({type:'png',pixelRatio:2,backgroundColor:theme.bg});}};
 }

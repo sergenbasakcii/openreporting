@@ -10,6 +10,7 @@ API'yi, güvenlik kurallarını ve testleri anlatır. Kurulum ve işletim rehber
 | 03 | [Dashboard sürüm farkı](03-dashboard-version-diff.md) | Okunur yapısal fark, onay akışı |
 | 04 | [REST API ve API anahtarları](04-api-and-tokens.md) | Servis hesapları, Bearer anahtar, OpenAPI |
 | 05 | [Eklenti sistemi](05-plugins.md) | Veri kaynağı (Python entry point) ve panel (ES modülü) eklentileri |
+| 06 | [Tema sistemi ve görsel kimlik](06-themes.md) | Beş özgün tema, token mimarisi, WCAG kontrast testi |
 
 ## İlgili belgeler
 
