@@ -33,6 +33,12 @@ def _sql_quote(value):
     return "'" + text.replace("'", "''") + "'"
 
 
+def _sql_quote_escaped(value):
+    # ClickHouse and Spark/Databricks SQL treat backslash as an escape inside string literals.
+    text = str(value).replace("\x00", "")
+    return "'" + text.replace("\\", "\\\\").replace("'", "''") + "'"
+
+
 def format_values(values, fmt, *, multi=False, name=""):
     if fmt == "promql":
         # A regex value inside a double-quoted PromQL/LogQL label matcher.
@@ -58,6 +64,12 @@ def format_values(values, fmt, *, multi=False, name=""):
         return json.dumps(values if multi or len(values) != 1 else values[0], ensure_ascii=False)
     if fmt == "sqlstring":
         return ",".join(_sql_quote(v) for v in values) if values else "NULL"
+    if fmt == "sqlstring_escaped":
+        return ",".join(_sql_quote_escaped(v) for v in values) if values else "NULL"
+    if fmt == "influxregex":
+        # Inside an InfluxQL /regex/ literal: escape regex syntax and the delimiter.
+        escaped = [re.escape(v).replace("/", r"\/") for v in values]
+        return escaped[0] if len(escaped) == 1 else "(" + "|".join(escaped) + ")"
     if fmt == "doublequote":
         return ",".join('"' + v.replace('"', '\\"') + '"' for v in values)
     if fmt == "singlequote":
@@ -76,7 +88,13 @@ def format_values(values, fmt, *, multi=False, name=""):
 
 
 # Formats that keep a value inert inside the datasource's own syntax.
-SAFE_FORMATS = {"sqlstring": {"sqlstring"}, "zabbix": {"zabbix", "regex", "csv", "pipe", "text", "json", "glob"}}
+SAFE_FORMATS = {
+    "sqlstring": {"sqlstring"},
+    "sqlstring_escaped": {"sqlstring_escaped"},
+    "influxregex": {"influxregex"},
+    "lucene": {"lucene"},
+    "zabbix": {"zabbix", "regex", "csv", "pipe", "text", "json", "glob"},
+}
 
 
 def validate_promql_variables(text, variables, builtins):

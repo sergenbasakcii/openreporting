@@ -13,6 +13,8 @@ from .testdata import SCENARIOS, TestDataSource
 from .zabbix import ZabbixDataSource, validate_url
 
 from .http_sources import PrometheusDataSource, LokiDataSource, JSONDataSource, CSVDataSource, validate_http_url
+from .search_tsdb import ElasticsearchDataSource, GraphiteDataSource, InfluxDBDataSource
+from .sql_engines import ClickHouseDataSource, DatabricksDataSource, TrinoDataSource
 
 TYPES = {
     "prometheus": PrometheusDataSource,
@@ -22,7 +24,15 @@ TYPES = {
     "zabbix": ZabbixDataSource,
     "postgres": PostgresDataSource,
     "testdata": TestDataSource,
+    "trino": TrinoDataSource,
+    "databricks": DatabricksDataSource,
+    "clickhouse": ClickHouseDataSource,
+    "elasticsearch": ElasticsearchDataSource,
+    "influxdb": InfluxDBDataSource,
+    "graphite": GraphiteDataSource,
 }
+# Built-in sources whose class validates its own json_data (validate_config classmethod).
+SELF_VALIDATING = ("trino", "databricks", "clickhouse", "elasticsearch", "influxdb", "graphite")
 TYPE_INFO = [
     {"type": "zabbix", "name": "Zabbix", "description": "Zabbix API: host grupları, hostlar, item'lar, history/trend, problemler", "secure_fields": ["token"]},
     {
@@ -40,6 +50,17 @@ TYPE_INFO += [
         ("loki", "Loki", "LogQL log ve metrik sorguları"),
         ("httpjson", "HTTP JSON", "REST uç noktasından tablo"),
         ("csv", "HTTP CSV", "CSV uç noktasından tablo"),
+    ]
+]
+TYPE_INFO += [
+    {"type": kind, "name": name, "description": description, "secure_fields": secure, "category": category}
+    for kind, name, description, secure, category in [
+        ("trino", "Veri gölü · Trino / Presto / Starburst", "Hive, Iceberg, Delta Lake ve S3/HDFS tabloları SQL ile", ["password", "token"], "lake"),
+        ("databricks", "Lakehouse · Databricks SQL", "Databricks SQL warehouse; Unity Catalog / Delta tabloları", ["token"], "lake"),
+        ("clickhouse", "ClickHouse", "Sütun tabanlı analitik veritabanı (sunucuda salt-okunur)", ["password"], "sql"),
+        ("elasticsearch", "Elasticsearch / OpenSearch", "Log arama, Lucene sorgusu, tarih histogramı metrikleri", ["password", "token"], "logs"),
+        ("influxdb", "InfluxDB", "InfluxQL zaman serileri (1.x, 2.x uyumluluk, 3.x)", ["password", "token"], "metrics"),
+        ("graphite", "Graphite", "Graphite render API hedefleri ve fonksiyonları", ["password", "token"], "metrics"),
     ]
 ]
 SECURE_FIELDS = {t["type"]: t["secure_fields"] for t in TYPE_INFO}
@@ -144,6 +165,10 @@ def validate(kind, url, json_data, settings):
         clean["timeout_ms"] = max(1000, min(_int(data, "timeout_ms", 30000), 300000))
         clean["max_rows"] = max(1, min(_int(data, "max_rows", 200000), 1_000_000))
         url = f"{clean['host']}:{clean['port']}/{clean['database']}"
+    elif kind in SELF_VALIDATING:
+        url, extra = TYPES[kind].validate_config(url, data, settings)
+        clean.update(extra)
+        clean["ca_pem"] = _pem(data.get("ca_pem", ""))
     elif kind.startswith("x-"):
         return _validate_plugin(kind, url, data, settings)
     else:

@@ -86,19 +86,40 @@ class SafeHTTP(http.client.HTTPConnection):
         safe_peer(self.sock.getpeername()[0], self.allow_loopback)
 
 
+def clean_header(value, what="erişim bilgisi"):
+    """Header values come from admin config/secrets: refuse control characters (header injection)."""
+    value = str(value)
+    if any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise DataSourceError(f"Geçersiz {what}")
+    return value
+
+
 class HTTPSource(DataSource):
-    def fetch(self, suffix="", params=None):
+    def auth_headers(self):
+        """Default: optional bearer token. Sources with other schemes override this."""
+        token = self.secure.get("token")
+        return {"Authorization": "Bearer " + clean_header(token, "erişim anahtarı")} if token else {}
+
+    def same_origin_path(self, url):
+        """Follow-up URL returned by the server (paging, async results): must stay on the saved origin."""
+        base = urlsplit(validate_http_url(self.url, self.settings.allow_http_datasources))
+        target = urlsplit(url)
+        if (target.scheme, target.hostname, target.port) != (base.scheme, base.hostname, base.port) or target.username or target.password:
+            raise DataSourceError("Kaynak başka bir adrese yönlendirdi; izlenmedi")
+        return target.path + ("?" + target.query if target.query else "")
+
+    def fetch(self, suffix="", params=None, *, method="GET", body=None, headers=None, raw_path=None, ok=(200,)):
         base = urlsplit(validate_http_url(self.url, self.settings.allow_http_datasources))
         # Targets cannot choose a URL, host or path; only the saved admin origin is used.
-        path = base.path.rstrip("/") + suffix if suffix else base.path
-        if params:
-            path += "?" + urlencode(params)
-        headers = {"Accept": "application/json,text/csv", "Accept-Encoding": "identity"}
-        token = self.secure.get("token")
-        if token:
-            if any(ord(c) < 32 for c in token):
-                raise DataSourceError("Geçersiz erişim anahtarı")
-            headers["Authorization"] = "Bearer " + token
+        if raw_path is not None:
+            path = raw_path
+        else:
+            path = base.path.rstrip("/") + suffix if suffix else base.path
+            if params:
+                path += "?" + urlencode(params)
+        headers = {"Accept": "application/json,text/csv", "Accept-Encoding": "identity", **self.auth_headers(), **(headers or {})}
+        if isinstance(body, str):
+            body = body.encode("utf-8")
         cls = SafeHTTPS if base.scheme == "https" else SafeHTTP
         kwargs = {"timeout": self.options.get("timeout", 30)}
         if base.scheme == "https":
@@ -111,10 +132,10 @@ class HTTPSource(DataSource):
         # The socket timeout is per operation; a slow-drip server is bounded by a total deadline too.
         deadline = time.monotonic() + float(kwargs["timeout"]) * 2
         try:
-            conn.request("GET", path or "/", headers=headers)
+            conn.request(method, path or "/", body=body, headers=headers)
             response = conn.getresponse()
-            if response.status != 200:
-                raise DataSourceError(f"Veri kaynağı HTTP {response.status}; yönlendirme izlenmez")
+            if response.status not in ok:
+                raise DataSourceError(self.http_error(response))
             chunks, size = [], 0
             while True:
                 if time.monotonic() > deadline:
@@ -133,6 +154,12 @@ class HTTPSource(DataSource):
             raise DataSourceError("Veri kaynağı okunamadı; bağlantı, TLS ve yanıt biçimini kontrol edin") from None
         finally:
             conn.close()
+
+    def http_error(self, response):
+        # Only the status is shown: response bodies can echo credentials or internal details.
+        if response.status in (401, 403):
+            return f"Veri kaynağı erişimi reddetti (HTTP {response.status}); kullanıcı/anahtar ve yetkileri kontrol edin"
+        return f"Veri kaynağı HTTP {response.status}; yönlendirme izlenmez"
 
     def health(self):
         if self.type in ("httpjson", "csv"):

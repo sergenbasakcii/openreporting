@@ -123,7 +123,22 @@ def _column(arg):
     return arg
 
 
-def expand_macros(sql, start, end, interval_s):
+# Per-dialect SQL for the shared time macros. "{iso}" is an ISO-8601 UTC instant, "{c}" a validated
+# column name and "{s}" a positive integer number of seconds.
+DIALECTS = {
+    "postgres": {"ts": "'{iso}'::timestamptz", "group": "to_timestamp(floor(extract(epoch from {c})/{s})*{s})", "interval": "'{s} seconds'::interval"},
+    "trino": {"ts": "from_iso8601_timestamp('{iso}')", "group": "from_unixtime(floor(to_unixtime({c})/{s})*{s})", "interval": "INTERVAL '{s}' SECOND"},
+    "clickhouse": {
+        "ts": "parseDateTime64BestEffort('{iso}', 3, 'UTC')",
+        "group": "toStartOfInterval({c}, INTERVAL {s} SECOND)",
+        "interval": "INTERVAL {s} SECOND",
+    },
+    "databricks": {"ts": "to_timestamp('{iso}')", "group": "timestamp_seconds(floor(unix_timestamp({c})/{s})*{s})", "interval": "INTERVAL {s} SECONDS"},
+}
+
+
+def expand_macros(sql, start, end, interval_s, dialect="postgres"):
+    d = DIALECTS[dialect]
     frm, to = start.timestamp(), end.timestamp()
     iso_from = start.astimezone(timezone.utc).isoformat()
     iso_to = end.astimezone(timezone.utc).isoformat()
@@ -139,14 +154,14 @@ def expand_macros(sql, start, end, interval_s):
         parts = [p.strip() for p in args.split(",")] if args is not None else []
         if name == "timeFilter":
             column = _column(parts[0] if parts else "time")
-            return f"{column} BETWEEN '{iso_from}'::timestamptz AND '{iso_to}'::timestamptz"
+            return f"{column} BETWEEN {d['ts'].format(iso=iso_from)} AND {d['ts'].format(iso=iso_to)}"
         if name == "unixEpochFilter":
             column = _column(parts[0] if parts else "clock")
             return f"{column} >= {int(frm)} AND {column} < {int(math.ceil(to))}"
         if name in ("timeGroup", "timeGroupAlias"):
             column = _column(parts[0] if parts else "time")
             seconds = interval_arg(parts[1] if len(parts) > 1 else "")
-            expr = f"to_timestamp(floor(extract(epoch from {column})/{seconds})*{seconds})"
+            expr = d["group"].format(c=column, s=seconds)
             return expr + (' AS "time"' if name == "timeGroupAlias" else "")
         if name in ("unixEpochGroup", "unixEpochGroupAlias"):
             column = _column(parts[0] if parts else "clock")
@@ -154,16 +169,16 @@ def expand_macros(sql, start, end, interval_s):
             expr = f"(floor({column}/{seconds})*{seconds})"
             return expr + (' AS "time"' if name == "unixEpochGroupAlias" else "")
         if name == "timeFrom":
-            return f"'{iso_from}'::timestamptz"
+            return d["ts"].format(iso=iso_from)
         if name == "timeTo":
-            return f"'{iso_to}'::timestamptz"
+            return d["ts"].format(iso=iso_to)
         if name == "unixEpochFrom":
             return str(int(frm))
         if name == "unixEpochTo":
             return str(int(math.ceil(to)))
         if name == "interval_s":
             return str(max(1, int(interval_s)))
-        return f"'{max(1, int(interval_s))} seconds'::interval"
+        return d["interval"].format(s=max(1, int(interval_s)))
 
     # Expand macros only in SQL code, never inside string literals produced by
     # variable interpolation (a value containing "$__timeFrom" stays literal).

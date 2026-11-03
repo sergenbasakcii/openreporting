@@ -132,7 +132,7 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 8
+CURRENT_VERSION = 9
 
 # Each migration is a tuple of complete statements, executed in one transaction.
 # Only the initial schema is split here; later migrations may contain triggers or
@@ -229,6 +229,21 @@ POSTGRES_MIGRATIONS[8] = postgres_store.widen_integers(
         "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
         f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK({_PLUGIN_TYPES})",
     )
+)
+
+# More built-in datasource types (data lake, search, time-series stores).
+_SOURCE_TYPES_V4 = _SOURCE_TYPES + ",'trino','databricks','clickhouse','elasticsearch','influxdb','graphite'"
+_PLUGIN_TYPES_V4 = f"type IN ({_SOURCE_TYPES_V4}) OR type LIKE 'x-%'"
+_source_schema_v4 = _source_schema_v3.replace("datasources_v3(", "datasources_v4(", 1).replace(_PLUGIN_TYPES, _PLUGIN_TYPES_V4)
+MIGRATIONS[9] = (
+    _source_schema_v4,
+    "INSERT INTO datasources_v4 SELECT * FROM datasources",
+    "DROP TABLE datasources",
+    "ALTER TABLE datasources_v4 RENAME TO datasources",
+)
+POSTGRES_MIGRATIONS[9] = (
+    "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
+    f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK({_PLUGIN_TYPES_V4})",
 )
 
 

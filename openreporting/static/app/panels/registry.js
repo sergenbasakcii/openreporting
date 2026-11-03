@@ -124,7 +124,7 @@ export const PLUGINS = {
   },
 };
 
-for (const [type, name] of Object.entries(EXTRA_NAMES)) PLUGINS[type] = { name, icon: 'chart-bar', render: renderExtended, defaults: { options: { reduceOptions: { calcs: ['lastNotNull'] }, bins: 10 }, fieldConfig: { defaults: { unit: 'auto' }, overrides: [] } }, sections: type === 'histogram' ? [{ title: 'Histogram', items: [{ path: 'options.bins', label: 'Aralık sayısı', type: 'number', min: 1, max: 50, default: 10 }] }] : [] };
+for (const [type, name] of Object.entries(EXTRA_NAMES)) PLUGINS[type] = { name, icon: `viz-${type}`, render: renderExtended, defaults: { options: { reduceOptions: { calcs: ['lastNotNull'] }, bins: 10 }, fieldConfig: { defaults: { unit: 'auto' }, overrides: [] } }, sections: type === 'histogram' ? [{ title: 'Histogram', items: [{ path: 'options.bins', label: 'Aralık sayısı', type: 'number', min: 1, max: 50, default: 10 }] }] : [] };
 
 export const ORDER = ['timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'statusgrid', 'statetimeline', 'text', ...Object.keys(EXTRA_NAMES)];
 export const CALC_OPTIONS = calcOptions;

@@ -128,6 +128,8 @@ export function timePicker({ range, timezone, onChange, getResolved, compact = f
     setTimeout(() => fromIn.focus(), 10);
   };
   const trigger = button('', { icon: 'clock', onClick: open, title: 'Zaman aralığı' });
+  // Icon + text button: drop the fixed square width of icon-only buttons.
+  trigger.classList.remove('icon');
   trigger.append(label);
   update(range);
   if (!compact) wrap.append(button('', { icon: 'chevron-left', title: 'Geri kaydır', onClick: () => shift(-1) }));
@@ -149,6 +151,7 @@ export function refreshPicker({ value, onRefresh, onInterval }) {
       closePopups(); label.textContent = iv; name(iv); onInterval(iv);
     } })), { align: 'right' });
   } });
+  pick.classList.remove('icon');
   pick.prepend(label);
   // The visible interval is part of the accessible name (WCAG 2.5.3 label in name).
   const name = (v) => pick.setAttribute('aria-label', v ? `${v} otomatik yenileme` : 'Otomatik yenileme');

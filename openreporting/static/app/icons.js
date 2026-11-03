@@ -1,4 +1,6 @@
 // Inline stroke icons (static, trusted markup only).
+import { VIZ_ICONS } from './viz-icons.js';
+
 const P = {
   home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
   apps: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
@@ -61,6 +63,7 @@ const P = {
   'arrow-up': '<path d="M12 19V5M6 11l6-6 6 6"/>', 'arrow-down': '<path d="M12 5v14M6 13l6 6 6-6"/>',
   import: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>', panel: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>',
   row: '<path d="M3 6h18M3 12h18"/><rect x="3" y="15" width="18" height="6" rx="1"/>', key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>',
+  ...VIZ_ICONS,
 };
 
 export function icon(name, cls = '') {

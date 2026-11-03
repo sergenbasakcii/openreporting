@@ -81,7 +81,7 @@ function shell(root) {
       navItem('/datasources', 'Veri kaynakları', 'database', '^/datasources'),
       navItem('/admin/users', 'Kullanıcılar', 'users', '^/admin/users'),
       navItem('/admin/settings', 'Sistem ayarları', 'settings', '^/admin/settings'),
-      navItem('/admin/api-keys', 'API anahtarları', 'key', '^/admin/(api-keys|api)$'),
+      navItem('/admin/api', 'API', 'code', '^/admin/(api-keys|api)$'),
       navItem('/admin/plugins', 'Eklentiler', 'layers', '^/admin/plugins'),
       navItem('/admin/server', 'Sunucu durumu', 'activity', '^/admin/server'),
       navItem('/admin/audit', 'Denetim kaydı', 'shield', '^/admin/audit'),

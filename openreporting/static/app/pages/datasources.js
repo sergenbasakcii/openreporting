@@ -1,10 +1,11 @@
 // Datasource administration (admin): list, create/edit with write-only secrets, connection test.
 import { h, button, input, select, textarea, field, toggle, toast, confirmDialog, loading, timeAgo } from '../dom.js';
+import { engineConnectionForm } from './datasource-forms.js';
 import { icon } from '../icons.js';
 import { get, post, put, del, invalidate } from '../api.js';
 import { navigate, setBreadcrumbs } from '../router.js';
 
-const TYPE_ICON = { zabbix: 'activity', postgres: 'database', testdata: 'layers' };
+const TYPE_ICON = { zabbix: 'activity', postgres: 'database', testdata: 'layers', trino: 'layers', databricks: 'layers', elasticsearch: 'search', influxdb: 'chart-line', graphite: 'chart-line', prometheus: 'activity', loki: 'list', clickhouse: 'database' };
 
 export async function datasourcesPage(root) {
   setBreadcrumbs([{ label: 'Veri kaynakları' }]);
@@ -62,6 +63,7 @@ export async function datasourceEditPage(root, { uid }) {
       field('Tür', existing ? input({ value: model.type, readonly: true }) : select(types.types.map((t) => ({ value: t.type, label: t.name })), model.type, (v) => { model.type = v; model.url = ''; model.secureJsonData = {}; model.jsonData = v === 'postgres' ? { port: 5432, sslmode: 'verify-full', timeout_ms: 30000, max_rows: 200000 } : v === 'zabbix' ? { auth_mode: 'bearer', trends_from: '7d', trends_range: '4d', cache_ttl: 60, timeout: 30, max_items: 500 } : {}; draw(); })),
       field(null, toggle('Varsayılan veri kaynağı', model.isDefault, (v) => { model.isDefault = v; }))),
     h('p', { class: 'hint', text: (types.types.find((t) => t.type === model.type) || {}).description || '' })));
+    const engineForm = engineConnectionForm(model.type, { model, jd, secret, redraw: () => draw() });
     if (model.type === 'zabbix') {
       form.append(h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Bağlantı' }),
         field('Zabbix API URL', input({ value: model.url, placeholder: 'https://zabbix.example.com/api_jsonrpc.php', onChange: (e) => { model.url = e.target.value; } }), 'Yalnızca HTTPS; yönlendirmeler reddedilir.'),
@@ -80,6 +82,8 @@ export async function datasourceEditPage(root, { uid }) {
         jd('history_table_float', 'History tablosu (float)', { placeholder: 'history' }), jd('history_table_uint', 'History tablosu (uint)', { placeholder: 'history_uint' }),
         jd('trends_table_float', 'Trend tablosu (float)', { placeholder: 'trends' }), jd('trends_table_uint', 'Trend tablosu (uint)', { placeholder: 'trends_uint' })) : null,
       h('p', { class: 'hint', text: 'Grup/host/item keşfi her zaman Zabbix API ile yapılır; SQL modu yalnızca büyük gruplarda zaman serisini hızlandırır.' })));
+    } else if (engineForm) {
+      form.append(engineForm);
     } else if (['prometheus', 'loki', 'httpjson', 'csv'].includes(model.type)) {
       form.append(h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Bağlantı' }),
         field('Sunucu / uç nokta URL', input({ value: model.url || '', placeholder: 'https://metrics.example.com', onChange: e => { model.url = e.target.value; } })),

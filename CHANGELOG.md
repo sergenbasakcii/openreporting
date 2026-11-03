@@ -1,6 +1,11 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Veri gölü ve 6 yeni veri kaynağı**: Trino/Presto/Starburst (Hive, Iceberg, Delta), Databricks SQL,
+  ClickHouse, Elasticsearch/OpenSearch, InfluxDB, Graphite; sürücüsüz, salt-okunur korumalı, lehçeli SQL makroları.
+  Teknik belge: `docs/technical/07-datalake-and-datasources.md`.
+- **Keşfet yeniden tasarlandı** (kaynak → sorgu → sonuç), **tek API sayfası** (genel bakış, uç noktalar, erişim
+  anahtarları), zaman seçici taşması düzeltildi, her görselleştirmeye ayrı ikon. Belge: `08-explore-api-ui.md`.
 - **Özgün tema sistemi**: Grafana görünümü yerine OpenReporting görsel dili; Aurora (varsayılan koyu),
   Porselen (varsayılan açık), Grafit, Kum ve Yüksek kontrast temaları + Sistem. Temaya özgü seri paletleri,
   profil sayfasında renk örnekli seçici, eski `dark`/`light` tercihleri otomatik dönüştürülür, PDF raporları

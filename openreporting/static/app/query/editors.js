@@ -1,5 +1,6 @@
 // Query editors (Zabbix / TestData / PostgreSQL / Expression), function chips, transformations.
 import { h, button, input, select, textarea, field, toggle, menu, clear, debounce } from '../dom.js';
+import { engineEditor } from './engine-editors.js';
 import { icon } from '../icons.js';
 import { post, datasourcesList, queryCatalog, cached } from '../api.js';
 import { effectiveZone } from '../time.js';
@@ -49,7 +50,7 @@ function zabbixEditor(target, ds, ctx, onChange) {
   const line1 = h('div', { class: 'q-line' }, h('span', { class: 'q-label', text: 'Sorgu türü' }),
     select(QUERY_TYPES, qType, (v) => { set({ queryType: v }); rerender(); }, { class: 'auto-width', label: 'Sorgu türü' }));
   if (ds.type === 'testdata') {
-    line1.prepend(h('span', { class: 'q-label', text: 'Senaryo' }), select(SCENARIOS, t.scenario || 'zabbix_sim', (v) => { set({ scenario: v }); rerender(); }, { label: 'Senaryo' }));
+    line1.prepend(h('span', { class: 'q-label', text: 'Örnek veri', title: 'TestData gerçek olmayan deneme verisi üretir' }), select(SCENARIOS, t.scenario || 'zabbix_sim', (v) => { set({ scenario: v }); rerender(); }, { label: 'Örnek veri türü' }));
   }
   wrap.append(line1);
   const rerender = () => { const fresh = queryEditor(t, ds, ctx, onChange); wrap.replaceWith(fresh); };
@@ -150,6 +151,8 @@ export function queryEditor(target, ds, ctx, onChange) {
   if (['prometheus', 'loki'].includes(ds?.type)) return h('div', field(ds.type === 'prometheus' ? 'PromQL' : 'LogQL', textarea({ value: target.expr || '', rows: 4, placeholder: ds.type === 'prometheus' ? 'rate(http_requests_total[5m])' : '{job="app"}', onChange: e => onChange({ ...target, expr: e.target.value }) })));
   if (['httpjson', 'csv'].includes(ds?.type)) return h('p', { class: 'hint', text: 'Kayıtlı uç noktadan tablo okunur. Alan seçimi ve düzenleme için Dönüşümler sekmesini kullanın.' });
   if (ds?.type?.startsWith('x-')) return pluginQueryEditor(target, ds, ctx, onChange);
+  const engine = ds ? engineEditor(target, ds, onChange) : null;
+  if (engine) return engine;
 
   if (!ds) return h('div', { class: 'alert warn', text: 'Veri kaynağı bulunamadı; bir veri kaynağı seçin.' });
   if (ds.type === '__expr__') return expressionEditor(target, ctx, onChange);
