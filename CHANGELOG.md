@@ -1,6 +1,11 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **API desteği**: servis hesapları ve süreli, iptal edilebilir API anahtarları (`Authorization: Bearer ortk_…`;
+  yalnız SHA-256 özeti saklanır, bir kez gösterilir, hesap/oturum/yönetim uçlarında kullanılamaz, klasör
+  izinleri uygulanır); oturum açmış kullanıcılara `GET /api/openapi.json`; Yönetim → API anahtarları ve
+  uygulama içi API başvurusu sayfası. Şema 8. Teknik belge: `docs/technical/04-api-and-tokens.md`.
+- Teknik dokümantasyon `docs/technical/` altında her geliştirme için numaralı belgelerle başlatıldı.
 - **Dashboard sürüm farkı**: *Ayarlar → Sürümler → Değişiklikleri gör* bir sürümden güncele panel, değişken ve
   dashboard düzeyindeki değişiklikleri Türkçe ve okunur biçimde gösterir (`GET /api/dashboards/uid/{uid}/diff`, klasör izni uygulanır).
 - **Rapor hatası bildirimleri**: başarısız çalışma, gönderilemeyen/belirsiz e-posta ve kendini kapatan

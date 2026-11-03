@@ -31,20 +31,33 @@ class Credentials(BaseModel):
     otp: str | None = Field(default=None, max_length=128)
 
 
+API_DESCRIPTION = (
+    "OpenReporting REST API. Tarayıcı oturumu (çerez + X-CSRF-Token) veya servis hesabı API anahtarı "
+    "(`Authorization: Bearer ortk_…`) ile kullanılır. Ayrıntılar: docs/technical/04-api-and-tokens.md"
+)
+
+
 def create_app(settings: Settings | None = None):
     from . import __version__, datasources as datasource_registry
     from .api import dashboards as dashboards_api, datasources as datasources_api, reports as reports_api
-    from .api import system as system_api, users as users_api, mfa as mfa_api, settings as settings_api
+    from .api import system as system_api, users as users_api, mfa as mfa_api, settings as settings_api, tokens as tokens_api
 
     settings = settings or Settings.from_env()
     init_db(settings)
     datasource_registry.provision(settings)
-    app = FastAPI(title="OpenReporting", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(
+        title="OpenReporting API",
+        version=__version__,
+        description=API_DESCRIPTION,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,  # served below only to signed-in callers
+    )
     app.state.settings = settings
     app.state.http_metrics = HttpMetrics()
     static = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
-    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api, mfa_api, settings_api):
+    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api, mfa_api, settings_api, tokens_api):
         app.include_router(module.router)
     app.add_middleware(RequestBodyLimitMiddleware)
     app.add_middleware(OriginValidationMiddleware)
@@ -82,6 +95,11 @@ def create_app(settings: Settings | None = None):
     @app.get("/", response_class=HTMLResponse)
     def index():
         return (static / "index.html").read_text(encoding="utf8")
+
+    @app.get("/api/openapi.json", include_in_schema=False)
+    def openapi_schema(user=Depends(authenticate)):
+        """Machine-readable API description (OpenAPI 3) for signed-in users and API tokens."""
+        return app.openapi()
 
     @app.get("/healthz")
     def health():

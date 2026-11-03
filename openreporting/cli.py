@@ -343,9 +343,11 @@ def _is_external(db, user_id):
 def _cmd_reset_password(args, settings):
     hashed = password_hash(_new_password("New password"))
     with connect(settings) as db, transaction(db):
-        target = _find_user(db, args.username)
+        target = _find_user(db, args.username, "id,password_hash")
         if _is_external(db, target["id"]):
             raise SystemExit("LDAP passwords must be changed in the directory")
+        if target["password_hash"] == "!service":
+            raise SystemExit("Service accounts have no password; issue an API token instead")
         db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, target["id"]))
         db.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))
         audit(db, "os-admin", "user.password_rotated", "user", target["id"])

@@ -205,11 +205,17 @@ def _login(settings, username: str, password: str, otp: str | None = None, clien
 
 
 def authenticate(request: Request):
-    token = request.cookies.get("openreporting_session")
-    if not token:
-        raise HTTPException(401, "Giriş yapmanız gerekiyor")
     from .runtime_settings import effective
 
+    token = request.cookies.get("openreporting_session")
+    bearer = request.headers.get("Authorization", "")
+    if not token and bearer.startswith("Bearer "):
+        # Automation: service-account API token (never combined with a browser session).
+        from .api_tokens import authenticate_bearer
+
+        return authenticate_bearer(effective(request.app.state.settings), bearer, request.scope["path"])
+    if not token:
+        raise HTTPException(401, "Giriş yapmanız gerekiyor")
     settings = effective(request.app.state.settings)
     try:
         with connect(settings) as db:
@@ -249,6 +255,8 @@ def require_role(user, *roles):
 
 
 def require_csrf(request: Request, user):
+    if user.get("via") == "token":
+        return  # Bearer tokens are never sent automatically by a browser, so they cannot be forged cross-site.
     header = request.headers.get("X-CSRF-Token", "")
     if not header or not hmac.compare_digest(digest(header), user["csrf_hash"]):
         raise HTTPException(403, messages.CSRF_FAILED)

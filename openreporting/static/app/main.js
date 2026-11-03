@@ -75,6 +75,7 @@ function shell(root) {
       navItem('/datasources', 'Veri kaynakları', 'database', '^/datasources'),
       navItem('/admin/users', 'Kullanıcılar', 'users', '^/admin/users'),
       navItem('/admin/settings', 'Sistem ayarları', 'settings', '^/admin/settings'),
+      navItem('/admin/api-keys', 'API anahtarları', 'key', '^/admin/(api-keys|api)$'),
       navItem('/admin/server', 'Sunucu durumu', 'activity', '^/admin/server'),
       navItem('/admin/audit', 'Denetim kaydı', 'shield', '^/admin/audit'),
     ] : null);
@@ -145,6 +146,8 @@ function registerRoutes() {
   route('/reports/:id', lazy('./pages/reports.js', 'reportEditPage'));
   route('/admin/users', lazy('./pages/admin.js', 'usersPage'));
   route('/admin/settings', lazy('./pages/settings.js', 'settingsPage'));
+  route('/admin/api-keys', lazy('./pages/apikeys.js', 'apiKeysPage'));
+  route('/admin/api', lazy('./pages/apikeys.js', 'apiReferencePage'));
   route('/admin/server', lazy('./pages/admin.js', 'serverPage'));
   route('/admin/audit', lazy('./pages/admin.js', 'auditPage'));
   route('/profile', lazy('./pages/admin.js', 'profilePage', { applyTheme }));

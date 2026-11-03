@@ -98,6 +98,8 @@ def update_user(user_id: str, body: UserPatch, request: Request, user=Depends(ad
         if external and body.role is not None:
             raise HTTPException(409, "LDAP rolleri dizin gruplarıyla yönetilir")
         role = body.role if body.role is not None else target["role"]
+        if target["password_hash"] == "!service" and role == "admin":
+            raise HTTPException(409, "Servis hesabı yönetici olamaz")
         active = int(body.active) if body.active is not None else target["active"]
         if role not in ROLES:
             raise HTTPException(422, "Geçersiz rol")
@@ -130,6 +132,8 @@ def reset_password(user_id: str, body: PasswordReset, request: Request, user=Dep
     with connect(settings_of(request)) as db, transaction(db):
         if db.execute("SELECT 1 FROM external_identities WHERE user_id=?", (user_id,)).fetchone():
             raise HTTPException(409, "LDAP parolası dizin hizmetinde değiştirilmelidir")
+        if db.execute("SELECT 1 FROM users WHERE id=? AND password_hash='!service'", (user_id,)).fetchone():
+            raise HTTPException(409, "Servis hesabının parolası yoktur; API anahtarı kullanın")
         if not db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, user_id)).rowcount:
             raise HTTPException(404, "Kullanıcı bulunamadı")
         db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
