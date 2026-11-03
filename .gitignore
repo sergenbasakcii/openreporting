@@ -13,3 +13,4 @@ deploy/docker/certs/*
 /backups/
 /.env
 deploy/docker/build-ca/*.crt
+.coverage

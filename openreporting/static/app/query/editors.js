@@ -3,6 +3,7 @@ import { h, button, input, select, textarea, field, toggle, menu, clear, debounc
 import { icon } from '../icons.js';
 import { post, datasourcesList, queryCatalog, cached } from '../api.js';
 import { effectiveZone } from '../time.js';
+import { QUERY_EDITORS } from '../plugins.js';
 
 export const EXPR = { type: '__expr__', uid: '__expr__' };
 const QUERY_TYPES = [{ value: 'metrics', label: 'Metrikler' }, { value: 'itemvalues', label: 'Son değerler (tablo)' },
@@ -134,9 +135,21 @@ function expressionEditor(target, ctx, onChange) {
   return wrap;
 }
 
+// Plugin datasources: the plugin's own editor when registered, otherwise a JSON editor for target.query.
+function pluginQueryEditor(target, ds, ctx, onChange) {
+  if (QUERY_EDITORS[ds.type]) return QUERY_EDITORS[ds.type](target, ds, ctx, onChange);
+  const area = textarea({ value: JSON.stringify(target.query || {}, null, 2), rows: 6, label: 'Eklenti sorgusu (JSON)' });
+  const error = h('div', { class: 'hint' });
+  area.addEventListener('change', () => {
+    try { onChange({ ...target, query: JSON.parse(area.value || '{}') }); error.textContent = ''; } catch { error.textContent = 'Geçersiz JSON'; }
+  });
+  return h('div', field('Eklenti sorgusu (JSON)', area), error);
+}
+
 export function queryEditor(target, ds, ctx, onChange) {
   if (['prometheus', 'loki'].includes(ds?.type)) return h('div', field(ds.type === 'prometheus' ? 'PromQL' : 'LogQL', textarea({ value: target.expr || '', rows: 4, placeholder: ds.type === 'prometheus' ? 'rate(http_requests_total[5m])' : '{job="app"}', onChange: e => onChange({ ...target, expr: e.target.value }) })));
   if (['httpjson', 'csv'].includes(ds?.type)) return h('p', { class: 'hint', text: 'Kayıtlı uç noktadan tablo okunur. Alan seçimi ve düzenleme için Dönüşümler sekmesini kullanın.' });
+  if (ds?.type?.startsWith('x-')) return pluginQueryEditor(target, ds, ctx, onChange);
 
   if (!ds) return h('div', { class: 'alert warn', text: 'Veri kaynağı bulunamadı; bir veri kaynağı seçin.' });
   if (ds.type === '__expr__') return expressionEditor(target, ctx, onChange);

@@ -3,7 +3,7 @@ import secrets
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -17,6 +17,7 @@ from .http_security import OriginValidationMiddleware, trusted_hosts
 from .http_telemetry import HttpMetrics, HttpTelemetryMiddleware
 from .security import authenticate, digest, login, logout, require_csrf, require_role
 from .api.deps import settings_of
+from . import plugins as plugin_registry
 from . import messages
 
 log = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ def create_app(settings: Settings | None = None):
 
     settings = settings or Settings.from_env()
     init_db(settings)
+    plugin_registry.load_datasource_plugins()
     datasource_registry.provision(settings)
     app = FastAPI(
         title="OpenReporting API",
@@ -100,6 +102,23 @@ def create_app(settings: Settings | None = None):
     def openapi_schema(user=Depends(authenticate)):
         """Machine-readable API description (OpenAPI 3) for signed-in users and API tokens."""
         return app.openapi()
+
+    @app.get("/api/plugins")
+    def enabled_plugins(request: Request, user=Depends(authenticate)):
+        """Browser panel plugins the client should import (allow-listed, valid manifest)."""
+        return plugin_registry.panel_plugins(settings_of(request))
+
+    @app.get("/api/admin/plugins")
+    def plugin_status(request: Request, user=Depends(authenticate)):
+        require_role(user, "admin")
+        return {"enabled": sorted(plugin_registry.enabled_ids()), "plugins": plugin_registry.status(settings_of(request))}
+
+    @app.get("/plugins/{plugin_id}/{asset:path}", include_in_schema=False)
+    def plugin_asset(plugin_id: str, asset: str, request: Request, user=Depends(authenticate)):
+        path = plugin_registry.asset_path(settings_of(request), plugin_id, asset)
+        if path is None:
+            raise HTTPException(404, messages.NOT_FOUND)
+        return FileResponse(path, media_type=plugin_registry.ASSET_TYPES[path.suffix], headers={"Cache-Control": "no-cache"})
 
     @app.get("/healthz")
     def health():

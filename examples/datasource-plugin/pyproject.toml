@@ -1,0 +1,18 @@
+# Example OpenReporting datasource plugin. Install into the application's venv, then allow-list it:
+#   /opt/openreporting/venv/bin/pip install ./examples/datasource-plugin
+#   OPENREPORTING_PLUGINS=x-static-table   (in openreporting.env), restart web + worker
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openreporting-plugin-static"
+version = "1.0.0"
+description = "Static table datasource: example plugin for OpenReporting"
+requires-python = ">=3.11"
+
+[project.entry-points."openreporting.datasources"]
+x-static-table = "openreporting_plugin_static:StaticTableDataSource"
+
+[tool.setuptools]
+py-modules = ["openreporting_plugin_static"]

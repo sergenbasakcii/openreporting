@@ -50,6 +50,8 @@ def _server_info(base):
         ("SMTP CA dosyası", "OPENREPORTING_SMTP_CA_FILE", base.smtp_ca_file or "—"),
         ("LDAP CA dosyası", "OPENREPORTING_LDAP_CA_FILE", base.ldap_ca_file or "—"),
         ("Sentetik TestData kaynağı", "OPENREPORTING_PROVISION_TESTDATA", "açık" if base.provision_testdata else "kapalı"),
+        ("Etkin eklentiler", "OPENREPORTING_PLUGINS", os.getenv("OPENREPORTING_PLUGINS", "") or "—"),
+        ("Eklenti klasörü", "OPENREPORTING_PLUGIN_DIR", os.getenv("OPENREPORTING_PLUGIN_DIR", "") or str(base.data_dir / "plugins")),
     ]
     return [{"label": label, "env": env, "value": value} for label, env, value in rows]
 

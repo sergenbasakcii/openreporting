@@ -144,9 +144,26 @@ def validate(kind, url, json_data, settings):
         clean["timeout_ms"] = max(1000, min(_int(data, "timeout_ms", 30000), 300000))
         clean["max_rows"] = max(1, min(_int(data, "max_rows", 200000), 1_000_000))
         url = f"{clean['host']}:{clean['port']}/{clean['database']}"
+    elif kind.startswith("x-"):
+        return _validate_plugin(kind, url, data, settings)
     else:
         url = ""
     return url, clean
+
+
+PLUGIN_CONFIG_BYTES = 16 * 1024
+
+
+def _validate_plugin(kind, url, data, settings):
+    """Plugins validate their own configuration; the platform enforces size and HTTPS by default."""
+    plugin = TYPES[kind]
+    if hasattr(plugin, "validate_config"):
+        url, data = plugin.validate_config(url, data, settings)
+    elif url and not (url.startswith("https://") or (getattr(settings, "allow_http_datasources", False) and url.startswith("http://"))):
+        raise DataSourceError("Eklenti veri kaynağı adresi https:// ile başlamalı")
+    if len(json.dumps(data, default=str)) > PLUGIN_CONFIG_BYTES:
+        raise DataSourceError("Eklenti ayarları 16 KB sınırını aşıyor")
+    return url, data
 
 
 def instance(settings, record, *, transport=None, registry_db=None):

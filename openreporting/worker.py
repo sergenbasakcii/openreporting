@@ -117,6 +117,9 @@ def run_forever(settings, once=False, interval=10):
     from .reporting import service as dash_reports
 
     init_db(settings)
+    from .plugins import load_datasource_plugins
+
+    load_datasource_plugins()
     with exclusive_worker(settings):
         # Exclusive ownership means unfinished jobs predate this worker. An
         # uncertain SMTP exchange must NEVER be silently resumed or replayed.

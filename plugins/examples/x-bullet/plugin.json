@@ -1,0 +1,8 @@
+{
+  "id": "x-bullet",
+  "type": "panel",
+  "name": "Hedef çubuğu (örnek eklenti)",
+  "version": "1.0.0",
+  "module": "module.js",
+  "style": "style.css"
+}

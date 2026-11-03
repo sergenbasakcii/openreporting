@@ -1,6 +1,10 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Eklenti sistemi**: izin listeli (`OPENREPORTING_PLUGINS`) veri kaynağı eklentileri (Python giriş noktası
+  `openreporting.datasources`) ve panel eklentileri (aynı kökenden ES modülü + isteğe bağlı CSS); `x-` ad alanı,
+  hata yalıtımı, Yönetim → Eklentiler durum sayfası, kapatılan eklentinin panelleri korunur; iki örnek eklenti.
+  Teknik belge: `docs/technical/05-plugins.md`.
 - **API desteği**: servis hesapları ve süreli, iptal edilebilir API anahtarları (`Authorization: Bearer ortk_…`;
   yalnız SHA-256 özeti saklanır, bir kez gösterilir, hesap/oturum/yönetim uçlarında kullanılamaz, klasör
   izinleri uygulanır); oturum açmış kullanıcılara `GET /api/openapi.json`; Yönetim → API anahtarları ve

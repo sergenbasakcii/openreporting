@@ -129,7 +129,20 @@ for (const [type, name] of Object.entries(EXTRA_NAMES)) PLUGINS[type] = { name, 
 export const ORDER = ['timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'statusgrid', 'statetimeline', 'text', ...Object.keys(EXTRA_NAMES)];
 export const CALC_OPTIONS = calcOptions;
 
-export function plugin(type) { return PLUGINS[type] || PLUGINS.timeseries; }
+// A plugin panel whose plugin is not loaded shows an explicit notice instead of a wrong chart.
+function missingPlugin(type) {
+  return { name: `Eklenti: ${type}`, icon: 'panel', defaults: {}, sections: [], render: (container) => {
+    const note = document.createElement('div');
+    note.className = 'alert warn';
+    note.textContent = `Bu panel "${type}" eklentisini kullanıyor; eklenti yüklü veya etkin değil. Yöneticiniz Yönetim → Eklentiler sayfasından kontrol edebilir.`;
+    container.replaceChildren(note);
+  } };
+}
+
+export function plugin(type) {
+  if (PLUGINS[type]) return PLUGINS[type];
+  return typeof type === 'string' && type.startsWith('x-') ? missingPlugin(type) : PLUGINS.timeseries;
+}
 
 export function getPath(obj, path) {
   return path.split('.').reduce((cur, key) => (cur === undefined || cur === null ? undefined : cur[key]), obj);

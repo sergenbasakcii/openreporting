@@ -4,6 +4,7 @@ import { icon } from './icons.js';
 import { get, post, setCsrf, onUnauthorized, refreshCsrf } from './api.js';
 import { route, startRouter, navigate, setCrumbHost, render, teardown } from './router.js';
 import { enrollmentPage } from './mfa.js';
+import { loadPlugins } from './plugins.js';
 
 const app = { user: null, prefs: null, settings: null, pendingDashboard: null };
 const NAV_KEY = 'openreporting.nav.collapsed';
@@ -76,6 +77,7 @@ function shell(root) {
       navItem('/admin/users', 'Kullanıcılar', 'users', '^/admin/users'),
       navItem('/admin/settings', 'Sistem ayarları', 'settings', '^/admin/settings'),
       navItem('/admin/api-keys', 'API anahtarları', 'key', '^/admin/(api-keys|api)$'),
+      navItem('/admin/plugins', 'Eklentiler', 'layers', '^/admin/plugins'),
       navItem('/admin/server', 'Sunucu durumu', 'activity', '^/admin/server'),
       navItem('/admin/audit', 'Denetim kaydı', 'shield', '^/admin/audit'),
     ] : null);
@@ -147,6 +149,7 @@ function registerRoutes() {
   route('/admin/users', lazy('./pages/admin.js', 'usersPage'));
   route('/admin/settings', lazy('./pages/settings.js', 'settingsPage'));
   route('/admin/api-keys', lazy('./pages/apikeys.js', 'apiKeysPage'));
+  route('/admin/plugins', lazy('./pages/plugins.js', 'pluginsPage'));
   route('/admin/api', lazy('./pages/apikeys.js', 'apiReferencePage'));
   route('/admin/server', lazy('./pages/admin.js', 'serverPage'));
   route('/admin/audit', lazy('./pages/admin.js', 'auditPage'));
@@ -172,7 +175,8 @@ async function boot() {
     return;
   }
   try { await refreshCsrf(); } catch { /* login will rotate */ }
-  const [me, settings] = await Promise.all([get('/api/user'), get('/api/frontend/settings')]);
+  const [me, settings, plugins] = await Promise.all([get('/api/user'), get('/api/frontend/settings'), get('/api/plugins').catch(() => [])]);
+  await loadPlugins(plugins);
   app.user = { ...app.user, ...me };
   app.prefs = me.preferences;
   app.settings = settings;

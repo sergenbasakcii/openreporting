@@ -329,7 +329,7 @@ class Pdf:
             else:
                 from ..dashboards import EXTRA_PANEL_TYPES
 
-                if kind in EXTRA_PANEL_TYPES:
+                if kind in EXTRA_PANEL_TYPES or kind.startswith("x-"):
                     self.text(bx, by + bh - 8, "Grafik verisi · tablo görünümü", 7, MUTED)
                     bh -= 16
                 self.draw_table(result.panel, frames, bx, by, bw, bh)

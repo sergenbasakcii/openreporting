@@ -35,6 +35,7 @@ EXTRA_PANEL_TYPES = {
     "bubble",
     "sankey",
 }
+PLUGIN_PANEL_TYPE = re.compile(r"^x-[a-z0-9][a-z0-9-]{1,39}$")
 PANEL_TYPES = EXTRA_PANEL_TYPES | {
     "timeseries",
     "barchart",
@@ -150,7 +151,9 @@ def _panel(panel, index, ds_map, ids):
     original_type = str(panel.get("type") or "timeseries")
     kind = TYPE_ALIASES.get(original_type, original_type)
     out = copy.deepcopy(panel)
-    if kind not in PANEL_TYPES:
+    # Plugin panel types ("x-…") are kept even while their plugin is not loaded: disabling a plugin
+    # must never rewrite saved dashboards.
+    if kind not in PANEL_TYPES and not PLUGIN_PANEL_TYPE.match(kind):
         out = {
             "type": "text",
             "title": panel.get("title", ""),
