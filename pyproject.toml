@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["httpx>=0.27,<1", "pytest>=8,<10"]
+test = ["coverage>=7,<8", "httpx>=0.27,<1", "pytest>=8,<10", "ruff>=0.9,<1"]
 
 [project.scripts]
 openreporting = "openreporting.cli:main"
@@ -37,3 +37,25 @@ openreporting = ["static/*", "static/app/*", "static/app/*/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 160
+extend-exclude = ["build", ".venv"]
+
+[tool.ruff.lint]
+# Correctness-focused gate: pyflakes, syntax/runtime errors, bugbear, pylint errors.
+select = ["F", "E9", "W605", "B", "PLE"]
+# zip(strict=) everywhere would be noise: lengths are validated where they matter.
+ignore = ["B905"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency markers are evaluated once by design.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "fastapi.Path", "fastapi.Header"]
+
+[tool.coverage.run]
+source = ["openreporting"]
+branch = true
+
+[tool.coverage.report]
+skip_empty = true

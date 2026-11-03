@@ -239,7 +239,7 @@ def apply_functions(frames, functions, interval_ms, anchor_ms=0):
             current = [dict(f, points=bucketize(f["points"], step, method, anchor_ms)) for f in current]
         elif name in ("scale", "offset"):
             factor = _number(_param(fn, 0))
-            op = (lambda v: v * factor) if name == "scale" else (lambda v: v + factor)
+            op = (lambda v, k=factor: v * k) if name == "scale" else (lambda v, k=factor: v + k)
             current = [dict(f, points=[[t, None if v is None else op(v)] for t, v in f["points"]]) for f in current]
         elif name in ("delta", "rate"):
             updated = []

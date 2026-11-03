@@ -61,7 +61,7 @@ def test_all_content_read_paths_hide_restricted_folder_and_limits(state):
     restrict(state)
     for role in ('viewer', 'editor'):
         with signin(app, role) as client:
-            for url in (f'/api/dashboards/uid/private', '/api/dashboards/uid/private/versions',
+            for url in ('/api/dashboards/uid/private', '/api/dashboards/uid/private/versions',
                         '/api/dashboards/uid/private/versions/1', '/api/annotations?dashboardUID=private',
                         f'/api/dash-reports/{rid}', f'/api/dash-reports/{rid}/runs',
                         f'/api/dash-reports/{rid}/schedules', f'/api/report-runs/{run}/files/csv',

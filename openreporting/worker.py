@@ -156,7 +156,7 @@ def _run_locked(settings, once, interval):
             ran = []
             errors = []
 
-            def phase(name, func, *args):
+            def phase(name, func, *args, errors=errors):
                 assert_worker_ownership()
                 # Each phase is isolated: a failing schedule never blocks report runs.
                 try:

@@ -161,7 +161,7 @@ def render_csv(config, collected, title):
             if result.panel.get("type") in ("row", "text"):
                 continue
             for block_title, headers, rows, units in panel_tables(result, tz, anchor):
-                for index, row in enumerate(rows):
+                for row in rows:
                     key = row[0].isoformat() if isinstance(row[0], datetime) else row[0]
                     for column, value, unit in list(zip(headers, row, units))[1:]:
                         if value is None and block_title == "Zaman serileri":

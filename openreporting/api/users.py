@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from .. import folder_access
 from ..db import audit, connect, transaction, utcnow
-from ..security import authenticate, check_password, create_user, password_hash, reauthenticate
+from ..security import authenticate, create_user, password_hash, reauthenticate
 from ..timerange import TimeRangeError, zone
 from .deps import admin, admin_read, settings_of, viewer_write
 

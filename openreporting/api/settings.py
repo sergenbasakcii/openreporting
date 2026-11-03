@@ -67,7 +67,7 @@ def _restart_hint():
         return {"env_file": "deploy/docker/openreporting.env (Docker Compose)",
                 "restart": "docker compose up -d   # değişen ayarla konteynerleri yeniden oluşturur"}
     if os.name == "nt":
-        return {"env_file": "windows\Settings.local.ps1", "restart": "Start-OpenReporting.ps1 penceresini kapatıp yeniden çalıştırın"}
+        return {"env_file": "windows/Settings.local.ps1", "restart": "Start-OpenReporting.ps1 penceresini kapatıp yeniden çalıştırın"}
     return {"env_file": "/etc/openreporting/openreporting.env",
             "restart": "sudo systemctl restart openreporting-web openreporting-worker"}
 

@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import secrets
 import ssl
-import sys
 import time
 
 import httpx

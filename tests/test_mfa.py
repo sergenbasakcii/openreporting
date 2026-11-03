@@ -2,7 +2,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import datetime,timedelta,timezone
-import json
 
 from fastapi.testclient import TestClient
 import pyotp
@@ -154,7 +153,7 @@ def test_same_factor_or_recovery_cannot_succeed_twice_in_parallel(state):
     with TestClient(app,base_url='https://localhost') as client:
         secret,codes=enroll(client)
     for code in (pyotp.TOTP(secret).at(NOW+30),codes[0]):
-        def consume(_):
+        def consume(_, code=code):
             with db.connect(settings) as conn,db.transaction(conn):
                 return mfa.consume(conn,settings,uid,code)
         with ThreadPoolExecutor(max_workers=2) as pool:

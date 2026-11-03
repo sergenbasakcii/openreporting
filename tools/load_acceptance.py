@@ -106,7 +106,7 @@ def run(users, seconds, series, points, output):
                 rows = [row for future in futures for row in future.result()]
             elapsed = time.perf_counter()-started
             groups = defaultdict(list)
-            for kind,duration,code,good in rows:
+            for kind,duration,_code,_good in rows:
                 groups[kind].append(duration)
             report = {'timestamp_utc':datetime.now(timezone.utc).isoformat(),'synthetic_only':True,
                       'source_sha256':{name:hashlib.sha256((Path(__file__).resolve().parents[1] / name).read_bytes()).hexdigest()

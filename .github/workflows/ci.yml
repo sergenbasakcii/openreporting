@@ -150,8 +150,16 @@ jobs:
           python tools/check_runtime_lock.py
           python tools/check_runtime_lock.py --scope build
           python tools/check_runtime_lock.py --scope test
-      - name: Pytest
-        run: python -m pytest -q -p no:cacheprovider
+      - name: Lint and format (ruff)
+        if: matrix.python == '3.13'
+        run: |
+          python -m ruff check openreporting tools tests
+          python -m ruff format --check openreporting tools tests
+      - name: Pytest with branch coverage
+        # The floor only moves up: raise it when coverage improves, never lower it to merge.
+        run: |
+          python -m coverage run -m pytest -q -p no:cacheprovider
+          python -m coverage report --fail-under=75 | tail -n 1
       - name: Enterprise evidence matrix consistency
         if: matrix.python == '3.13'
         run: |

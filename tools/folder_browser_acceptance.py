@@ -1,5 +1,4 @@
 """Own an ephemeral loopback test application; never use a configured/live data store."""
-from dataclasses import replace
 import os
 from pathlib import Path
 import secrets
