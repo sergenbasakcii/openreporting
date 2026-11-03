@@ -73,7 +73,7 @@ export class PanelView {
     this.el = h('div', { class: ['panel', panel.transparent ? 'transparent' : ''].join(' '), tabindex: '-1' });
     this.loader = h('div', { class: 'panel-loading', hidden: true });
     this.status = h('span', { class: 'panel-status', hidden: true });
-    this.titleEl = h('div', { class: 'panel-title' });
+    this.titleEl = h('h2', { class: 'panel-title' }); // dashboard h1 > panel h2 > markdown h3
     const icons = h('div', { class: 'p-icons' });
     if (panel.description) icons.append(h('span', { class: 'panel-status', title: interpolate(panel.description, ctx.variables, ctx.scopedVars) }, icon('info')));
     this.menuBtn = button('', { icon: 'dots', variant: 'ghost', size: 'sm', title: 'Panel menüsü', onClick: (e) => this.openMenu(e.currentTarget) });
@@ -99,7 +99,9 @@ export class PanelView {
     const title = interpolate(this.panel.title || '', this.ctx.variables, this.ctx.scopedVars);
     this.titleEl.textContent = title;
     this.titleEl.title = title;
-    this.header.hidden = !title && !this.ctx.editable && this.panel.type !== 'text' ? false : false;
+    // An untitled panel keeps its header (menu, status) but must not expose an empty heading.
+    if (title) this.titleEl.removeAttribute('aria-hidden');
+    else this.titleEl.setAttribute('aria-hidden', 'true');
   }
 
   setContext(ctx) { this.ctx = { ...this.ctx, ...ctx }; this.updateTitle(); }

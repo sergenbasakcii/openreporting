@@ -173,7 +173,7 @@ export function renderTable(container, frames, panel, ctx) {
         const c2 = (mapped && mapped.color && color(mapped.color)) || thresholdColor(v, cfg.thresholds, cfg.min ?? 0, cfg.max ?? 100);
         const td = h('td', { class: 'num' });
         if ((cell === 'color-background' || cell === 'color-background-solid') && v !== null && c2) { td.style.background = cell === 'color-background' ? alpha(c2, 0.75) : c2; td.style.color = contrastText(c2); td.textContent = text; }
-        else if (cell === 'color-text' && c2) { td.style.color = c2; td.textContent = text; }
+        else if (cell === 'color-text' && c2) { td.style.color = readableColor(c2, cssVar('--bg-panel')); td.textContent = text; }
         else if ((cell === 'gauge' || cell === 'lcd-gauge' || cell === 'gradient-gauge') && v !== null) {
           if (!columnMax.has(ci)) columnMax.set(ci, Math.max(maxOf(table.rows.map((x) => x[ci] ?? 0), 0), 1));
           const max = cfg.max ?? (unit === 'percent' ? 100 : columnMax.get(ci));

@@ -2,6 +2,7 @@
 const { chromium } = require(process.env.OPENREPORTING_PLAYWRIGHT_MODULE || 'playwright');
 const AxeBuilder = require(process.env.OPENREPORTING_AXE_MODULE || '@axe-core/playwright').default;
 const assert = require('node:assert/strict');
+const { THEMES, applyTheme } = require('./themes.cjs');
 const fs = require('node:fs');
 assert.equal(process.env.OPENREPORTING_FOLDER_DISPOSABLE, 'true');
 const base = process.env.OPENREPORTING_UI_URL;
@@ -19,11 +20,12 @@ assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
       return { context, page };
     }
     async function scan(page, stage) {
-      for (const theme of ['dark', 'light']) {
-        await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
+      for (const { id: theme, scheme } of THEMES) {
+        await applyTheme(page, { id: theme, scheme });
         const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice']).analyze();
         const violations = result.violations.map(v => ({ id: v.id, impact: v.impact, count: v.nodes.length }));
-        results.push({ stage, theme, violations }); assert.deepEqual(violations, [], `${stage}/${theme}`);
+        const where = result.violations.flatMap(v => v.nodes.slice(0, 5).map(n => `${v.id}: ${n.target.join(' ')} (${(n.failureSummary || '').replace(/\s+/g, ' ').slice(0, 200)})`));
+        results.push({ stage, theme, violations }); assert.deepEqual(violations, [], `${stage}/${theme} ${where.join('; ')}`);
       }
     }
     const { context, page } = await login('folderadmin');

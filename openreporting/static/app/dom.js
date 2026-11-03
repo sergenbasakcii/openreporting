@@ -269,7 +269,9 @@ export function menu(anchor, items, opts = {}) {
   pop.el.setAttribute('role', 'menu');
   menuKeys(pop.el);
   const first = pop.el.querySelector('[role="menuitem"]');
-  if (first) setTimeout(() => { if (pop.el.isConnected) first.focus({ preventScroll: true }); }, 0);
+  // Focus synchronously: the popover is already in the DOM, and a deferred focus lets an immediate
+  // keystroke (End/Home/arrows) land on the page instead of the menu while panels are rendering.
+  if (first) first.focus({ preventScroll: true });
   return pop;
 }
 

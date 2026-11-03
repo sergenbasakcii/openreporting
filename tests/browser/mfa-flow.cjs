@@ -3,6 +3,7 @@ const { chromium } = require(process.env.OPENREPORTING_PLAYWRIGHT_MODULE || 'pla
 const AxeBuilder = require(process.env.OPENREPORTING_AXE_MODULE || '@axe-core/playwright').default;
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
+const { THEMES, applyTheme } = require('./themes.cjs');
 const fs = require('node:fs');
 assert.equal(process.env.OPENREPORTING_MFA_DISPOSABLE, 'true', 'Use the disposable fixture launcher');
 const base = process.env.OPENREPORTING_UI_URL;
@@ -26,8 +27,8 @@ function totp(secret) {
     page.on('pageerror', error => errors.push(error.message));
     async function scan(stage) {
       console.log(`MFA UI check: ${stage}`);
-      for (const theme of ['dark', 'light']) {
-        await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
+      for (const { id: theme, scheme } of THEMES) {
+        await applyTheme(page, { id: theme, scheme });
         const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice']).analyze();
         // Never save full axe node HTML: this page can contain one-time secrets.
         const violations = result.violations.map(v => ({ id: v.id, impact: v.impact, count: v.nodes.length }));

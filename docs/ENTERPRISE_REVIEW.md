@@ -172,7 +172,7 @@ Durum dağılımı: V: 86, R: 16, P: 10, O: 2, E: 6.
 | I05 | Panel inceleme ve PDF bekleme yüzeyi | V | P2 | [tests/browser/theme-surfaces.cjs](../tests/browser/theme-surfaces.cjs) — Beyaz ekran regresyonu giderildi |
 | I06 | DOM/Markdown güvenli metin oluşturma | R | P1 | [openreporting/static/app/markdown.js](../openreporting/static/app/markdown.js) — innerHTML yok; link scheme kontrolü |
 | I07 | Modal odak tuzağı ve klavye menüsü | V | P2 | [tests/browser/accessibility-surfaces.cjs](../tests/browser/accessibility-surfaces.cjs) — Gerçek Chromium: modal Tab/Shift+Tab, Escape/odak dönüşü, menü okları ve bölüm Space/Enter kabulü; tam ekran okuyucu kabulü değil |
-| I08 | WCAG/ekran okuyucu ve kontrast denetimi | P | P2 | [tests/browser/accessibility-surfaces.cjs](../tests/browser/accessibility-surfaces.cjs) — axe-core 4.14: giriş + 8 rota, koyu/açık 17 taramada bulgu yok; gerçek ekran okuyucu/bağımsız WCAG kabulü açık |
+| I08 | WCAG/ekran okuyucu ve kontrast denetimi | P | P2 | [tests/browser/accessibility-surfaces.cjs](../tests/browser/accessibility-surfaces.cjs) — axe-core 4.14: giriş + 8 rota, 5 temada 41 taramada ciddi/kritik bulgu yok; gerçek ekran okuyucu/bağımsız WCAG kabulü açık |
 | I09 | Mobil/yoğun veri ve uzun metin yerleşimi | P | P2 | [openreporting/static/app/app.css](../openreporting/static/app/app.css) — Önceki smoke var; bütün 30 tür mobil matrisi yok |
 | I10 | Kaydetme çakışması ve sürüm geçmişi | V | P1 | [tests/test_datasources_engine.py](../tests/test_datasources_engine.py) — Optimistic locking ve sürümler testli |
 

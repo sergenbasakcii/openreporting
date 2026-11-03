@@ -60,3 +60,22 @@ WCAG AA (4.5:1) kontrast sağlar. Kontrol, saydamlık arka plana harmanlanarak h
 `tests/test_themes.mjs`: istemci/CSS/sunucu kimlik eşleşmesi, tam token kümesi, 10 geçerli seri rengi, kontrast,
 eski değer ve bilinmeyen kimlik çözümlemesi, karşı şema geçişi. `tests/test_theme_preferences.py`: yeni kullanıcının
 `system` alması, tüm temaların kaydedilip okunması, `dark`/`light` dönüşümü, geçersiz değerlerin 422 ile reddi.
+
+## Tarayıcı erişilebilirlik kabulü
+
+`tests/browser/themes.cjs` tema listesini paylaşır; `mfa-flow`, `folder-flow` ve `accessibility-surfaces`
+betikleri her ekranı beş temanın hepsinde axe-core ile tarar (tema değişiminden sonra geçişlerin oturması beklenir).
+Bu çalışmada bulunan ve düzeltilen bulgular:
+
+- Tema değişirken renk geçişleri (`transition`) ara karışık renkler üretiyordu → geçiş sırasında kökte
+  `.theme-switching` sınıfı tüm geçişleri kapatır; `prefers-reduced-motion` de saygı görür.
+- Tabloda "renkli metin" hücreleri ham eşik rengini kullanıyordu (açık temada 2.2:1) → `readableColor` ile
+  panel zeminine göre koyulaştırılır.
+- Panel başlıkları artık `h2` (dashboard `h1` → panel `h2` → markdown `h3`); başlıksız panelde başlık
+  erişilebilirlik ağacından gizlenir.
+- Otomatik yenileme düğmesinin erişilebilir adı görünen aralığı içerir ("1m otomatik yenileme").
+- Kaydırılabilir seri göstergeleri klavyeyle odaklanabilir (`tabindex=0`, `role=group`).
+- Menü ilk öğeye eşzamanlı odaklanır; açılır açılmaz basılan End/Home/ok tuşları menüye gider.
+
+Sonuç: 8 rota × 5 tema + giriş ekranı, ciddi/kritik bulgu yok (panel düzenleyicide bir "moderate"
+başlık sırası notu kalır).

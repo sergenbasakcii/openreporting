@@ -16,9 +16,10 @@ function legendEl(entries, mode, calcs, onToggle, placement) {
         calcs.map((c) => h('td', { text: formatValue(e.calcs[c], e.unit, e.decimals) }))));
     }
     table.append(body);
-    return h('div', { style: { overflow: 'auto', maxHeight: placement === 'right' ? '100%' : '40%', flex: 'none' } }, table);
+    return h('div', { tabindex: '0', role: 'group', 'aria-label': 'Seri göstergesi', style: { overflow: 'auto', maxHeight: placement === 'right' ? '100%' : '40%', flex: 'none' } }, table);
   }
-  const wrap = h('div', { class: 'legend', style: placement === 'right' ? { flexDirection: 'column', flexWrap: 'nowrap', maxHeight: '100%' } : { maxHeight: '30%' } });
+  // Focusable so keyboard users can scroll a long legend (WCAG 2.1.1).
+  const wrap = h('div', { class: 'legend', tabindex: '0', role: 'group', 'aria-label': 'Seri göstergesi', style: placement === 'right' ? { flexDirection: 'column', flexWrap: 'nowrap', maxHeight: '100%' } : { maxHeight: '30%' } });
   for (const e of entries) {
     const calcText = calcs.map((c) => `${REDUCERS[c] || c}: ${formatValue(e.calcs[c], e.unit, e.decimals)}`).join('  ');
     wrap.append(h('span', { class: ['legend-item', e.hidden ? 'off' : ''].join(' '), title: e.name, onclick: (ev) => onToggle(e.key, ev) },

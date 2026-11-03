@@ -3,6 +3,7 @@
 const { chromium } = require(process.env.OPENREPORTING_PLAYWRIGHT_MODULE || 'playwright');
 const AxeBuilder = require(process.env.OPENREPORTING_AXE_MODULE || '@axe-core/playwright').default;
 const assert = require('node:assert/strict');
+const { THEMES, applyTheme } = require('./themes.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const base = process.env.OPENREPORTING_UI_URL || 'http://127.0.0.1:8811';
@@ -32,12 +33,9 @@ const output = process.env.OPENREPORTING_A11Y_OUTPUT || 'build/a11y-report.json'
       await page.goto(base + route);
       await page.locator('.app-shell').waitFor();
       await page.waitForLoadState('networkidle');
-      for (const theme of ['dark', 'light']) {
-        await page.evaluate(value => {
-          document.documentElement.dataset.theme = value;
-          window.dispatchEvent(new CustomEvent('openreporting:themechange', { detail: value }));
-        }, theme);
-        await scan(route, theme);
+      for (const theme of THEMES) {
+        await applyTheme(page, theme);
+        await scan(route, theme.id);
       }
     }
     // Actual user dialog: Tab wraps, Escape cancels and restores the opener.

@@ -46,10 +46,13 @@ export function syncSeriesPalette(root = document.documentElement) {
 
 export function applyThemeToDocument(themeId, root = document.documentElement) {
   const theme = BY_ID[themeId] || BY_ID[DEFAULT_THEME];
+  // Swap all tokens at once: hover/colour transitions would otherwise animate through mixed themes.
+  root.classList.add('theme-switching');
   root.dataset.theme = theme.id;
   root.dataset.scheme = theme.scheme;
   root.style.colorScheme = theme.scheme;
   syncSeriesPalette(root);
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
   return theme;
 }
 

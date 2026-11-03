@@ -146,12 +146,15 @@ export function refreshPicker({ value, onRefresh, onInterval }) {
   const refresh = button('', { icon: 'refresh', title: 'Yenile', onClick: () => onRefresh() });
   const pick = button('', { icon: 'chevron-down', title: 'Otomatik yenileme', onClick: () => {
     popover(pick, REFRESH_INTERVALS.map((iv) => h('button', { type: 'button', text: iv || 'Kapalı', onclick: () => {
-      closePopups(); label.textContent = iv; onInterval(iv);
+      closePopups(); label.textContent = iv; name(iv); onInterval(iv);
     } })), { align: 'right' });
   } });
   pick.prepend(label);
+  // The visible interval is part of the accessible name (WCAG 2.5.3 label in name).
+  const name = (v) => pick.setAttribute('aria-label', v ? `${v} otomatik yenileme` : 'Otomatik yenileme');
+  name(value);
   wrap.append(refresh, pick);
-  wrap.setValue = (v) => { label.textContent = v || ''; };
+  wrap.setValue = (v) => { label.textContent = v || ''; name(v); };
   return wrap;
 }
 
