@@ -1,4 +1,5 @@
 """Regression tests for the security/backend review fixes (viewer isolation, SQL guard, report output safety)."""
+
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
@@ -19,8 +20,13 @@ from openreporting.web import create_app
 
 EDITOR = ("editor1", "an-editor-password-123")
 VIEWER = ("viewer1", "a-viewer-password-1234")
-CPU_TARGET = {"refId": "A", "datasource": {"uid": "testdata"}, "group": {"filter": "Linux servers"},
-              "host": {"filter": "/.*/"}, "item": {"filter": "CPU utilization"}}
+CPU_TARGET = {
+    "refId": "A",
+    "datasource": {"uid": "testdata"},
+    "group": {"filter": "Linux servers"},
+    "host": {"filter": "/.*/"},
+    "item": {"filter": "CPU utilization"},
+}
 
 
 @pytest.fixture
@@ -41,10 +47,11 @@ def login(http, credentials):
 
 def saved_dashboard(http):
     headers = login(http, EDITOR)
-    model = {"title": "Viewer test", "templating": {"list": [
-        {"name": "group", "type": "custom", "query": "Linux servers,WAN Routers", "current": {"value": "Linux servers"}}]},
-        "panels": [{"id": 7, "type": "timeseries", "title": "CPU", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
-                    "targets": [CPU_TARGET]}]}
+    model = {
+        "title": "Viewer test",
+        "templating": {"list": [{"name": "group", "type": "custom", "query": "Linux servers,WAN Routers", "current": {"value": "Linux servers"}}]},
+        "panels": [{"id": 7, "type": "timeseries", "title": "CPU", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "targets": [CPU_TARGET]}],
+    }
     res = http.post("/api/dashboards/db", headers=headers, json={"dashboard": model})
     assert res.status_code == 200, res.text
     http.post("/api/logout", headers=headers)
@@ -59,11 +66,9 @@ def test_viewer_cannot_run_ad_hoc_queries(web):
     saved_dashboard(web)
     headers = login(web, VIEWER)
     assert web.post("/api/ds/query", headers=headers, json=query_body()).status_code == 403
-    find = web.post("/api/datasources/testdata/metric-find", headers=headers,
-                    json={"query": "{*}", "range": {"from": "now-1h", "to": "now"}})
+    find = web.post("/api/datasources/testdata/metric-find", headers=headers, json={"query": "{*}", "range": {"from": "now-1h", "to": "now"}})
     assert find.status_code == 403
-    resolve = web.post("/api/dashboards/variables/resolve", headers=headers,
-                       json={"dashboard": {"templating": {"list": []}}, "overrides": {}})
+    resolve = web.post("/api/dashboards/variables/resolve", headers=headers, json={"dashboard": {"templating": {"list": []}}, "overrides": {}})
     assert resolve.status_code == 403
 
 
@@ -79,8 +84,7 @@ def test_viewer_runs_the_saved_panel_not_the_posted_targets(web):
     assert all("CPU" in name for name in names)
     missing = web.post("/api/ds/query", headers=headers, json=query_body(dashboardUid=uid, panelId=99))
     assert missing.status_code == 404
-    variables = web.post("/api/dashboards/variables/resolve", headers=headers,
-                         json={"uid": uid, "dashboard": {}, "overrides": {"group": "WAN Routers"}})
+    variables = web.post("/api/dashboards/variables/resolve", headers=headers, json={"uid": uid, "dashboard": {}, "overrides": {"group": "WAN Routers"}})
     assert variables.status_code == 200
     assert variables.json()["variables"]["group"]["value"] == "WAN Routers"
 
@@ -88,8 +92,7 @@ def test_viewer_runs_the_saved_panel_not_the_posted_targets(web):
 def test_report_run_history_endpoint(web):
     uid = saved_dashboard(web)
     headers = login(web, EDITOR)
-    rid = web.post("/api/dash-reports", headers=headers,
-                   json={"name": "Geçmiş", "dashboard_uid": uid, "formats": ["pdf"]}).json()["id"]
+    rid = web.post("/api/dash-reports", headers=headers, json={"name": "Geçmiş", "dashboard_uid": uid, "formats": ["pdf"]}).json()["id"]
     run = web.post(f"/api/dash-reports/{rid}/runs", headers=headers, json={})
     assert run.status_code == 200, run.text
     runs = web.get(f"/api/dash-reports/{rid}/runs")
@@ -103,6 +106,7 @@ def test_report_run_history_endpoint(web):
 
 def test_no_route_is_bound_to_a_private_helper(web):
     from fastapi.routing import APIRoute
+
     endpoints = [r.endpoint.__name__ for r in web.app.routes if isinstance(r, APIRoute)]
     assert endpoints and not [name for name in endpoints if name.startswith("_")]
 
@@ -121,12 +125,15 @@ def test_strict_interpolation_forces_quoted_sql():
     assert strict == "SELECT 'x''; DROP TABLE t; --'"
 
 
-@pytest.mark.parametrize("sql", [
-    "SELECT E'\\'' ; DELETE FROM t",
-    "SELECT $q$ ; $q$; DROP TABLE t",
-    "SELECT U&'\\0027'",
-    "SELECT 1; DROP TABLE t",
-])
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT E'\\'' ; DELETE FROM t",
+        "SELECT $q$ ; $q$; DROP TABLE t",
+        "SELECT U&'\\0027'",
+        "SELECT 1; DROP TABLE t",
+    ],
+)
 def test_guard_sql_rejects_quote_tricks(sql):
     with pytest.raises(DataSourceError):
         guard_sql(sql)
@@ -163,7 +170,7 @@ def test_value_mappings_match_float_values():
 
 
 def test_excel_cells_are_sanitised():
-    assert _safe("=HYPERLINK(\"http://x\")") == "'=HYPERLINK(\"http://x\")"
+    assert _safe('=HYPERLINK("http://x")') == '\'=HYPERLINK("http://x")'
     assert _safe("@SUM(A1)").startswith("'")
     assert _safe("ok\x00\x07text") == "okt" + "ext"
     assert _safe(-5) == -5
@@ -186,6 +193,7 @@ def test_time_shift_moves_points_back_into_the_window(tmp_path):
     settings = replace(Settings.from_env(), data_dir=tmp_path, zabbix_url="", zabbix_token_file="", provision_testdata=True)
     from openreporting import datasources
     from openreporting.db import init_db
+
     init_db(settings)
     datasources.provision(settings)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)  # the engine only honours a "now" close to real time

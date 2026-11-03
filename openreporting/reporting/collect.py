@@ -1,4 +1,5 @@
 """Turn a dashboard + report config into data-filled sections (one per split value)."""
+
 import copy
 import logging
 from dataclasses import dataclass, field
@@ -60,8 +61,7 @@ def variable_summary(variables):
     return [(v.get("label") or name, _variable_text(v)) for name, v in variables.items() if v.get("type") != "constant"]
 
 
-def collect(settings, dashboard, config, start, end, *, user="report", max_sections=500, panel_filter=None,
-            section_limit=None, trusted=True):
+def collect(settings, dashboard, config, start, end, *, user="report", max_sections=500, panel_filter=None, section_limit=None, trusted=True):
     """Resolve variables once, then query every (section × panel).
 
     ``section_limit`` stops after N sections (previews); ``trusted=False`` formats
@@ -71,8 +71,7 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
     rng = _absolute_range(start, end)
     request = {"range": rng, "timezone": tz}
     overrides = dict(config.get("variables") or {})
-    variables, warnings = dashboard_runtime.resolve_variables(settings, dashboard, overrides, request, user=user,
-                                                              trusted=trusted)
+    variables, warnings = dashboard_runtime.resolve_variables(settings, dashboard, overrides, request, user=user, trusted=trusted)
     split = config.get("split_by")
     section_vars = []
     if split:
@@ -87,8 +86,7 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
             scoped = dashboard_runtime._scoped(variables, split, value)  # noqa: SLF001 - shared helper
             # Dependent variables (e.g. $item depending on $host) re-resolve for the section.
             dep_overrides = {**overrides, split: value}
-            dependent, dep_warn = dashboard_runtime.resolve_variables(settings, dashboard, dep_overrides, request,
-                                                                      user=user, trusted=trusted)
+            dependent, dep_warn = dashboard_runtime.resolve_variables(settings, dashboard, dep_overrides, request, user=user, trusted=trusted)
             warnings.extend(w for w in dep_warn if w not in warnings)
             dependent[split] = scoped[split]
             section_vars.append((f"{variables[split].get('label') or split}: {scoped[split].get('text', value)}", dependent))
@@ -111,12 +109,22 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
             result = PanelResult(panel=panel, title=interpolate(panel.get("title", ""), local))
             if panel.get("type") not in NO_QUERY_TYPES and panel.get("targets"):
                 try:
-                    response = query_engine.run(settings, {
-                        "targets": copy.deepcopy(panel["targets"]), "datasource": panel.get("datasource"),
-                        "range": _panel_range(panel, rng), "timezone": tz,
-                        "maxDataPoints": max(10, min(int(panel.get("maxDataPoints") or 600), 20000)), "minInterval": panel.get("interval"),
-                        "variables": local, "transformations": panel.get("transformations") or [],
-                        "dashboardTitle": dashboard.get("title", "")}, user=user, trusted=trusted)
+                    response = query_engine.run(
+                        settings,
+                        {
+                            "targets": copy.deepcopy(panel["targets"]),
+                            "datasource": panel.get("datasource"),
+                            "range": _panel_range(panel, rng),
+                            "timezone": tz,
+                            "maxDataPoints": max(10, min(int(panel.get("maxDataPoints") or 600), 20000)),
+                            "minInterval": panel.get("interval"),
+                            "variables": local,
+                            "transformations": panel.get("transformations") or [],
+                            "dashboardTitle": dashboard.get("title", ""),
+                        },
+                        user=user,
+                        trusted=trusted,
+                    )
                     result.frames = response["frames"]
                     result.interval_ms = int(response["request"]["intervalMs"])
                     for ref, res in response["results"].items():
@@ -135,8 +143,7 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
                 result.panel = {**panel, "options": {**(panel.get("options") or {}), "content": interpolate(content, local)}}
             results.append(result)
         sections.append(Section(title=title, variables=scope, panels=results))
-    return Collected(dashboard=dashboard, variables=variables, sections=sections, start=start, end=end, timezone=tz,
-                     warnings=warnings)
+    return Collected(dashboard=dashboard, variables=variables, sections=sections, start=start, end=end, timezone=tz, warnings=warnings)
 
 
 def _panel_range(panel, rng):
@@ -144,10 +151,12 @@ def _panel_range(panel, rng):
         frm, to = rng["from"], rng["to"]
         if panel.get("timeFrom"):
             from ..timerange import parse_duration
+
             to_ms = int(to)
             frm = str(to_ms - int(parse_duration(panel["timeFrom"]) * 1000))
         if panel.get("timeShift"):
             from ..timerange import parse_duration
+
             shift = int(parse_duration(panel["timeShift"]) * 1000)
             frm, to = str(int(frm) - shift), str(int(to) - shift)
         return {"from": frm, "to": to}

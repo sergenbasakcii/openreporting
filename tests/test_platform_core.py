@@ -1,4 +1,5 @@
 """Core platform behaviour: login hardening, scheduling maths, single worker, schema upgrades."""
+
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -15,8 +16,9 @@ from openreporting.worker import completed_period, exclusive_worker, run_forever
 
 @pytest.fixture
 def settings(tmp_path):
-    return replace(Settings.from_env(), data_dir=tmp_path, secure_cookie=False, mail_enabled=False,
-                   zabbix_url="", zabbix_token_file="", provision_testdata=True)
+    return replace(
+        Settings.from_env(), data_dir=tmp_path, secure_cookie=False, mail_enabled=False, zabbix_url="", zabbix_token_file="", provision_testdata=True
+    )
 
 
 @pytest.fixture

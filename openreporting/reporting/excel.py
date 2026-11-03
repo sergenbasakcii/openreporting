@@ -1,4 +1,5 @@
 """Excel (openpyxl) and CSV exports of the exact report data (all rows, no chart sampling)."""
+
 import csv
 import io
 import re
@@ -52,8 +53,12 @@ def panel_tables(result, tz, anchor_ms=0):
             units = [c.get("unit", "") for c in frame["columns"]]
             rows = []
             for row in frame["rows"]:
-                rows.append([datetime.fromtimestamp(v / 1000, timezone.utc).astimezone(tzinfo).replace(tzinfo=None)
-                             if c["type"] == "time" and v is not None else v for v, c in zip(row, frame["columns"])])
+                rows.append(
+                    [
+                        datetime.fromtimestamp(v / 1000, timezone.utc).astimezone(tzinfo).replace(tzinfo=None) if c["type"] == "time" and v is not None else v
+                        for v, c in zip(row, frame["columns"])
+                    ]
+                )
             blocks.append((frame.get("name") or "Tablo", headers, rows, units))
     series = [f for f in result.frames if f["type"] == "timeseries"]
     if series:
@@ -63,8 +68,7 @@ def panel_tables(result, tz, anchor_ms=0):
         lookups = [dict(points) for points in aligned]
         headers = ["Zaman"] + [display_name(f) for f in series]
         units = [""] + [resolve_unit(None, f.get("unit")) for f in series]
-        rows = [[datetime.fromtimestamp(t / 1000, timezone.utc).astimezone(tzinfo).replace(tzinfo=None)] +
-                [lk.get(t) for lk in lookups] for t in stamps]
+        rows = [[datetime.fromtimestamp(t / 1000, timezone.utc).astimezone(tzinfo).replace(tzinfo=None)] + [lk.get(t) for lk in lookups] for t in stamps]
         blocks.append(("Zaman serileri", headers, rows, units))
     return blocks
 
@@ -136,8 +140,7 @@ def render_xlsx(config, collected, title):
                         elif isinstance(cell.value, float):
                             cell.number_format = "#,##0.###"
                 ws.freeze_panes = "A5"
-            summary.append([_safe(section.title or "—"), _safe(result.title or kind), _safe(kind), _safe(status[:300]),
-                            _safe(sheet_name) or "—"])
+            summary.append([_safe(section.title or "—"), _safe(result.title or kind), _safe(kind), _safe(status[:300]), _safe(sheet_name) or "—"])
     for col, width in zip("ABCDE", (28, 46, 14, 60, 28)):
         summary.column_dimensions[col].width = width
     for row in summary.iter_rows(min_row=1, max_row=6):
@@ -166,7 +169,15 @@ def render_csv(config, collected, title):
                     for column, value, unit in list(zip(headers, row, units))[1:]:
                         if value is None and block_title == "Zaman serileri":
                             continue  # long format: a missing sample is simply absent
-                        writer.writerow([_safe(section.title), _safe(result.title), _safe(block_title), _safe(key), _safe(column),
-                                         "" if value is None else (value.isoformat() if isinstance(value, datetime) else _safe(value)),
-                                         _safe(unit)])
+                        writer.writerow(
+                            [
+                                _safe(section.title),
+                                _safe(result.title),
+                                _safe(block_title),
+                                _safe(key),
+                                _safe(column),
+                                "" if value is None else (value.isoformat() if isinstance(value, datetime) else _safe(value)),
+                                _safe(unit),
+                            ]
+                        )
     return out.getvalue().encode("utf-8-sig")

@@ -14,9 +14,11 @@ def unicode_bold_font_path() -> str:
     explicit = os.environ.get("OPENREPORTING_PDF_BOLD_FONT_FILE", "").strip()
     if explicit and Path(explicit).is_file():
         return explicit
-    candidates = [Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-                  Path("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf"),
-                  Path("/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf")]
+    candidates = [
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        Path("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf"),
+        Path("/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"),
+    ]
     if os.name == "nt":
         win_dir = Path(os.environ.get("WINDIR", r"C:\Windows"))
         candidates.extend(win_dir / "Fonts" / name for name in ("arialbd.ttf", "segoeuib.ttf", "tahomabd.ttf"))
@@ -40,14 +42,10 @@ def unicode_font_path() -> str:
     ]
     if os.name == "nt":
         win_dir = Path(os.environ.get("WINDIR", r"C:\Windows"))
-        candidates.extend(win_dir / "Fonts" / name for name in (
-            "arial.ttf", "segoeui.ttf", "tahoma.ttf", "calibri.ttf"
-        ))
+        candidates.extend(win_dir / "Fonts" / name for name in ("arial.ttf", "segoeui.ttf", "tahoma.ttf", "calibri.ttf"))
     font = next((path for path in candidates if path.is_file()), None)
     if font is None:
-        raise RuntimeError(
-            "Unicode PDF font unavailable. Set OPENREPORTING_PDF_FONT_FILE to a valid TrueType font."
-        )
+        raise RuntimeError("Unicode PDF font unavailable. Set OPENREPORTING_PDF_FONT_FILE to a valid TrueType font.")
     return str(font)
 
 

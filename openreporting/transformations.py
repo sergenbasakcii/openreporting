@@ -3,6 +3,7 @@
 Run on the server for the dashboard view *and* the report renderer, so a group
 summary table in the browser is byte-for-byte the same table in the PDF.
 """
+
 import re
 from collections import OrderedDict
 
@@ -11,12 +12,13 @@ from .frames import REDUCERS, display_name, reduce_values, table_frame
 from .safe_regex import RegexError, compile_slashed
 
 CATALOG = [
-    {"id": "reduce", "name": "Seriyi tek değere indir",
-     "description": "Her seriyi satıra çevirir: ortalama, en yüksek, son değer… (grup özet tablosu)"},
-    {"id": "reduceByLabel", "name": "Etikete göre matris (host × metrik)",
-     "description": "Satırlar etiket değeri (ör. host), sütunlar metrikler; hücre seçilen hesaplama."},
-    {"id": "seriesToColumns", "name": "Zamana göre birleştir",
-     "description": "Tüm zaman serilerini ortak zaman sütununda tek tabloya birleştirir."},
+    {"id": "reduce", "name": "Seriyi tek değere indir", "description": "Her seriyi satıra çevirir: ortalama, en yüksek, son değer… (grup özet tablosu)"},
+    {
+        "id": "reduceByLabel",
+        "name": "Etikete göre matris (host × metrik)",
+        "description": "Satırlar etiket değeri (ör. host), sütunlar metrikler; hücre seçilen hesaplama.",
+    },
+    {"id": "seriesToColumns", "name": "Zamana göre birleştir", "description": "Tüm zaman serilerini ortak zaman sütununda tek tabloya birleştirir."},
     {"id": "seriesToRows", "name": "Serileri satırlara çevir", "description": "Zaman, Metrik, Değer uzun format tablo."},
     {"id": "filterByName", "name": "Ada göre filtrele", "description": "Seri/sütun adını regex ile dahil et/çıkar."},
     {"id": "filterByRefId", "name": "Sorguya göre filtrele", "description": "Yalnızca seçilen sorgu sonuçlarını göster."},
@@ -57,7 +59,7 @@ def reduce_series(frames, reducers, labels_to_fields=True):
     label_keys = []
     if labels_to_fields:
         for f in series:
-            for key in (f.get("labels") or {}):
+            for key in f.get("labels") or {}:
                 if key not in label_keys and not key.endswith("id") and key != "host_technical":
                     label_keys.append(key)
     units = {f.get("unit", "") for f in series}
@@ -66,18 +68,15 @@ def reduce_series(frames, reducers, labels_to_fields=True):
     columns += [{"name": key, "type": "string"} for key in label_keys]
     for reducer in reducers:
         column = {"name": REDUCERS[reducer], "type": "number", "reducer": reducer}
-        if shared_unit and reducer not in ("count", "nullCount", "changeCount", "distinctCount",
-                                          "allIsNull", "allIsZero"):
+        if shared_unit and reducer not in ("count", "nullCount", "changeCount", "distinctCount", "allIsNull", "allIsZero"):
             column["unit"] = shared_unit
         columns.append(column)
     rows, row_units = [], []
     for f in series:
         values = [p[1] for p in f["points"]]
-        rows.append([display_name(f)] + [(f.get("labels") or {}).get(k, "") for k in label_keys] +
-                    [reduce_values(values, r) for r in reducers])
+        rows.append([display_name(f)] + [(f.get("labels") or {}).get(k, "") for k in label_keys] + [reduce_values(values, r) for r in reducers])
         row_units.append(f.get("unit", ""))
-    table = table_frame("Özet", columns, rows, ref_id=series[0]["refId"] if series else "",
-                        meta={"rowUnits": row_units if not shared_unit else []})
+    table = table_frame("Özet", columns, rows, ref_id=series[0]["refId"] if series else "", meta={"rowUnits": row_units if not shared_unit else []})
     for column, original in zip(table["columns"], columns):
         if original.get("reducer"):
             column["reducer"] = original["reducer"]
@@ -103,11 +102,9 @@ def reduce_by_label(frames, label="host", reducer="mean", column_by="name"):
             column = display_name(f) if label not in labels else (labels.get("item") or display_name(f))
         columns.setdefault(column, f.get("unit", ""))
         matrix.setdefault(row, {})[column] = reduce_values([p[1] for p in f["points"]], reducer)
-    header = [{"name": label, "type": "string"}] + [
-        {"name": name, "type": "number", **({"unit": unit} if unit else {})} for name, unit in columns.items()]
+    header = [{"name": label, "type": "string"}] + [{"name": name, "type": "number", **({"unit": unit} if unit else {})} for name, unit in columns.items()]
     rows = [[row] + [values.get(name) for name in columns] for row, values in matrix.items()]
-    return [table_frame(f"{label} × metrik", header, rows, ref_id=series[0]["refId"] if series else "",
-                        meta={"reducer": reducer})] + _tables(frames)
+    return [table_frame(f"{label} × metrik", header, rows, ref_id=series[0]["refId"] if series else "", meta={"reducer": reducer})] + _tables(frames)
 
 
 def series_to_columns(frames):
@@ -115,7 +112,8 @@ def series_to_columns(frames):
     timestamps = sorted({p[0] for f in series for p in f["points"]})
     lookups = [dict((t, v) for t, v in f["points"]) for f in series]
     columns = [{"name": "Zaman", "type": "time"}] + [
-        {"name": display_name(f), "type": "number", **({"unit": f["unit"]} if f.get("unit") else {})} for f in series]
+        {"name": display_name(f), "type": "number", **({"unit": f["unit"]} if f.get("unit") else {})} for f in series
+    ]
     rows = [[ts] + [lookup.get(ts) for lookup in lookups] for ts in timestamps]
     return [table_frame("Birleşik", columns, rows)] + _tables(frames)
 
@@ -129,8 +127,7 @@ def series_to_rows(frames):
     value_column = {"name": "Değer", "type": "number"}
     if len(units) == 1 and next(iter(units)):
         value_column["unit"] = next(iter(units))
-    return [table_frame("Satırlar", [{"name": "Zaman", "type": "time"}, {"name": "Metrik", "type": "string"},
-                                     value_column], rows)] + _tables(frames)
+    return [table_frame("Satırlar", [{"name": "Zaman", "type": "time"}, {"name": "Metrik", "type": "string"}, value_column], rows)] + _tables(frames)
 
 
 def _filter_by_name(frames, options):
@@ -153,8 +150,7 @@ def _filter_by_name(frames, options):
                 output.append(f)
         else:
             indexes = [i for i, c in enumerate(f["columns"]) if keep(c["name"])]
-            output.append(dict(f, columns=[f["columns"][i] for i in indexes],
-                               rows=[[row[i] for i in indexes] for row in f["rows"]]))
+            output.append(dict(f, columns=[f["columns"][i] for i in indexes], rows=[[row[i] for i in indexes] for row in f["rows"]]))
     return output
 
 
@@ -164,8 +160,7 @@ def _organize(frame, options):
     rename = options.get("renameByName") or {}
     indexes = [i for i, c in enumerate(frame["columns"]) if c["name"] not in exclude]
     indexes.sort(key=lambda i: order.get(frame["columns"][i]["name"], 1000 + i))
-    columns = [dict(frame["columns"][i], name=rename.get(frame["columns"][i]["name"]) or frame["columns"][i]["name"])
-               for i in indexes]
+    columns = [dict(frame["columns"][i], name=rename.get(frame["columns"][i]["name"]) or frame["columns"][i]["name"]) for i in indexes]
     return dict(frame, columns=columns, rows=[[row[i] for i in indexes] for row in frame["rows"]])
 
 
@@ -207,8 +202,7 @@ def _calculate(frame, options):
             except (TypeError, ValueError):
                 raise TransformationError("Binary calculation needs two columns or a number") from None
         op = binary.get("operator", "+")
-        ops = {"+": lambda a, b: a + b, "-": lambda a, b: a - b, "*": lambda a, b: a * b,
-               "/": lambda a, b: a / b if b else None}
+        ops = {"+": lambda a, b: a + b, "-": lambda a, b: a - b, "*": lambda a, b: a * b, "/": lambda a, b: a / b if b else None}
         if left is None or op not in ops:
             raise TransformationError("Invalid binary calculation")
         rows = []
@@ -229,8 +223,7 @@ def _calculate(frame, options):
     if options.get("replaceFields"):
         if not frame["columns"]:
             raise TransformationError("Hesaplanan sütun için tabloda sütun yok")
-        return table_frame(frame["name"], [frame["columns"][0], column],
-                           [[row[0], row[-1]] for row in rows], ref_id=frame.get("refId", ""))
+        return table_frame(frame["name"], [frame["columns"][0], column], [[row[0], row[-1]] for row in rows], ref_id=frame.get("refId", ""))
     return dict(frame, columns=frame["columns"] + [column], rows=rows)
 
 
@@ -247,9 +240,9 @@ def _grouping_matrix(frame, options):
         matrix.setdefault(row[row_i], {})[row[col_i]] = row[val_i]
     unit = frame["columns"][val_i].get("unit")
     header = [{"name": f"{options.get('rowField')}\\{options.get('columnField')}", "type": "string"}] + [
-        {"name": str(c), "type": "number", **({"unit": unit} if unit else {})} for c in columns]
-    return table_frame(frame["name"], header, [[r] + [v.get(c) for c in columns] for r, v in matrix.items()],
-                       ref_id=frame.get("refId", ""))
+        {"name": str(c), "type": "number", **({"unit": unit} if unit else {})} for c in columns
+    ]
+    return table_frame(frame["name"], header, [[r] + [v.get(c) for c in columns] for r, v in matrix.items()], ref_id=frame.get("refId", ""))
 
 
 def apply_transformations(frames, transformations):
@@ -262,13 +255,16 @@ def apply_transformations(frames, transformations):
         if kind == "reduce":
             if options.get("mode") == "reduceFields":
                 reducer = (options.get("reducers") or ["lastNotNull"])[0]
-                current = [dict(f, points=[[f["points"][-1][0], reduce_values([p[1] for p in f["points"]], reducer)]]
-                                if f["points"] else []) if f["type"] == "timeseries" else f for f in current]
+                current = [
+                    dict(f, points=[[f["points"][-1][0], reduce_values([p[1] for p in f["points"]], reducer)]] if f["points"] else [])
+                    if f["type"] == "timeseries"
+                    else f
+                    for f in current
+                ]
             else:
                 current = reduce_series(current, options.get("reducers"), options.get("labelsToFields", True))
         elif kind == "reduceByLabel":
-            current = reduce_by_label(current, str(options.get("label") or "host"),
-                                      options.get("reducer", "mean"), str(options.get("columnBy") or "name"))
+            current = reduce_by_label(current, str(options.get("label") or "host"), options.get("reducer", "mean"), str(options.get("columnBy") or "name"))
         elif kind in ("seriesToColumns", "joinByField"):
             current = series_to_columns(current)
         elif kind == "seriesToRows":
@@ -293,9 +289,12 @@ def apply_transformations(frames, transformations):
             pattern = _regex(options.get("regex"))
             replacement = re.sub(r"\$(\d+)", r"\\\1", str(options.get("renamePattern", "")))
             if pattern:
-                current = [dict(f, name=pattern.sub(replacement, display_name(f)),
-                                meta={**(f.get("meta") or {}), "displayName": None})
-                           if f["type"] == "timeseries" else f for f in current]
+                current = [
+                    dict(f, name=pattern.sub(replacement, display_name(f)), meta={**(f.get("meta") or {}), "displayName": None})
+                    if f["type"] == "timeseries"
+                    else f
+                    for f in current
+                ]
         elif kind == "merge":
             tables = _tables(current)
             if len(tables) > 1:

@@ -1,4 +1,5 @@
 """Datasource registry, Zabbix/TestData/Postgres adapters, query engine and dashboard runtime."""
+
 import json
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -24,19 +25,50 @@ def settings(tmp_path):
 
 def fake_zabbix(method, params):
     groups = [{"groupid": "1", "name": "Linux servers"}, {"groupid": "2", "name": "Routers"}]
-    hosts = [{"hostid": "10", "host": "web01", "name": "Web 01", "status": "0", "hostgroups": [{"groupid": "1"}]},
-             {"hostid": "11", "host": "web02", "name": "Web 02", "status": "0", "hostgroups": [{"groupid": "1"}]},
-             {"hostid": "20", "host": "rtr", "name": "Router", "status": "0", "hostgroups": [{"groupid": "2"}]}]
-    items = [{"itemid": "100", "hostid": "10", "name": "CPU utilization", "key_": "system.cpu.util", "units": "%",
-              "value_type": "0", "status": "0", "lastvalue": "12.5", "lastclock": "1770000000",
-              "tags": [{"tag": "component", "value": "cpu"}]},
-             {"itemid": "101", "hostid": "11", "name": "CPU utilization", "key_": "system.cpu.util", "units": "%",
-              "value_type": "0", "status": "0", "lastvalue": "40", "lastclock": "1770000000",
-              "tags": [{"tag": "component", "value": "cpu"}]},
-             {"itemid": "102", "hostid": "11", "name": "Agent version", "key_": "agent.version", "units": "",
-              "value_type": "1", "status": "0", "lastvalue": "7.0", "lastclock": "1770000000", "tags": []},
-             {"itemid": "200", "hostid": "20", "name": "CPU utilization", "key_": "cpu", "units": "%",
-              "value_type": "3", "status": "0", "tags": []}]
+    hosts = [
+        {"hostid": "10", "host": "web01", "name": "Web 01", "status": "0", "hostgroups": [{"groupid": "1"}]},
+        {"hostid": "11", "host": "web02", "name": "Web 02", "status": "0", "hostgroups": [{"groupid": "1"}]},
+        {"hostid": "20", "host": "rtr", "name": "Router", "status": "0", "hostgroups": [{"groupid": "2"}]},
+    ]
+    items = [
+        {
+            "itemid": "100",
+            "hostid": "10",
+            "name": "CPU utilization",
+            "key_": "system.cpu.util",
+            "units": "%",
+            "value_type": "0",
+            "status": "0",
+            "lastvalue": "12.5",
+            "lastclock": "1770000000",
+            "tags": [{"tag": "component", "value": "cpu"}],
+        },
+        {
+            "itemid": "101",
+            "hostid": "11",
+            "name": "CPU utilization",
+            "key_": "system.cpu.util",
+            "units": "%",
+            "value_type": "0",
+            "status": "0",
+            "lastvalue": "40",
+            "lastclock": "1770000000",
+            "tags": [{"tag": "component", "value": "cpu"}],
+        },
+        {
+            "itemid": "102",
+            "hostid": "11",
+            "name": "Agent version",
+            "key_": "agent.version",
+            "units": "",
+            "value_type": "1",
+            "status": "0",
+            "lastvalue": "7.0",
+            "lastclock": "1770000000",
+            "tags": [],
+        },
+        {"itemid": "200", "hostid": "20", "name": "CPU utilization", "key_": "cpu", "units": "%", "value_type": "3", "status": "0", "tags": []},
+    ]
     if method == "apiinfo.version":
         return "7.0.5"
     if method == "hostgroup.get":
@@ -54,19 +86,24 @@ def fake_zabbix(method, params):
                 rows.append({"itemid": itemid, "clock": str(params["time_from"] + n * 60), "value": str(10 * n + int(itemid) % 7)})
         return rows
     if method == "trend.get":
-        return [{"itemid": i, "clock": str(params["time_from"]), "num": "60", "value_min": "1", "value_avg": "5",
-                 "value_max": "9"} for i in params["itemids"]]
+        return [{"itemid": i, "clock": str(params["time_from"]), "num": "60", "value_min": "1", "value_avg": "5", "value_max": "9"} for i in params["itemids"]]
     if method == "trigger.get":
-        return [{"triggerid": "7", "description": "High CPU", "priority": "4", "lastchange": "1770000000",
-                 "hosts": [{"hostid": "11", "name": "Web 02"}]}]
+        return [{"triggerid": "7", "description": "High CPU", "priority": "4", "lastchange": "1770000000", "hosts": [{"hostid": "11", "name": "Web 02"}]}]
     raise AssertionError(method)
 
 
 def add_zabbix(settings):
-    return datasources.save(settings, "tester", {"type": "zabbix", "name": "Zabbix Prod",
-                                                 "url": "https://zbx.example.org/api_jsonrpc.php",
-                                                 "jsonData": {"trends_from": "7d", "trends_range": "4d"},
-                                                 "secureJsonData": {"token": "super-secret-token"}})
+    return datasources.save(
+        settings,
+        "tester",
+        {
+            "type": "zabbix",
+            "name": "Zabbix Prod",
+            "url": "https://zbx.example.org/api_jsonrpc.php",
+            "jsonData": {"trends_from": "7d", "trends_range": "4d"},
+            "secureJsonData": {"token": "super-secret-token"},
+        },
+    )
 
 
 def test_provisioned_testdata_and_secret_never_listed(settings):
@@ -78,8 +115,7 @@ def test_provisioned_testdata_and_secret_never_listed(settings):
     with connect(settings) as db:
         stored = db.execute("SELECT secure_json FROM datasources WHERE uid=?", (uid,)).fetchone()[0]
     assert "super-secret-token" not in stored
-    datasources.save(settings, "tester", {"type": "zabbix", "name": "Zabbix Prod",
-                                          "url": "https://zbx.example.org/api_jsonrpc.php", "jsonData": {}}, uid=uid)
+    datasources.save(settings, "tester", {"type": "zabbix", "name": "Zabbix Prod", "url": "https://zbx.example.org/api_jsonrpc.php", "jsonData": {}}, uid=uid)
     assert datasources.get(settings, uid).api.token == "super-secret-token"
     with pytest.raises(DataSourceError):
         datasources.save(settings, "t", {"type": "zabbix", "name": "Bad", "url": "http://x/api_jsonrpc.php"})
@@ -92,8 +128,13 @@ def test_zabbix_group_query_regex_tags_and_trends(settings):
     ds = datasources.get(settings, uid, transport=fake_zabbix)
     end = datetime.now(timezone.utc)
     ctx = QueryContext(start=end - timedelta(hours=1), end=end, interval_s=60, max_points=1000)
-    target = {"refId": "A", "group": {"filter": "/Linux/"}, "host": {"filter": "*"},
-              "item": {"filter": "CPU utilization"}, "itemTag": {"filter": "component: cpu"}}
+    target = {
+        "refId": "A",
+        "group": {"filter": "/Linux/"},
+        "host": {"filter": "*"},
+        "item": {"filter": "CPU utilization"},
+        "itemTag": {"filter": "component: cpu"},
+    }
     result = ds.query(target, ctx)
     assert sorted(f["labels"]["host"] for f in result.frames) == ["Web 01", "Web 02"]
     assert result.frames[0]["labels"]["group"] == "Linux servers"
@@ -128,37 +169,61 @@ def test_filters_support_regex_glob_and_exact():
 
 def test_sql_guard_and_macros():
     assert guard_sql("SELECT 1;") == "SELECT 1"
-    for bad in ("DELETE FROM t", "SELECT 1; DROP TABLE t", "WITH x AS (DELETE FROM t RETURNING *) SELECT 1",
-                "SELECT * INTO new_t FROM t", "COPY t TO '/tmp/x'"):
+    for bad in (
+        "DELETE FROM t",
+        "SELECT 1; DROP TABLE t",
+        "WITH x AS (DELETE FROM t RETURNING *) SELECT 1",
+        "SELECT * INTO new_t FROM t",
+        "COPY t TO '/tmp/x'",
+    ):
         with pytest.raises(DataSourceError):
             guard_sql(bad)
     assert guard_sql("SELECT 'a;b' AS v -- comment;\n") == "SELECT 'a;b' AS v"
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    sql = expand_macros("SELECT $__unixEpochGroupAlias(clock, 5m), avg(value) FROM h WHERE $__unixEpochFilter(clock) "
-                        "AND $__timeFilter(ts)", start, start + timedelta(hours=1), 60)
-    assert "(floor(clock/300)*300) AS \"time\"" in sql and "clock >= 1767225600" in sql and "BETWEEN" in sql
+    sql = expand_macros(
+        "SELECT $__unixEpochGroupAlias(clock, 5m), avg(value) FROM h WHERE $__unixEpochFilter(clock) AND $__timeFilter(ts)",
+        start,
+        start + timedelta(hours=1),
+        60,
+    )
+    assert '(floor(clock/300)*300) AS "time"' in sql and "clock >= 1767225600" in sql and "BETWEEN" in sql
     with pytest.raises(DataSourceError):
         expand_macros("SELECT $__timeFilter(1;drop)", start, start, 60)
-    frames = rows_to_frames(["time", "metric", "value"], [(1767225600, "a", 1.5), (1767225660, "a", None),
-                                                          (1767225600, "b", 3)], "time_series", "A")
+    frames = rows_to_frames(["time", "metric", "value"], [(1767225600, "a", 1.5), (1767225660, "a", None), (1767225600, "b", 3)], "time_series", "A")
     assert {f["name"]: len(f["points"]) for f in frames} == {"a": 2, "b": 1}
     table = rows_to_frames(["host", "value"], [("x", 1)], "table", "A")[0]
     assert table["columns"][1]["type"] == "number"
 
 
 def test_query_engine_testdata_group_report_flow(settings):
-    response = query_engine.run(settings, {
-        "range": {"from": "now-6h", "to": "now"}, "maxDataPoints": 200,
-        "variables": {"group": {"value": "Linux servers"}},
-        "targets": [{"refId": "A", "datasource": {"uid": "testdata"}, "group": {"filter": "$group"},
-                     "host": {"filter": "/.*/"}, "item": {"filter": "CPU utilization"}},
-                    {"refId": "B", "datasource": {"uid": "testdata"}, "group": {"filter": "$group"},
-                     "host": {"filter": "/.*/"}, "item": {"filter": "CPU utilization"},
-                     "functions": [{"name": "aggregateBy", "params": ["10m", "avg"]}, {"name": "setAlias", "params": ["Grup ortalaması"]}]},
-                    {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "math",
-                     "expression": "$B * 2", "hide": True}],
-        "transformations": [{"id": "filterByRefId", "options": {"include": "A"}},
-                            {"id": "reduceByLabel", "options": {"label": "host", "reducer": "max"}}]}, user="t")
+    response = query_engine.run(
+        settings,
+        {
+            "range": {"from": "now-6h", "to": "now"},
+            "maxDataPoints": 200,
+            "variables": {"group": {"value": "Linux servers"}},
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {"uid": "testdata"},
+                    "group": {"filter": "$group"},
+                    "host": {"filter": "/.*/"},
+                    "item": {"filter": "CPU utilization"},
+                },
+                {
+                    "refId": "B",
+                    "datasource": {"uid": "testdata"},
+                    "group": {"filter": "$group"},
+                    "host": {"filter": "/.*/"},
+                    "item": {"filter": "CPU utilization"},
+                    "functions": [{"name": "aggregateBy", "params": ["10m", "avg"]}, {"name": "setAlias", "params": ["Grup ortalaması"]}],
+                },
+                {"refId": "C", "datasource": {"type": "__expr__", "uid": "__expr__"}, "type": "math", "expression": "$B * 2", "hide": True},
+            ],
+            "transformations": [{"id": "filterByRefId", "options": {"include": "A"}}, {"id": "reduceByLabel", "options": {"label": "host", "reducer": "max"}}],
+        },
+        user="t",
+    )
     assert response["results"]["A"]["error"] is None
     assert response["results"]["C"]["error"] is None
     table = response["frames"][0]
@@ -167,26 +232,42 @@ def test_query_engine_testdata_group_report_flow(settings):
 
 
 def test_query_engine_reports_bad_target_without_crashing(settings):
-    response = query_engine.run(settings, {"range": {"from": "now-1h", "to": "now"},
-                                           "targets": [{"refId": "A", "datasource": {"uid": "missing"}},
-                                                       {"refId": "B", "datasource": {"uid": "testdata"},
-                                                        "scenario": "sine"}]})
+    response = query_engine.run(
+        settings,
+        {
+            "range": {"from": "now-1h", "to": "now"},
+            "targets": [{"refId": "A", "datasource": {"uid": "missing"}}, {"refId": "B", "datasource": {"uid": "testdata"}, "scenario": "sine"}],
+        },
+    )
     assert "bulunamadı" in response["results"]["A"]["error"]
     assert response["results"]["B"]["error"] is None and response["frames"]
 
 
 def test_dashboard_import_normalizes_grafana_json(settings):
-    grafana = {"__inputs": [{"name": "DS_ZABBIX", "type": "datasource", "pluginId": "alexanderzobnin-zabbix-datasource"}],
-               "title": "Imported", "uid": "imp-1", "version": 7,
-               "templating": {"list": [{"name": "host", "type": "query", "datasource": "${DS_ZABBIX}",
-                                        "query": "{Linux servers}{*}", "multi": True, "includeAll": True}]},
-               "panels": [{"id": 3, "type": "graph", "title": "CPU $host", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
-                           "datasource": "${DS_ZABBIX}", "yaxes": [{"format": "percent"}], "fill": 2,
-                           "targets": [{"group": {"filter": "Linux servers"}, "host": {"filter": "$host"},
-                                        "item": {"filter": "CPU utilization"}, "queryType": "0"}],
-                           "repeat": "host"},
-                          {"type": "alexanderzobnin-zabbix-triggers-panel", "title": "Problems", "targets": [{}]},
-                          {"type": "some-unknown-plugin", "title": "X"}]}
+    grafana = {
+        "__inputs": [{"name": "DS_ZABBIX", "type": "datasource", "pluginId": "alexanderzobnin-zabbix-datasource"}],
+        "title": "Imported",
+        "uid": "imp-1",
+        "version": 7,
+        "templating": {
+            "list": [{"name": "host", "type": "query", "datasource": "${DS_ZABBIX}", "query": "{Linux servers}{*}", "multi": True, "includeAll": True}]
+        },
+        "panels": [
+            {
+                "id": 3,
+                "type": "graph",
+                "title": "CPU $host",
+                "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+                "datasource": "${DS_ZABBIX}",
+                "yaxes": [{"format": "percent"}],
+                "fill": 2,
+                "targets": [{"group": {"filter": "Linux servers"}, "host": {"filter": "$host"}, "item": {"filter": "CPU utilization"}, "queryType": "0"}],
+                "repeat": "host",
+            },
+            {"type": "alexanderzobnin-zabbix-triggers-panel", "title": "Problems", "targets": [{}]},
+            {"type": "some-unknown-plugin", "title": "X"},
+        ],
+    }
     rows = datasources.list_all(settings)
     mapping = dashboards.import_map(rows, grafana)
     model = dashboards.normalize(grafana, mapping)
@@ -202,14 +283,34 @@ def test_dashboard_import_normalizes_grafana_json(settings):
 def test_dashboard_versions_conflicts_and_repeat_expansion(settings):
     uid = create_user(settings, "editor1", "an-editor-password-123", "editor")
     user = {"id": uid, "role": "editor"}
-    model = {"title": "Group report", "templating": {"list": [
-        {"name": "group", "type": "custom", "query": "Linux servers,WAN Routers", "current": {"value": "Linux servers"}},
-        {"name": "host", "type": "query", "datasource": {"uid": "testdata"}, "query": "{$group}{*}",
-         "multi": True, "includeAll": True, "current": {"value": ["$__all"]}}]},
-        "panels": [{"type": "row", "title": "Host $host", "repeat": "host", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}},
-                   {"type": "stat", "title": "CPU $host", "gridPos": {"x": 0, "y": 1, "w": 6, "h": 4},
-                    "targets": [{"datasource": {"uid": "testdata"}, "group": {"filter": "$group"},
-                                 "host": {"filter": "$host"}, "item": {"filter": "CPU utilization"}}]}]}
+    model = {
+        "title": "Group report",
+        "templating": {
+            "list": [
+                {"name": "group", "type": "custom", "query": "Linux servers,WAN Routers", "current": {"value": "Linux servers"}},
+                {
+                    "name": "host",
+                    "type": "query",
+                    "datasource": {"uid": "testdata"},
+                    "query": "{$group}{*}",
+                    "multi": True,
+                    "includeAll": True,
+                    "current": {"value": ["$__all"]},
+                },
+            ]
+        },
+        "panels": [
+            {"type": "row", "title": "Host $host", "repeat": "host", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}},
+            {
+                "type": "stat",
+                "title": "CPU $host",
+                "gridPos": {"x": 0, "y": 1, "w": 6, "h": 4},
+                "targets": [
+                    {"datasource": {"uid": "testdata"}, "group": {"filter": "$group"}, "host": {"filter": "$host"}, "item": {"filter": "CPU utilization"}}
+                ],
+            },
+        ],
+    }
     saved = dashboards.save(settings, user, model, message="ilk")
     loaded = dashboards.get(settings, saved["uid"], user)
     assert loaded["dashboard"]["version"] == 1
@@ -245,10 +346,14 @@ def test_stored_token_is_not_kept_when_the_destination_changes(settings):
 
 def test_repeated_row_clones_keep_their_source_panel_id(settings):
     # Report panel selection matches clones by source id, not id % 1000.
-    model = {"title": "Repeat ids", "templating": {"list": [
-        {"name": "host", "type": "custom", "query": "a,b,c", "multi": True, "current": {"value": ["a", "b", "c"]}}]},
-        "panels": [{"type": "row", "id": 1, "title": "Host $host", "repeat": "host", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}},
-                   {"type": "stat", "id": 5, "title": "CPU $host", "gridPos": {"x": 0, "y": 1, "w": 6, "h": 4}}]}
+    model = {
+        "title": "Repeat ids",
+        "templating": {"list": [{"name": "host", "type": "custom", "query": "a,b,c", "multi": True, "current": {"value": ["a", "b", "c"]}}]},
+        "panels": [
+            {"type": "row", "id": 1, "title": "Host $host", "repeat": "host", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}},
+            {"type": "stat", "id": 5, "title": "CPU $host", "gridPos": {"x": 0, "y": 1, "w": 6, "h": 4}},
+        ],
+    }
     variables, _ = dashboard_runtime.resolve_variables(settings, model)
     stats = [p for p in dashboard_runtime.expand(model, variables) if p["type"] == "stat"]
     assert len(stats) == 3
@@ -256,8 +361,13 @@ def test_repeated_row_clones_keep_their_source_panel_id(settings):
 
 
 def test_failed_variable_options_never_widen_a_filter_to_everything(settings):
-    model = {"templating": {"list": [{"name": "host", "type": "query", "datasource": {"uid": "missing-source"},
-                                      "query": "x", "includeAll": True, "current": {"value": "$__all"}}]}}
+    model = {
+        "templating": {
+            "list": [
+                {"name": "host", "type": "query", "datasource": {"uid": "missing-source"}, "query": "x", "includeAll": True, "current": {"value": "$__all"}}
+            ]
+        }
+    }
     variables, warnings = dashboard_runtime.resolve_variables(settings, model)
     assert warnings and variables["host"]["value"] == dashboard_runtime.UNRESOLVED
     variables, _ = dashboard_runtime.resolve_variables(settings, model, {"host": "srv-01"})

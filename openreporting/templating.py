@@ -4,6 +4,7 @@ Values are formatted for their destination: Zabbix filters receive anchored
 regexes for multi-value selections, SQL receives escaped quoted literals. A
 viewer-controlled textbox can therefore never inject raw SQL by default.
 """
+
 import json
 import re
 from urllib.parse import quote
@@ -14,13 +15,11 @@ _PATTERN = re.compile(r"\$(\w+)|\[\[(\w+?)(?::(\w+))?\]\]|\$\{(\w+)(?::([^}]+))?
 
 def _values(variable):
     value = variable.get("value") if isinstance(variable, dict) else variable
-    if isinstance(variable, dict) and variable.get("includeAll") and (
-            value == ALL or (isinstance(value, list) and ALL in value)):
+    if isinstance(variable, dict) and variable.get("includeAll") and (value == ALL or (isinstance(value, list) and ALL in value)):
         if variable.get("allValue"):
             return None  # Grafana semantics: custom all value is used verbatim.
         options = variable.get("options") or []
-        return [str(o.get("value") if isinstance(o, dict) else o) for o in options
-                if (o.get("value") if isinstance(o, dict) else o) != ALL]
+        return [str(o.get("value") if isinstance(o, dict) else o) for o in options if (o.get("value") if isinstance(o, dict) else o) != ALL]
     if value is None:
         return []
     if isinstance(value, list):
@@ -37,7 +36,7 @@ def _sql_quote(value):
 def format_values(values, fmt, *, multi=False, name=""):
     if fmt == "promql":
         # A regex value inside a double-quoted PromQL/LogQL label matcher.
-        escaped = [re.sub(r'([\\.^$|?*+(){}\[\]])', r'\\\1', v) for v in values]
+        escaped = [re.sub(r"([\\.^$|?*+(){}\[\]])", r"\\\1", v) for v in values]
         pattern = escaped[0] if len(escaped) == 1 else "(" + "|".join(escaped) + ")"
         return json.dumps(pattern, ensure_ascii=False)[1:-1]
     if fmt in (None, "", "raw"):
@@ -138,31 +137,37 @@ def interpolate(text, variables, *, default_format=None, builtins=None, strict=F
     return _PATTERN.sub(replace, text)
 
 
-def interpolate_deep(value, variables, *, default_format=None, builtins=None, skip_keys=("refId", "datasource"),
-                     strict=False):
+def interpolate_deep(value, variables, *, default_format=None, builtins=None, skip_keys=("refId", "datasource"), strict=False):
     """Recursively interpolate every string inside a query target."""
     if isinstance(value, str):
         return interpolate(value, variables, default_format=default_format, builtins=builtins, strict=strict)
     if isinstance(value, list):
-        return [interpolate_deep(v, variables, default_format=default_format, builtins=builtins, strict=strict,
-                                 skip_keys=skip_keys) for v in value]
+        return [interpolate_deep(v, variables, default_format=default_format, builtins=builtins, strict=strict, skip_keys=skip_keys) for v in value]
     if isinstance(value, dict):
-        return {k: (v if k in skip_keys else interpolate_deep(v, variables, default_format=default_format, strict=strict,
-                                                              builtins=builtins, skip_keys=skip_keys))
-                for k, v in value.items()}
+        return {
+            k: (v if k in skip_keys else interpolate_deep(v, variables, default_format=default_format, strict=strict, builtins=builtins, skip_keys=skip_keys))
+            for k, v in value.items()
+        }
     return value
 
 
 def builtin_variables(start, end, interval_s, *, dashboard="", user="", timezone_name="UTC"):
     interval_ms = int(interval_s * 1000)
     from .timerange import format_duration
+
     range_s = int((end - start).total_seconds())
     return {
-        "__interval": format_duration(interval_s), "__interval_ms": interval_ms,
-        "__from": int(start.timestamp() * 1000), "__to": int(end.timestamp() * 1000),
-        "__range": format_duration(range_s) if range_s else "0s", "__range_s": range_s,
-        "__range_ms": range_s * 1000, "__dashboard": dashboard, "__user": user,
-        "__timezone": timezone_name, "__rate_interval": format_duration(max(interval_s * 4, 60)),
+        "__interval": format_duration(interval_s),
+        "__interval_ms": interval_ms,
+        "__from": int(start.timestamp() * 1000),
+        "__to": int(end.timestamp() * 1000),
+        "__range": format_duration(range_s) if range_s else "0s",
+        "__range_s": range_s,
+        "__range_ms": range_s * 1000,
+        "__dashboard": dashboard,
+        "__user": user,
+        "__timezone": timezone_name,
+        "__rate_interval": format_duration(max(interval_s * 4, 60)),
     }
 
 

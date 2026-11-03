@@ -1,4 +1,5 @@
 """Dashboards, folders, stars, versions, import and annotations."""
+
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -57,8 +58,7 @@ def _fail(exc):
 
 
 @router.get("/api/search")
-def search(request: Request, query: str = "", tag: str = "", folderUid: str | None = None, starred: bool = False,
-           user=Depends(authenticate)):
+def search(request: Request, query: str = "", tag: str = "", folderUid: str | None = None, starred: bool = False, user=Depends(authenticate)):
     results = dashboards.search(settings_of(request), user, query[:200], tag[:50], folderUid, starred)
     return results
 
@@ -79,8 +79,7 @@ def get_dashboard(uid: str, request: Request, user=Depends(authenticate)):
 @router.post("/api/dashboards/db")
 def save_dashboard(body: DashboardSaveIn, request: Request, user=Depends(editor)):
     try:
-        return dashboards.save(settings_of(request), user, body.dashboard, folder_uid=body.folderUid,
-                               message=body.message, overwrite=body.overwrite)
+        return dashboards.save(settings_of(request), user, body.dashboard, folder_uid=body.folderUid, message=body.message, overwrite=body.overwrite)
     except DomainError as exc:
         _fail(exc)
 
@@ -91,8 +90,7 @@ def import_dashboard(body: ImportIn, request: Request, user=Depends(editor)):
     mapping = dashboards.import_map(datasources.list_all(settings), body.dashboard)
     try:
         folder = body.folderUid if body.folderUid is not None else dashboards.KEEP_FOLDER
-        result = dashboards.save(settings, user, body.dashboard, folder_uid=folder,
-                                 message="İçe aktarıldı", overwrite=body.overwrite, ds_map=mapping)
+        result = dashboards.save(settings, user, body.dashboard, folder_uid=folder, message="İçe aktarıldı", overwrite=body.overwrite, ds_map=mapping)
     except DomainError as exc:
         _fail(exc)
     return result
@@ -150,8 +148,8 @@ def resolve_variables(body: ResolveIn, request: Request, user=Depends(viewer_wri
         else:
             raise HTTPException(403, "İzleyiciler yalnızca kayıtlı dashboard değişkenlerini çözebilir")
         variables, warnings = dashboard_runtime.resolve_variables(
-            settings, model, body.overrides, {"range": body.range, "timezone": body.timezone},
-            user=user["username"], trusted=trusted)
+            settings, model, body.overrides, {"range": body.range, "timezone": body.timezone}, user=user["username"], trusted=trusted
+        )
     except DomainError as exc:
         _fail(exc)
     return {"variables": variables, "warnings": warnings}
@@ -206,16 +204,17 @@ def remove_folder(uid: str, request: Request, user=Depends(editor)):
 
 
 @router.get("/api/annotations")
-def list_annotations(request: Request, dashboardUID: str = "", start: int = 0, end: int = 0,
-                     user=Depends(authenticate)):
+def list_annotations(request: Request, dashboardUID: str = "", start: int = 0, end: int = 0, user=Depends(authenticate)):
     with connect(settings_of(request)) as db:
         if dashboardUID:
             folder_access.require_dashboard(db, user, dashboardUID)
-        rows = db.execute("""SELECT a.id,a.dashboard_uid,a.panel_id,a.time_ms,a.time_end_ms,a.text,a.tags_json,
+        rows = db.execute(
+            """SELECT a.id,a.dashboard_uid,a.panel_id,a.time_ms,a.time_end_ms,a.text,a.tags_json,
                              a.created_at,u.username AS created_by FROM annotations a LEFT JOIN users u ON u.id=a.created_by
                              WHERE (a.dashboard_uid=? OR a.dashboard_uid IS NULL) AND a.time_ms<=? AND
                              COALESCE(a.time_end_ms,a.time_ms)>=? ORDER BY a.time_ms LIMIT 1000""",
-                          (dashboardUID or None, end or 2**53, start)).fetchall()
+            (dashboardUID or None, end or 2**53, start),
+        ).fetchall()
     return [{**dict(r), "tags": json.loads(r["tags_json"])} for r in rows]
 
 
@@ -227,9 +226,10 @@ def create_annotation(body: AnnotationIn, request: Request, user=Depends(editor)
     with connect(settings_of(request)) as db, transaction(db):
         if body.dashboardUID:
             folder_access.require_dashboard(db, user, body.dashboardUID, edit=True)
-        db.execute("INSERT INTO annotations VALUES(?,?,?,?,?,?,?,?,?)",
-                   (annotation_id, body.dashboardUID, body.panelId, body.time, body.timeEnd, body.text,
-                    json.dumps([t[:50] for t in body.tags]), utcnow(), user["id"]))
+        db.execute(
+            "INSERT INTO annotations VALUES(?,?,?,?,?,?,?,?,?)",
+            (annotation_id, body.dashboardUID, body.panelId, body.time, body.timeEnd, body.text, json.dumps([t[:50] for t in body.tags]), utcnow(), user["id"]),
+        )
         audit(db, user["id"], "annotation.created", "annotation", annotation_id)
     return {"id": annotation_id}
 

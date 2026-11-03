@@ -3,6 +3,7 @@
 Keep SQLite connection details here so the application-facing db module and
 operations commands can gain another backend without duplicating driver logic.
 """
+
 import os
 import sqlite3
 import time

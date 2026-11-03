@@ -1,4 +1,5 @@
 """Dashboard reports: definitions, preview, instant runs, schedules, archive downloads."""
+
 import threading
 from urllib.parse import quote
 
@@ -25,8 +26,14 @@ class _heavy:
 
     def __exit__(self, *exc):
         HEAVY_RENDERS.release()
-MEDIA = {"pdf": "application/pdf", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-         "csv": "text/csv; charset=utf-8", "manifest": "application/json"}
+
+
+MEDIA = {
+    "pdf": "application/pdf",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "csv": "text/csv; charset=utf-8",
+    "manifest": "application/json",
+}
 
 
 class ReportIn(BaseModel):
@@ -100,8 +107,7 @@ def content_disposition(name, fmt):
 
 
 def _file_response(payload, fmt, name):
-    return Response(payload, media_type=MEDIA.get(fmt, "application/octet-stream"),
-                    headers={"Content-Disposition": content_disposition(name, fmt)})
+    return Response(payload, media_type=MEDIA.get(fmt, "application/octet-stream"), headers={"Content-Disposition": content_disposition(name, fmt)})
 
 
 @router.get("/api/dash-reports")
@@ -176,11 +182,11 @@ def preview(body: PreviewIn, request: Request, user=Depends(editor)):
         from ..reporting.excel import render_csv, render_xlsx
         from ..reporting.pdf import render_pdf
         from .. import dashboards
+
         dashboard = dashboards.get(settings, config["dashboard_uid"], user)["dashboard"]
         renderer = {"pdf": render_pdf, "xlsx": render_xlsx, "csv": render_csv}[fmt]
         with _heavy():
-            collected = collect(settings, dashboard, config, start, end, user=user["username"],
-                                section_limit=body.max_sections)
+            collected = collect(settings, dashboard, config, start, end, user=user["username"], section_limit=body.max_sections)
             extra = {"logo": service.report_logo(settings, config)} if fmt == "pdf" else {}
             payload = renderer(config, collected, f"{config['name']} (önizleme)", **extra)
         dashboards.get(settings, config["dashboard_uid"], user)
@@ -194,17 +200,38 @@ def export_dashboard(body: DashboardExportIn, request: Request, user=Depends(vie
     """One-click 'download this dashboard as PDF/Excel' with the current time range and variables."""
     settings = settings_of(request)
     from .. import dashboards
+
     try:
         dashboard = dashboards.get(settings, body.dashboard_uid, user)["dashboard"]
-        config = service.validate_config({"name": dashboard["title"], "dashboard_uid": body.dashboard_uid,
-                                          "time_range": body.time_range, "timezone": body.timezone,
-                                          "variables": body.variables, "layout": body.layout, "orientation": body.orientation,
-                                          "formats": [body.format], "cover": False, "toc": False}, settings, user)
+        config = service.validate_config(
+            {
+                "name": dashboard["title"],
+                "dashboard_uid": body.dashboard_uid,
+                "time_range": body.time_range,
+                "timezone": body.timezone,
+                "variables": body.variables,
+                "layout": body.layout,
+                "orientation": body.orientation,
+                "formats": [body.format],
+                "cover": False,
+                "toc": False,
+            },
+            settings,
+            user,
+        )
         start, end = resolve_range(config["time_range"]["from"], config["time_range"]["to"], config["timezone"])
         with _heavy():
-            _, outputs, _ = service.build_outputs(settings, config, dashboard["title"], start, end,
-                                                  user=user["username"], formats=[config["formats"][0]],
-                                                  trusted=user["role"] in ("admin", "editor"), principal=user)
+            _, outputs, _ = service.build_outputs(
+                settings,
+                config,
+                dashboard["title"],
+                start,
+                end,
+                user=user["username"],
+                formats=[config["formats"][0]],
+                trusted=user["role"] in ("admin", "editor"),
+                principal=user,
+            )
     except (DomainError, TimeRangeError) as exc:
         _fail(exc)
     fmt = config["formats"][0]

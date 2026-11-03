@@ -1,4 +1,5 @@
 """User administration (admin) and self-service profile/preferences."""
+
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -59,11 +60,14 @@ def _email(value):
 @router.get("/api/users")
 def list_users(request: Request, user=Depends(admin_read)):
     with connect(settings_of(request)) as db:
-        return [dict(r) for r in db.execute("""SELECT u.id,username,role,active,email,display_name,created_at,last_login_at,
+        return [
+            dict(r)
+            for r in db.execute("""SELECT u.id,username,role,active,email,display_name,created_at,last_login_at,
                                                COALESCE(e.provider,'local') AS auth_provider,
                                                COALESCE(m.enabled,0) AS mfa_enabled
                                                FROM users u LEFT JOIN external_identities e ON e.user_id=u.id
-                                               LEFT JOIN user_mfa m ON m.user_id=u.id ORDER BY username""")]
+                                               LEFT JOIN user_mfa m ON m.user_id=u.id ORDER BY username""")
+        ]
 
 
 @router.post("/api/users", status_code=201)
@@ -79,8 +83,7 @@ def add_user(body: UserIn, request: Request, user=Depends(admin)):
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     with connect(settings) as db, transaction(db):
-        db.execute("UPDATE users SET email=?,display_name=? WHERE id=?",
-                   (_email(body.email), body.display_name.strip(), uid))
+        db.execute("UPDATE users SET email=?,display_name=? WHERE id=?", (_email(body.email), body.display_name.strip(), uid))
         audit(db, user["id"], "user.created_by_admin", "user", uid, {"role": body.role})
     return {"id": uid}
 
@@ -111,8 +114,7 @@ def update_user(user_id: str, body: UserPatch, request: Request, user=Depends(ad
             raise HTTPException(409, "Kendi hesabınızı devre dışı bırakamazsınız")
         email = _email(body.email) if body.email is not None else target["email"]
         name = body.display_name.strip() if body.display_name is not None else target["display_name"]
-        db.execute("UPDATE users SET role=?,active=?,email=?,display_name=? WHERE id=?",
-                   (role, active, email, name, user_id))
+        db.execute("UPDATE users SET role=?,active=?,email=?,display_name=? WHERE id=?", (role, active, email, name, user_id))
         if not active or role != target["role"]:
             db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
         audit(db, user["id"], "user.updated", "user", user_id, {"role": role, "active": bool(active)})
@@ -157,17 +159,17 @@ def reset_mfa(user_id: str, body: MfaReset, request: Request, user=Depends(admin
 @router.get("/api/user")
 def current_user(request: Request, user=Depends(authenticate)):
     with connect(settings_of(request)) as db:
-        row = db.execute("""SELECT u.id,username,role,email,display_name,last_login_at,COALESCE(e.provider,'local') AS auth_provider
+        row = db.execute(
+            """SELECT u.id,username,role,email,display_name,last_login_at,COALESCE(e.provider,'local') AS auth_provider
                             FROM users u LEFT JOIN external_identities e ON e.user_id=u.id WHERE u.id=?""",
-                         (user["id"],)).fetchone()
-        prefs = db.execute("SELECT theme,timezone,home_dashboard_uid FROM user_prefs WHERE user_id=?",
-                           (user["id"],)).fetchone()
+            (user["id"],),
+        ).fetchone()
+        prefs = db.execute("SELECT theme,timezone,home_dashboard_uid FROM user_prefs WHERE user_id=?", (user["id"],)).fetchone()
         if prefs and prefs["home_dashboard_uid"]:
             target = db.execute("SELECT folder_id FROM dashboards WHERE uid=?", (prefs["home_dashboard_uid"],)).fetchone()
             if not target or not folder_access.allowed(db, user, target["folder_id"]):
                 prefs = {**dict(prefs), "home_dashboard_uid": None}
-    return {**dict(row), "preferences": dict(prefs) if prefs else
-            {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None}}
+    return {**dict(row), "preferences": dict(prefs) if prefs else {"theme": "dark", "timezone": "browser", "home_dashboard_uid": None}}
 
 
 @router.put("/api/user/preferences")
@@ -180,18 +182,19 @@ def update_preferences(body: PreferencesIn, request: Request, user=Depends(viewe
         except TimeRangeError as exc:
             raise HTTPException(422, str(exc)) from exc
     with connect(settings_of(request)) as db, transaction(db):
-        if body.home_dashboard_uid and not db.execute("SELECT 1 FROM dashboards WHERE uid=?",
-                                                      (body.home_dashboard_uid,)).fetchone():
+        if body.home_dashboard_uid and not db.execute("SELECT 1 FROM dashboards WHERE uid=?", (body.home_dashboard_uid,)).fetchone():
             raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı")
         if body.home_dashboard_uid:
             try:
                 folder_access.require_dashboard(db, user, body.home_dashboard_uid)
             except HTTPException:
                 raise HTTPException(422, "Ana sayfa dashboard'u bulunamadı") from None
-        db.execute("""INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,updated_at) VALUES(?,?,?,?,?)
+        db.execute(
+            """INSERT INTO user_prefs(user_id,theme,timezone,home_dashboard_uid,updated_at) VALUES(?,?,?,?,?)
                       ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,timezone=excluded.timezone,
                       home_dashboard_uid=excluded.home_dashboard_uid,updated_at=excluded.updated_at""",
-                   (user["id"], body.theme, body.timezone, body.home_dashboard_uid, utcnow()))
+            (user["id"], body.theme, body.timezone, body.home_dashboard_uid, utcnow()),
+        )
     return body.model_dump()
 
 
@@ -214,6 +217,7 @@ def change_password(body: PasswordChange, request: Request, user=Depends(viewer_
         raise HTTPException(422, str(exc)) from exc
     token = request.cookies.get("openreporting_session", "")
     from ..security import digest
+
     with connect(settings) as db, transaction(db):
         db.execute("UPDATE users SET password_hash=? WHERE id=?", (hashed, user["id"]))
         db.execute("DELETE FROM sessions WHERE user_id=? AND token_hash<>?", (user["id"], digest(token)))

@@ -1,4 +1,5 @@
 """Verified TLS SMTP transport shared by reports and non-delivery diagnostics."""
+
 import re
 import smtplib
 import ssl
@@ -22,6 +23,7 @@ def validate_settings(settings):
         if not re.fullmatch(r"[^\s/@:]+", settings.smtp_host):
             raise ValueError("SMTP_HOST must be a hostname or IP address")
         from .domain import validate_emails
+
         validate_emails([settings.smtp_from], (settings.smtp_from.lower().rsplit("@", 1)[-1],))
         if not settings.recipient_domains or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}", d) for d in settings.recipient_domains):
             raise ValueError("Invalid SMTP recipient domain allowlist")

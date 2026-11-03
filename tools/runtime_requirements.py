@@ -3,6 +3,7 @@
 Run after installing the application. Test/audit tools are excluded unless a runtime
 package itself requires them. This is an inventory, not a cross-platform lock file.
 """
+
 import argparse
 from importlib import metadata
 from pathlib import Path
@@ -12,27 +13,31 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 
-def inventory(project, scope='runtime'):
-    with project.open('rb') as handle:
+def inventory(project, scope="runtime"):
+    with project.open("rb") as handle:
         manifest = tomllib.load(handle)
-    if scope not in {'runtime','build','test'}:
-        raise ValueError('Unknown dependency scope')
-    roots = (manifest['project']['dependencies'] if scope=='runtime' else
-             ['pip',*manifest['build-system']['requires']] if scope=='build' else
-             manifest['project']['optional-dependencies']['test'])
+    if scope not in {"runtime", "build", "test"}:
+        raise ValueError("Unknown dependency scope")
+    roots = (
+        manifest["project"]["dependencies"]
+        if scope == "runtime"
+        else ["pip", *manifest["build-system"]["requires"]]
+        if scope == "build"
+        else manifest["project"]["optional-dependencies"]["test"]
+    )
     queue = [Requirement(raw) for raw in roots]
     result, visited = {}, set()
     while queue:
         requirement = queue.pop()
         if requirement.url:
-            raise ValueError('Runtime audit inventory does not export URL requirements')
-        if requirement.marker and not requirement.marker.evaluate({'extra':''}):
+            raise ValueError("Runtime audit inventory does not export URL requirements")
+        if requirement.marker and not requirement.marker.evaluate({"extra": ""}):
             continue
         name = canonicalize_name(requirement.name)
         distribution = metadata.distribution(name)
         version = distribution.version
         if requirement.specifier and not requirement.specifier.contains(version, prereleases=True):
-            raise ValueError(f'Installed {name} does not meet the runtime version constraint')
+            raise ValueError(f"Installed {name} does not meet the runtime version constraint")
         result[name] = version
         key = (name, tuple(sorted(requirement.extras)))
         if key in visited:
@@ -40,8 +45,8 @@ def inventory(project, scope='runtime'):
         visited.add(key)
         for raw in distribution.requires or []:
             dependency = Requirement(raw)
-            extras = requirement.extras or {''}
-            if dependency.marker and not any(dependency.marker.evaluate({'extra':extra}) for extra in extras):
+            extras = requirement.extras or {""}
+            if dependency.marker and not any(dependency.marker.evaluate({"extra": extra}) for extra in extras):
                 continue
             # Already evaluated in the declaring package's extra context.
             dependency.marker = None
@@ -51,18 +56,18 @@ def inventory(project, scope='runtime'):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--project', type=Path, default=Path(__file__).resolve().parents[1] / 'pyproject.toml')
-    parser.add_argument('--output', type=Path)
+    parser.add_argument("--project", type=Path, default=Path(__file__).resolve().parents[1] / "pyproject.toml")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     data = inventory(args.project)
-    text = ''.join(f'{name}=={version}\n' for name, version in data.items())
+    text = "".join(f"{name}=={version}\n" for name, version in data.items())
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(text, encoding='utf8')
-        print(f'Inventoried {len(data)} installed runtime packages; no private package paths exported')
+        args.output.write_text(text, encoding="utf8")
+        print(f"Inventoried {len(data)} installed runtime packages; no private package paths exported")
     else:
-        print(text, end='')
+        print(text, end="")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

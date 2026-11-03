@@ -1,4 +1,5 @@
 """Python mirror of the browser's field-config, thresholds and colors (static/app/colors.js)."""
+
 import copy
 import math
 import re
@@ -8,30 +9,72 @@ from ..safe_regex import RegexError, compile_slashed
 from ..units import format_value, resolve_unit
 
 NAMED = {
-    "green": "#73BF69", "dark-green": "#37872D", "semi-dark-green": "#56A64B", "light-green": "#96D98D",
-    "yellow": "#FADE2A", "dark-yellow": "#E0B400", "semi-dark-yellow": "#F2CC0C", "light-yellow": "#FFEE52",
-    "red": "#F2495C", "dark-red": "#C4162A", "semi-dark-red": "#E02F44", "light-red": "#FF7383",
-    "blue": "#5794F2", "dark-blue": "#1F60C4", "semi-dark-blue": "#3274D9", "light-blue": "#8AB8FF",
-    "orange": "#FF9830", "dark-orange": "#FA6400", "semi-dark-orange": "#FF780A", "light-orange": "#FFB357",
-    "purple": "#B877D9", "dark-purple": "#8F3BB8", "semi-dark-purple": "#A352CC", "light-purple": "#CA95E5",
-    "text": "#404450", "white": "#FFFFFF", "black": "#000000", "transparent": "#FFFFFF",
+    "green": "#73BF69",
+    "dark-green": "#37872D",
+    "semi-dark-green": "#56A64B",
+    "light-green": "#96D98D",
+    "yellow": "#FADE2A",
+    "dark-yellow": "#E0B400",
+    "semi-dark-yellow": "#F2CC0C",
+    "light-yellow": "#FFEE52",
+    "red": "#F2495C",
+    "dark-red": "#C4162A",
+    "semi-dark-red": "#E02F44",
+    "light-red": "#FF7383",
+    "blue": "#5794F2",
+    "dark-blue": "#1F60C4",
+    "semi-dark-blue": "#3274D9",
+    "light-blue": "#8AB8FF",
+    "orange": "#FF9830",
+    "dark-orange": "#FA6400",
+    "semi-dark-orange": "#FF780A",
+    "light-orange": "#FFB357",
+    "purple": "#B877D9",
+    "dark-purple": "#8F3BB8",
+    "semi-dark-purple": "#A352CC",
+    "light-purple": "#CA95E5",
+    "text": "#404450",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "transparent": "#FFFFFF",
 }
-PALETTE = ["#73BF69", "#F2CC0C", "#8AB8FF", "#FF780A", "#F2495C", "#5794F2", "#B877D9", "#705DA0", "#37872D", "#FADE2A",
-           "#447EBC", "#C15C17", "#890F02", "#0A437C", "#6D1F62", "#584477", "#B7DBAB", "#F4D598", "#70DBED", "#F9BA8F"]
+PALETTE = [
+    "#73BF69",
+    "#F2CC0C",
+    "#8AB8FF",
+    "#FF780A",
+    "#F2495C",
+    "#5794F2",
+    "#B877D9",
+    "#705DA0",
+    "#37872D",
+    "#FADE2A",
+    "#447EBC",
+    "#C15C17",
+    "#890F02",
+    "#0A437C",
+    "#6D1F62",
+    "#584477",
+    "#B7DBAB",
+    "#F4D598",
+    "#70DBED",
+    "#F9BA8F",
+]
 DEFAULT_THRESHOLDS = {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "red", "value": 80}]}
 
 PANEL_DEFAULTS = {
-    "timeseries": {"options": {"legend": {"showLegend": True, "displayMode": "list", "calcs": []}},
-                   "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1}, "color": "palette-classic"},
+    "timeseries": {
+        "options": {"legend": {"showLegend": True, "displayMode": "list", "calcs": []}},
+        "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1},
+        "color": "palette-classic",
+    },
     "barchart": {"options": {"reduceOptions": {"calcs": ["mean"]}}, "color": "palette-classic"},
-    "stat": {"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area",
-                         "textMode": "auto"}, "color": "thresholds"},
+    "stat": {"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area", "textMode": "auto"}, "color": "thresholds"},
     "gauge": {"options": {"reduceOptions": {"calcs": ["lastNotNull"]}}, "color": "thresholds", "min": 0, "max": 100},
     "bargauge": {"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "displayMode": "gradient"}, "color": "thresholds"},
     "table": {"options": {}, "color": "thresholds"},
     "piechart": {"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "pieType": "pie"}, "color": "palette-classic"},
-    "statusgrid": {"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "labelField": "host", "sort": "name"},
-                   "color": "thresholds"},
+    "statusgrid": {"options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "labelField": "host", "sort": "name"}, "color": "thresholds"},
     "statetimeline": {"options": {}, "color": "thresholds"},
 }
 
@@ -191,8 +234,17 @@ def reduced_items(panel, frames):
             value = reduce_values(values, calc)
             unit = resolve_unit(cfg.get("unit"), frame.get("unit"))
             label = cfg.get("displayName") or name
-            items.append({"name": label, "value": value, "unit": unit, "cfg": cfg, "color": series_color(cfg, index, value),
-                          "points": frame["points"], "labels": frame.get("labels") or {}})
+            items.append(
+                {
+                    "name": label,
+                    "value": value,
+                    "unit": unit,
+                    "cfg": cfg,
+                    "color": series_color(cfg, index, value),
+                    "points": frame["points"],
+                    "labels": frame.get("labels") or {},
+                }
+            )
             index += 1
         else:
             label_index = next((i for i, c in enumerate(frame["columns"]) if c["type"] == "string"), None)
@@ -204,17 +256,22 @@ def reduced_items(panel, frames):
                     for ri, row in enumerate(frame["rows"]):
                         row_units = (frame.get("meta") or {}).get("rowUnits") or []
                         unit = resolve_unit(cfg.get("unit"), column.get("unit") or (row_units[ri] if ri < len(row_units) else ""))
-                        label = (f"{row[label_index]}" + (f" · {column['name']}" if len(numeric) > 1 else "")
-                                 if label_index is not None else f"{column['name']} {ri + 1}")
+                        label = (
+                            f"{row[label_index]}" + (f" · {column['name']}" if len(numeric) > 1 else "")
+                            if label_index is not None
+                            else f"{column['name']} {ri + 1}"
+                        )
                         value = row[ci]
-                        items.append({"name": label, "value": value, "unit": unit, "cfg": cfg,
-                                      "color": series_color(cfg, index, value), "points": [], "labels": {}})
+                        items.append(
+                            {"name": label, "value": value, "unit": unit, "cfg": cfg, "color": series_color(cfg, index, value), "points": [], "labels": {}}
+                        )
                         index += 1
                 else:
                     value = reduce_values([r[ci] for r in frame["rows"]], calc)
                     unit = resolve_unit(cfg.get("unit"), column.get("unit"))
-                    items.append({"name": column["name"], "value": value, "unit": unit, "cfg": cfg,
-                                  "color": series_color(cfg, index, value), "points": [], "labels": {}})
+                    items.append(
+                        {"name": column["name"], "value": value, "unit": unit, "cfg": cfg, "color": series_color(cfg, index, value), "points": [], "labels": {}}
+                    )
                     index += 1
     limit = int(options(panel, "reduceOptions.limit", 0) or 0)
     return items[:limit] if limit > 0 else items
@@ -222,7 +279,7 @@ def reduced_items(panel, frames):
 
 def hex_rgb(value):
     value = color(value).lstrip("#")
-    return tuple(int(value[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return tuple(int(value[i : i + 2], 16) / 255 for i in (0, 2, 4))
 
 
 def contrast(value):

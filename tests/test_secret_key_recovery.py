@@ -1,4 +1,5 @@
 """A missing key must never be replaced when credential state is unknown."""
+
 from dataclasses import replace
 
 import pytest
@@ -33,9 +34,12 @@ def test_missing_key_with_stored_credentials_is_not_replaced(settings):
     init_db(settings)
     token = encrypt(settings, {"token": "test-value"})
     with connect(settings) as db:
-        db.execute("""INSERT INTO datasources
+        db.execute(
+            """INSERT INTO datasources
             (id,uid,name,type,secure_json,created_at,updated_at,updated_by)
-            VALUES (?,?,?,?,?,?,?,?)""", ("test", "test", "Test", "testdata", token, "test", "test", "test"))
+            VALUES (?,?,?,?,?,?,?,?)""",
+            ("test", "test", "Test", "testdata", token, "test", "test", "test"),
+        )
     key_path(settings).unlink()
     reset_cache()
     assert has_encrypted_secrets(settings)
@@ -66,6 +70,7 @@ def test_read_only_inspection_handles_special_characters_in_path(settings):
     settings = replace(settings, data_dir=settings.data_dir / "space # question ? unicode ç")
     # '?' is not a valid Windows filename; exercise the other URI-sensitive characters there.
     import os
+
     if os.name == "nt":
         settings = replace(settings, data_dir=settings.data_dir.with_name("space # unicode ç"))
     init_db(settings)

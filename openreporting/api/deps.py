@@ -1,4 +1,5 @@
 """Shared FastAPI dependencies: authentication, CSRF and role gates."""
+
 from fastapi import Depends, HTTPException, Request
 
 from ..runtime_settings import effective

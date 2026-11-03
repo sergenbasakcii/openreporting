@@ -1,4 +1,5 @@
 """Time math, units, series functions, expressions, transformations, templating."""
+
 from datetime import datetime, timezone
 
 import pytest
@@ -124,21 +125,27 @@ def test_transformations_group_matrix_and_summary():
     table = matrix[0]
     assert [c["name"] for c in table["columns"]] == ["host", "CPU", "Memory"]
     assert table["rows"] == [["h1", 20, 50], ["h2", 80, 30]]
-    summary = apply_transformations(frames, [{"id": "reduce", "options": {"reducers": ["max", "mean"]}},
-                                             {"id": "sortBy", "options": {"sort": [{"field": "En yüksek", "desc": True}]}},
-                                             {"id": "limit", "options": {"limitField": 2}}])
+    summary = apply_transformations(
+        frames,
+        [
+            {"id": "reduce", "options": {"reducers": ["max", "mean"]}},
+            {"id": "sortBy", "options": {"sort": [{"field": "En yüksek", "desc": True}]}},
+            {"id": "limit", "options": {"limitField": 2}},
+        ],
+    )
     assert len(summary[0]["rows"]) == 2 and summary[0]["rows"][0][0] == "h2: CPU"
     joined = apply_transformations(frames[:2], [{"id": "seriesToColumns"}])
     assert joined[0]["columns"][0]["type"] == "time" and len(joined[0]["rows"]) == 2
-    calc = apply_transformations(matrix, [{"id": "calculateField", "options": {"mode": "reduceRow", "alias": "Toplam",
-                                                                                 "reduce": {"reducer": "sum"}}}])
+    calc = apply_transformations(matrix, [{"id": "calculateField", "options": {"mode": "reduceRow", "alias": "Toplam", "reduce": {"reducer": "sum"}}}])
     assert calc[0]["rows"][0][-1] == 70
 
 
 def test_variable_interpolation_formats():
-    variables = {"host": {"value": ["a.b", "c"], "multi": True, "options": []},
-                 "group": {"value": ALL, "includeAll": True, "options": [{"text": "x", "value": "x"}, {"text": "y", "value": "y"}]},
-                 "name": {"value": "O'Brien"}}
+    variables = {
+        "host": {"value": ["a.b", "c"], "multi": True, "options": []},
+        "group": {"value": ALL, "includeAll": True, "options": [{"text": "x", "value": "x"}, {"text": "y", "value": "y"}]},
+        "name": {"value": "O'Brien"},
+    }
     assert interpolate("$host", variables, default_format="zabbix") == "/^(?:a\\.b|c)$/"
     assert interpolate("${host:csv}", variables) == "a.b,c"
     assert interpolate("[[host:pipe]]", variables) == "a.b|c"

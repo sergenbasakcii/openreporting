@@ -43,6 +43,7 @@ def test_local_unicode_pdf_is_not_helvetica_fallback(monkeypatch):
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.pdfgen import canvas
+
     pdfmetrics.registerFont(TTFont("PortableCheck", path))
     out = BytesIO()
     page = canvas.Canvas(out)
@@ -50,4 +51,3 @@ def test_local_unicode_pdf_is_not_helvetica_fallback(monkeypatch):
     page.drawString(40, 800, "Ağ Performansı — Türkiye · Örnek %97")
     page.save()
     assert out.getvalue().startswith(b"%PDF-")
-

@@ -4,6 +4,7 @@ The browser has the same logic in ``static/app/variables.js``/``layout.js``.
 Reports use this module so that "repeat for each host in $group" produces the
 same panels in the PDF as on screen.
 """
+
 import copy
 import re
 
@@ -13,8 +14,16 @@ from .domain import DomainError
 from .safe_regex import compile_slashed
 from .templating import ALL, interpolate
 
-SORTS = {1: (False, False), 2: (False, True), 3: (True, False), 4: (True, True), 5: (False, False, True),
-         6: (False, True, True), 7: (True, False, True), 8: (True, True, True)}
+SORTS = {
+    1: (False, False),
+    2: (False, True),
+    3: (True, False),
+    4: (True, True),
+    5: (False, False, True),
+    6: (False, True, True),
+    7: (True, False, True),
+    8: (True, True, True),
+}
 
 
 def _options_from_custom(query):
@@ -77,8 +86,7 @@ def variable_options(settings, var, resolved, request, *, user="", trusted=True)
         return _options_from_custom(var.get("query") or "1m,10m,30m,1h,6h,12h,1d,7d")
     if kind == "datasource":
         wanted = var.get("query") or ""
-        return [{"text": d["name"], "value": d["uid"]} for d in datasources.list_all(settings)
-                if not wanted or d["type"] == wanted]
+        return [{"text": d["name"], "value": d["uid"]} for d in datasources.list_all(settings) if not wanted or d["type"] == wanted]
     if kind in ("constant", "textbox"):
         value = str(var.get("query") or "")
         return [{"text": value, "value": value}]
@@ -87,8 +95,7 @@ def variable_options(settings, var, resolved, request, *, user="", trusted=True)
     query = var.get("query")
     if isinstance(query, dict) and "query" in query and len(query) <= 3 and not query.get("type"):
         query = query.get("query")
-    found = query_engine.metric_find(settings, uid, query, {**request, "variables": resolved}, user=user,
-                                     trusted=trusted)
+    found = query_engine.metric_find(settings, uid, query, {**request, "variables": resolved}, user=user, trusted=trusted)
     options = [{"text": str(o.get("text")), "value": str(o.get("value", o.get("text")))} for o in found]
     return _sort(_apply_regex(options, var.get("regex")), var.get("sort"))
 
@@ -140,8 +147,7 @@ def _pick(var, options, override):
 def resolve_variables(settings, dashboard, overrides=None, request=None, *, user="", trusted=True):
     """Return {name: {value, text, options, multi, includeAll, allValue}} in dependency order."""
     overrides = overrides or {}
-    request = request or {"range": dashboard.get("time") or {"from": "now-6h", "to": "now"},
-                          "timezone": "UTC"}
+    request = request or {"range": dashboard.get("time") or {"from": "now-6h", "to": "now"}, "timezone": "UTC"}
     resolved = {}
     warnings = []
     for var in (dashboard.get("templating") or {}).get("list", []):
@@ -158,11 +164,17 @@ def resolve_variables(settings, dashboard, overrides=None, request=None, *, user
             if _override_missing(var, options, override, value):
                 warnings.append(f"${name}: istenen değer artık seçenekler arasında yok; yerine '{value}' kullanıldı")
         values = value if isinstance(value, list) else [value]
-        text = " + ".join("Tümü" if v == ALL else next((o["text"] for o in options if o["value"] == v), v)
-                          for v in values)
-        resolved[name] = {"value": value, "text": text, "options": options, "multi": bool(var.get("multi")),
-                          "includeAll": bool(var.get("includeAll")), "allValue": var.get("allValue") or None,
-                          "type": var.get("type"), "label": var.get("label") or name}
+        text = " + ".join("Tümü" if v == ALL else next((o["text"] for o in options if o["value"] == v), v) for v in values)
+        resolved[name] = {
+            "value": value,
+            "text": text,
+            "options": options,
+            "multi": bool(var.get("multi")),
+            "includeAll": bool(var.get("includeAll")),
+            "allValue": var.get("allValue") or None,
+            "type": var.get("type"),
+            "label": var.get("label") or name,
+        }
     return resolved, warnings
 
 
@@ -201,8 +213,9 @@ def compact(panels):
         pos = dict(panel["gridPos"])
         y = 0
         while True:
-            collision = next((q for q in placed if pos["x"] < q["x"] + q["w"] and q["x"] < pos["x"] + pos["w"]
-                              and y < q["y"] + q["h"] and q["y"] < y + pos["h"]), None)
+            collision = next(
+                (q for q in placed if pos["x"] < q["x"] + q["w"] and q["x"] < pos["x"] + pos["w"] and y < q["y"] + q["h"] and q["y"] < y + pos["h"]), None
+            )
             if collision is None:
                 break
             y = collision["y"] + collision["h"]
@@ -244,12 +257,11 @@ def expand(dashboard, variables, include_collapsed=True):
             section_height = 0
             for panel in members:
                 repeat_var = panel.get("repeat")
-                panel_values = (expanded_values(scope[repeat_var]) if repeat_var and repeat_var in scope else [None])
+                panel_values = expanded_values(scope[repeat_var]) if repeat_var and repeat_var in scope else [None]
                 rel_y = panel["gridPos"]["y"] - base_y
                 count = len(panel_values)
                 per_row = int(panel.get("maxPerRow") or 0) or max(1, 24 // max(1, panel["gridPos"]["w"]))
-                width = panel["gridPos"]["w"] if panel.get("repeatDirection") == "v" or count == 1 else \
-                    max(1, 24 // max(1, min(count, per_row)))
+                width = panel["gridPos"]["w"] if panel.get("repeatDirection") == "v" or count == 1 else max(1, 24 // max(1, min(count, per_row)))
                 for index, pv in enumerate(panel_values):
                     clone = copy.deepcopy(panel)
                     local = _scoped(scope, repeat_var, pv) if pv is not None else scope

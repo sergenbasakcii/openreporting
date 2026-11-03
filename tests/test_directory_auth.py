@@ -1,4 +1,5 @@
 """Directory trust boundaries, identity collision, role sync and local recovery."""
+
 import json
 from contextlib import contextmanager
 from dataclasses import replace
@@ -16,28 +17,45 @@ from openreporting.web import create_app
 
 @pytest.fixture
 def settings(tmp_path):
-    return replace(Settings.from_env(), data_dir=tmp_path, secure_cookie=False, secret_key_file="", database_url="",
-                   ldap_enabled=True, ldap_url="ldaps://directory.example.com:636", ldap_bind_dn="cn=reader,dc=example,dc=com",
-                   ldap_bind_password="isolated-service-password", ldap_base_dn="dc=example,dc=com",
-                   ldap_group_roles=json.dumps({"cn=readers,dc=example,dc=com": "viewer", "cn=editors,dc=example,dc=com": "editor"}))
+    return replace(
+        Settings.from_env(),
+        data_dir=tmp_path,
+        secure_cookie=False,
+        secret_key_file="",
+        database_url="",
+        ldap_enabled=True,
+        ldap_url="ldaps://directory.example.com:636",
+        ldap_bind_dn="cn=reader,dc=example,dc=com",
+        ldap_bind_password="isolated-service-password",
+        ldap_base_dn="dc=example,dc=com",
+        ldap_group_roles=json.dumps({"cn=readers,dc=example,dc=com": "viewer", "cn=editors,dc=example,dc=com": "editor"}),
+    )
 
 
 def directory_fixture(monkeypatch, *, groups=None, entries=1, bind_code=0, search_code=0):
     state = SimpleNamespace(calls=[], filters=[])
-    attrs = {"memberOf": groups if groups is not None else ["cn=readers,dc=example,dc=com"], "mail": ["reader@example.com"], "displayName": ["Directory reader"]}
+    attrs = {
+        "memberOf": groups if groups is not None else ["cn=readers,dc=example,dc=com"],
+        "mail": ["reader@example.com"],
+        "displayName": ["Directory reader"],
+    }
     entry = {"type": "searchResEntry", "dn": "cn=reader,dc=example,dc=com", "raw_attributes": {"objectGUID": [b"stable-id"]}, "attributes": attrs}
+
     @contextmanager
     def connection(settings, username, password):
         state.calls.append((username, password))
         is_service = len(state.calls) % 2 == 1
         conn = SimpleNamespace(result={"result": 0 if is_service else bind_code}, response=[entry] * entries)
         conn.bind = lambda: is_service or bind_code == 0
+
         def search(base, query, **kwargs):
             state.filters.append((query, kwargs))
             conn.result = {"result": search_code}
             return entries > 0 and search_code == 0
+
         conn.search = search
         yield conn
+
     monkeypatch.setattr(ldap, "_connection", connection)
     return state
 
@@ -94,13 +112,13 @@ def test_directory_provision_sync_and_no_password_fallback(settings, monkeypatch
     with pytest.raises(HTTPException):
         security.login(settings, "renamed-reader", "directory-password")
     with TestClient(app, base_url="http://localhost") as http:
-        response = http.post('/api/login', json={"username": "reader", "password": "directory-password"})
+        response = http.post("/api/login", json={"username": "reader", "password": "directory-password"})
         assert response.status_code == 200
         headers = {"X-CSRF-Token": response.json()["csrf"]}
-        assert http.get('/api/user').json()["auth_provider"] == "ldap"
-        assert http.put('/api/user/password', json={"old_password": "x", "new_password": "an-arbitrary-password"}, headers=headers).status_code == 409
+        assert http.get("/api/user").json()["auth_provider"] == "ldap"
+        assert http.put("/api/user/password", json={"old_password": "x", "new_password": "an-arbitrary-password"}, headers=headers).status_code == 409
         # Viewer isolation remains intact for provisioned directory users.
-        assert http.get('/api/users').status_code == 403
+        assert http.get("/api/users").status_code == 403
 
 
 def test_local_disable_outage_and_lockout(settings, monkeypatch):
@@ -113,8 +131,10 @@ def test_local_disable_outage_and_lockout(settings, monkeypatch):
     with pytest.raises(HTTPException) as failure:
         security.login(settings, "reader", "password")
     assert failure.value.status_code == 401
+
     def outage(*args):
         raise ldap.DirectoryUnavailable("safe operational message")
+
     monkeypatch.setattr(ldap, "authenticate", outage)
     with pytest.raises(HTTPException) as failure:
         security.login(settings, "newreader", "password")
@@ -138,16 +158,16 @@ def test_external_password_and_role_admin_guards(settings, monkeypatch):
     monkeypatch.setattr(ldap, "authenticate", lambda *args: ldap.Identity("subject", "viewer"))
     security.login(settings, "reader", "password")
     with TestClient(app, base_url="http://localhost") as http:
-        res = http.post('/api/login', json={"username":"admin1", "password":"local-recovery-password-123"})
+        res = http.post("/api/login", json={"username": "admin1", "password": "local-recovery-password-123"})
         headers = {"X-CSRF-Token": res.json()["csrf"]}
-        user = next(x for x in http.get('/api/users').json() if x['username'] == 'reader')
-        assert http.patch(f"/api/users/{user['id']}", json={"role":"admin"}, headers=headers).status_code == 409
-        assert http.post(f"/api/users/{user['id']}/password", json={"password":"a-local-backdoor-password"}, headers=headers).status_code == 409
-        assert http.patch(f"/api/users/{user['id']}", json={"active":False}, headers=headers).status_code == 200
-        assert http.post('/api/admin/integrations/ldap/check', json={}).status_code == 403
-        monkeypatch.setattr(ldap, 'check_connection', lambda *args: 'verified')
-        assert http.post('/api/admin/integrations/ldap/check', json={}, headers=headers).json()['ok'] is True
-        assert 'isolated-service-password' not in http.get('/api/admin/integrations').text
+        user = next(x for x in http.get("/api/users").json() if x["username"] == "reader")
+        assert http.patch(f"/api/users/{user['id']}", json={"role": "admin"}, headers=headers).status_code == 409
+        assert http.post(f"/api/users/{user['id']}/password", json={"password": "a-local-backdoor-password"}, headers=headers).status_code == 409
+        assert http.patch(f"/api/users/{user['id']}", json={"active": False}, headers=headers).status_code == 200
+        assert http.post("/api/admin/integrations/ldap/check", json={}).status_code == 403
+        monkeypatch.setattr(ldap, "check_connection", lambda *args: "verified")
+        assert http.post("/api/admin/integrations/ldap/check", json={}, headers=headers).json()["ok"] is True
+        assert "isolated-service-password" not in http.get("/api/admin/integrations").text
     with db.connect(settings) as conn:
         assert db.verify_audit(conn) == (True, None)
 
@@ -168,34 +188,39 @@ def test_v2_to_v3_preserves_local_users(settings, monkeypatch):
 def test_connection_never_binds_before_starttls(settings, monkeypatch):
     import ldap3
     import ssl
+
     events = []
+
     def server(host, **options):
-        assert options['tls'].validate == ssl.CERT_REQUIRED
-        assert options['tls'].valid_names == [host]
-        assert options['connect_timeout'] == settings.ldap_timeout
+        assert options["tls"].validate == ssl.CERT_REQUIRED
+        assert options["tls"].valid_names == [host]
+        assert options["connect_timeout"] == settings.ldap_timeout
         return object()
+
     def connection(server, **options):
-        assert options['read_only'] and options['auto_referrals'] is False
-        assert options['receive_timeout'] == settings.ldap_timeout
-        return SimpleNamespace(closed=False, open=lambda:events.append('open'),
-                               start_tls=lambda:events.append('tls') or False, unbind=lambda:events.append('close'))
-    monkeypatch.setattr(ldap3, 'Server', server)
-    monkeypatch.setattr(ldap3, 'Connection', connection)
+        assert options["read_only"] and options["auto_referrals"] is False
+        assert options["receive_timeout"] == settings.ldap_timeout
+        return SimpleNamespace(
+            closed=False, open=lambda: events.append("open"), start_tls=lambda: events.append("tls") or False, unbind=lambda: events.append("close")
+        )
+
+    monkeypatch.setattr(ldap3, "Server", server)
+    monkeypatch.setattr(ldap3, "Connection", connection)
     with pytest.raises(ldap.DirectoryUnavailable):
-        ldap.check_connection(replace(settings, ldap_url='ldap://directory.example.com:389'))
-    assert events == ['open','tls','close']
+        ldap.check_connection(replace(settings, ldap_url="ldap://directory.example.com:389"))
+    assert events == ["open", "tls", "close"]
 
 
 def test_disabled_ldap_invalidates_external_sessions_and_keeps_recovery_admin(settings, monkeypatch):
     app = create_app(settings)
-    security.create_user(settings, 'admin1', 'local-recovery-password-123', 'admin')
-    monkeypatch.setattr(ldap, 'authenticate', lambda *args:ldap.Identity('subject','admin'))
+    security.create_user(settings, "admin1", "local-recovery-password-123", "admin")
+    monkeypatch.setattr(ldap, "authenticate", lambda *args: ldap.Identity("subject", "admin"))
     with TestClient(app, base_url="http://localhost") as directory_http:
-        assert directory_http.post('/api/login',json={'username':'reader','password':'password'}).status_code == 200
+        assert directory_http.post("/api/login", json={"username": "reader", "password": "password"}).status_code == 200
         with TestClient(app, base_url="http://localhost") as local_http:
-            res = local_http.post('/api/login',json={'username':'admin1','password':'local-recovery-password-123'})
-            headers = {'X-CSRF-Token':res.json()['csrf']}
-            target = next(u for u in local_http.get('/api/users').json() if u['username']=='admin1')
-            assert local_http.patch(f"/api/users/{target['id']}",json={'role':'viewer'},headers=headers).status_code == 409
+            res = local_http.post("/api/login", json={"username": "admin1", "password": "local-recovery-password-123"})
+            headers = {"X-CSRF-Token": res.json()["csrf"]}
+            target = next(u for u in local_http.get("/api/users").json() if u["username"] == "admin1")
+            assert local_http.patch(f"/api/users/{target['id']}", json={"role": "viewer"}, headers=headers).status_code == 409
         app.state.settings = replace(settings, ldap_enabled=False)
-        assert directory_http.get('/api/user').status_code == 401
+        assert directory_http.get("/api/user").status_code == 401

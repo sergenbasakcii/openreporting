@@ -1,4 +1,5 @@
 """Dashboard report engine: group sections, PDF/XLSX/CSV, schedules, archive integrity, API."""
+
 import io
 import json
 import zipfile
@@ -19,40 +20,85 @@ DS = {"uid": "testdata"}
 
 
 def target(ref, item, functions=None, **extra):
-    return {"refId": ref, "datasource": DS, "scenario": "zabbix_sim", "group": {"filter": "$group"},
-            "host": {"filter": "$host"}, "item": {"filter": item}, "functions": functions or [], **extra}
+    return {
+        "refId": ref,
+        "datasource": DS,
+        "scenario": "zabbix_sim",
+        "group": {"filter": "$group"},
+        "host": {"filter": "$host"},
+        "item": {"filter": item},
+        "functions": functions or [],
+        **extra,
+    }
 
 
 DASHBOARD = {
-    "uid": "rep-test", "title": "Rapor testi", "time": {"from": "now-6h", "to": "now"},
-    "templating": {"list": [
-        {"name": "group", "type": "custom", "query": "Linux servers,WAN Routers", "current": {"value": "WAN Routers"}},
-        {"name": "host", "type": "query", "datasource": DS, "query": {"type": "host", "group": "$group"},
-         "multi": True, "includeAll": True, "current": {"value": ["$__all"]}}]},
+    "uid": "rep-test",
+    "title": "Rapor testi",
+    "time": {"from": "now-6h", "to": "now"},
+    "templating": {
+        "list": [
+            {"name": "group", "type": "custom", "query": "Linux servers,WAN Routers", "current": {"value": "WAN Routers"}},
+            {
+                "name": "host",
+                "type": "query",
+                "datasource": DS,
+                "query": {"type": "host", "group": "$group"},
+                "multi": True,
+                "includeAll": True,
+                "current": {"value": ["$__all"]},
+            },
+        ]
+    },
     "panels": [
         {"id": 1, "type": "row", "title": "Özet", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}},
-        {"id": 2, "type": "timeseries", "title": "CPU $host", "gridPos": {"x": 0, "y": 1, "w": 12, "h": 8},
-         "targets": [target("A", "CPU utilization")], "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []},
-         "options": {"legend": {"displayMode": "table", "calcs": ["mean", "max"]}}},
-        {"id": 3, "type": "stat", "title": "Bellek", "gridPos": {"x": 12, "y": 1, "w": 6, "h": 4},
-         "targets": [target("A", "Memory utilization")], "options": {"colorMode": "background"}},
-        {"id": 4, "type": "gauge", "title": "Kayıp", "gridPos": {"x": 18, "y": 1, "w": 6, "h": 4},
-         "targets": [target("A", "ICMP loss")]},
-        {"id": 5, "type": "table", "title": "Özet tablo", "gridPos": {"x": 12, "y": 5, "w": 12, "h": 6},
-         "targets": [target("A", "/CPU|Memory/")], "transformations": [{"id": "reduceByLabel", "options": {"label": "host"}}]},
+        {
+            "id": 2,
+            "type": "timeseries",
+            "title": "CPU $host",
+            "gridPos": {"x": 0, "y": 1, "w": 12, "h": 8},
+            "targets": [target("A", "CPU utilization")],
+            "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []},
+            "options": {"legend": {"displayMode": "table", "calcs": ["mean", "max"]}},
+        },
+        {
+            "id": 3,
+            "type": "stat",
+            "title": "Bellek",
+            "gridPos": {"x": 12, "y": 1, "w": 6, "h": 4},
+            "targets": [target("A", "Memory utilization")],
+            "options": {"colorMode": "background"},
+        },
+        {"id": 4, "type": "gauge", "title": "Kayıp", "gridPos": {"x": 18, "y": 1, "w": 6, "h": 4}, "targets": [target("A", "ICMP loss")]},
+        {
+            "id": 5,
+            "type": "table",
+            "title": "Özet tablo",
+            "gridPos": {"x": 12, "y": 5, "w": 12, "h": 6},
+            "targets": [target("A", "/CPU|Memory/")],
+            "transformations": [{"id": "reduceByLabel", "options": {"label": "host"}}],
+        },
         {"id": 6, "type": "piechart", "title": "Pay", "gridPos": {"x": 0, "y": 9, "w": 6, "h": 6}, "targets": [target("A", "CPU utilization")]},
         {"id": 7, "type": "bargauge", "title": "Top", "gridPos": {"x": 6, "y": 9, "w": 6, "h": 6}, "targets": [target("A", "CPU utilization")]},
         {"id": 8, "type": "statusgrid", "title": "Izgara", "gridPos": {"x": 12, "y": 11, "w": 6, "h": 4}, "targets": [target("A", "CPU utilization")]},
         {"id": 9, "type": "statetimeline", "title": "Durum", "gridPos": {"x": 18, "y": 11, "w": 6, "h": 4}, "targets": [target("A", "ICMP loss")]},
         {"id": 10, "type": "barchart", "title": "Çubuk", "gridPos": {"x": 0, "y": 15, "w": 12, "h": 6}, "targets": [target("A", "CPU utilization")]},
-        {"id": 11, "type": "text", "title": "Not", "gridPos": {"x": 12, "y": 15, "w": 12, "h": 3},
-         "options": {"content": "# Başlık $group\n- madde **kalın**"}},
-    ]}
+        {
+            "id": 11,
+            "type": "text",
+            "title": "Not",
+            "gridPos": {"x": 12, "y": 15, "w": 12, "h": 3},
+            "options": {"content": "# Başlık $group\n- madde **kalın**"},
+        },
+    ],
+}
 
 
 @pytest.fixture
 def env(tmp_path):
-    settings = replace(Settings.from_env(), data_dir=tmp_path, secure_cookie=False, zabbix_url="", zabbix_token_file="", mail_enabled=False, recipient_domains=("example.org",))
+    settings = replace(
+        Settings.from_env(), data_dir=tmp_path, secure_cookie=False, zabbix_url="", zabbix_token_file="", mail_enabled=False, recipient_domains=("example.org",)
+    )
     app = create_app(settings)
     admin_id = create_user(settings, "admin1", "an-admin-password-123", "admin")
     create_user(settings, "viewer1", "a-viewer-password-123", "viewer")
@@ -63,9 +109,18 @@ def env(tmp_path):
 
 def test_group_report_sections_and_all_formats(env):
     settings, _, user = env
-    created = service.save_report(settings, user, {"name": "WAN haftalık", "dashboard_uid": "rep-test",
-                                                   "time_range": {"from": "now-6h", "to": "now"}, "split_by": "host",
-                                                   "formats": ["pdf", "xlsx", "csv"], "timezone": "Europe/Istanbul"})
+    created = service.save_report(
+        settings,
+        user,
+        {
+            "name": "WAN haftalık",
+            "dashboard_uid": "rep-test",
+            "time_range": {"from": "now-6h", "to": "now"},
+            "split_by": "host",
+            "formats": ["pdf", "xlsx", "csv"],
+            "timezone": "Europe/Istanbul",
+        },
+    )
     queued = service.request_run(settings, user, created["id"], {})
     run_id = service.claim(settings)
     assert run_id == queued["run_id"]
@@ -101,9 +156,9 @@ def test_missing_datasource_makes_report_partial_and_blocks_mail(env):
     with connect(settings) as db:
         row = db.execute("SELECT * FROM dash_reports WHERE id=?", (created["id"],)).fetchone()
         from openreporting.db import transaction
+
         with transaction(db):
-            run_id = service.enqueue(db, row, user["id"], "2026-10-01T00:00:00+00:00", "2026-10-01T06:00:00+00:00",
-                                     None, ["ops@example.org"])
+            run_id = service.enqueue(db, row, user["id"], "2026-10-01T00:00:00+00:00", "2026-10-01T06:00:00+00:00", None, ["ops@example.org"])
     service.claim(settings_mail)
     service.execute(settings_mail, run_id)
     run = service.list_runs(settings, created["id"])[0]
@@ -122,6 +177,7 @@ def test_schedule_math_and_periods():
 
 def test_scheduled_enqueue_is_idempotent_and_does_not_duplicate_audit(env):
     from openreporting.db import transaction, verify_audit
+
     settings, _, user = env
     created = service.save_report(settings, user, {"name": "Queue test", "dashboard_uid": "rep-test", "formats": ["csv"]})
     with connect(settings) as db, transaction(db):
@@ -164,8 +220,7 @@ def test_schedule_rules_and_tick(env):
         service.save_schedule(settings, user, created["id"], {"cadence": "daily", "enabled": True, "recipients": ["a@example.org"]})
     sched = service.save_schedule(settings, user, created["id"], {"cadence": "hourly", "minute": 0, "enabled": True})
     with connect(settings) as db:
-        db.execute("UPDATE dash_report_schedules SET next_due=? WHERE id=?",
-                   (datetime.now(timezone.utc).replace(microsecond=0).isoformat(), sched["id"]))
+        db.execute("UPDATE dash_report_schedules SET next_due=? WHERE id=?", (datetime.now(timezone.utc).replace(microsecond=0).isoformat(), sched["id"]))
     service.tick_schedules(settings)
     runs = service.list_runs(settings, created["id"])
     assert len(runs) == 1 and runs[0]["schedule_id"] == sched["id"]
@@ -203,6 +258,7 @@ def test_report_api_permissions_preview_and_export(env):
 def _png(color=(30, 90, 200, 255), size=(240, 80)):
     import io
     from PIL import Image
+
     out = io.BytesIO()
     Image.new("RGBA", size, color).save(out, format="PNG")
     return out.getvalue()
@@ -212,14 +268,14 @@ def test_customer_logo_upload_and_pdf_embedding(env):
     import base64
     from fastapi.testclient import TestClient
     from openreporting.reporting import logos
+
     settings, app, user = env
     with TestClient(app, base_url="http://localhost") as http:
         csrf = http.post("/api/login", json={"username": "viewer1", "password": "a-viewer-password-123"}).json()["csrf"]
         data = "data:image/png;base64," + base64.b64encode(_png()).decode()
         assert http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf}, json={"data": data}).status_code == 403
         csrf = http.post("/api/login", json={"username": "admin1", "password": "an-admin-password-123"}).json()["csrf"]
-        bad = http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf},
-                        json={"data": base64.b64encode(b"<svg onload=alert(1)></svg>").decode()})
+        bad = http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf}, json={"data": base64.b64encode(b"<svg onload=alert(1)></svg>").decode()})
         assert bad.status_code == 422
         res = http.post("/api/dash-reports/logos", headers={"X-CSRF-Token": csrf}, json={"data": data})
         assert res.status_code == 201, res.text
@@ -231,8 +287,11 @@ def test_customer_logo_upload_and_pdf_embedding(env):
     # Unknown logo ids are refused in a report definition.
     with pytest.raises(logos.LogoError):
         service.save_report(settings, user, {"name": "Logo", "dashboard_uid": "rep-test", "logo_id": "0" * 64})
-    created = service.save_report(settings, user, {"name": "Logolu rapor", "dashboard_uid": "rep-test", "logo_id": logo["id"],
-                                                   "time_range": {"from": "now-6h", "to": "now"}, "formats": ["pdf"]})
+    created = service.save_report(
+        settings,
+        user,
+        {"name": "Logolu rapor", "dashboard_uid": "rep-test", "logo_id": logo["id"], "time_range": {"from": "now-6h", "to": "now"}, "formats": ["pdf"]},
+    )
     config = service.get_report(settings, created["id"])["config"]
     assert config["logo_id"] == logo["id"] and config["logo_on_cover"] and config["logo_on_pages"]
     start, end = datetime.now(timezone.utc) - timedelta(hours=6), datetime.now(timezone.utc)
@@ -244,6 +303,7 @@ def test_customer_logo_upload_and_pdf_embedding(env):
 
 def test_logo_normalisation_rejects_bad_input():
     from openreporting.reporting import logos
+
     with pytest.raises(logos.LogoError):
         logos.normalize(b"not an image")
     with pytest.raises(logos.LogoError):
@@ -251,6 +311,7 @@ def test_logo_normalisation_rejects_bad_input():
     big = logos.normalize(_png(size=(3000, 600)))
     from io import BytesIO
     from PIL import Image
+
     assert max(Image.open(BytesIO(big)).size) <= logos.MAX_EDGE
 
 

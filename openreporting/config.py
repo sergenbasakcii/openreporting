@@ -12,6 +12,7 @@ def _flag(name: str, default: bool = False) -> bool:
 
 def _validate_pem(pem: str):
     import ssl
+
     if len(pem) > 65536 or "-----BEGIN CERTIFICATE-----" not in pem:
         raise ValueError("CA certificate must be PEM text (max 64 KB)")
     try:
@@ -134,8 +135,8 @@ class Settings:
             ldap_ca_file=os.getenv("OPENREPORTING_LDAP_CA_FILE", "").strip(),
             ldap_timeout=int(os.getenv("OPENREPORTING_LDAP_TIMEOUT", "10")),
             ldap_session_minutes=int(os.getenv("OPENREPORTING_LDAP_SESSION_MINUTES", "60")),
-            allowed_hosts=tuple(x.strip() for x in os.getenv("OPENREPORTING_ALLOWED_HOSTS", "").split(',') if x.strip()),
-            mfa_required_roles=tuple(dict.fromkeys(x.strip() for x in os.getenv('OPENREPORTING_MFA_REQUIRED_ROLES','').split(',') if x.strip())),
+            allowed_hosts=tuple(x.strip() for x in os.getenv("OPENREPORTING_ALLOWED_HOSTS", "").split(",") if x.strip()),
+            mfa_required_roles=tuple(dict.fromkeys(x.strip() for x in os.getenv("OPENREPORTING_MFA_REQUIRED_ROLES", "").split(",") if x.strip())),
         )
         return data.validate()
 
@@ -147,9 +148,10 @@ class Settings:
         if not 0 <= data.report_retention_days <= 36500:
             raise ValueError("Invalid report retention")
         from .http_security import trusted_hosts
+
         trusted_hosts(data)
-        if any(role not in {'admin','editor','viewer'} for role in data.mfa_required_roles):
-            raise ValueError('Invalid MFA required role policy')
+        if any(role not in {"admin", "editor", "viewer"} for role in data.mfa_required_roles):
+            raise ValueError("Invalid MFA required role policy")
         if not 1 <= data.session_hours <= 168 or not 1 <= data.max_rows <= 1_000_000:
             raise ValueError("Invalid session duration or max rows")
         if not 1000 <= data.query_timeout_ms <= 300_000:
@@ -161,6 +163,7 @@ class Settings:
                 _validate_pem(pem)
         from .mail_transport import validate_settings as validate_smtp
         from .directory_auth import validate_settings as validate_ldap
+
         validate_smtp(data)
         validate_ldap(data)
         if data.zabbix_url and (not data.zabbix_url.startswith("https://") or not data.zabbix_url.endswith("/api_jsonrpc.php")):
@@ -169,6 +172,7 @@ class Settings:
             if not data.database_url.startswith(("postgresql://", "postgres://")):
                 raise ValueError("OPENREPORTING_DATABASE_URL must be a PostgreSQL URL")
             from psycopg.conninfo import conninfo_to_dict
+
             try:
                 conninfo_to_dict(data.database_url)
             except Exception:
@@ -184,4 +188,3 @@ class Settings:
     @property
     def archive_dir(self):
         return self.data_dir / "archive"
-

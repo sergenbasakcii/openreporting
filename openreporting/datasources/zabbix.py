@@ -4,6 +4,7 @@ Security model (unchanged from v0.4): only allow-listed read methods, TLS
 verification always on, redirects refused, the token never leaves the server.
 Large selections are refused with a clear message instead of being truncated.
 """
+
 import json
 import math
 import re
@@ -18,16 +19,26 @@ from urllib.parse import urlsplit
 from ..frames import finite, table_frame, ts_frame
 from ..series_functions import query_option
 from ..timerange import parse_duration
-from .base import (DataSource, DataSourceError, QueryResult, TTLCache, bucket_average,
-                   compile_filter)
+from .base import DataSource, DataSourceError, QueryResult, TTLCache, bucket_average, compile_filter
 
-READ_METHODS = frozenset({"apiinfo.version", "hostgroup.get", "host.get", "item.get", "history.get",
-                          "trend.get", "trigger.get", "problem.get", "event.get", "valuemap.get"})
+READ_METHODS = frozenset(
+    {"apiinfo.version", "hostgroup.get", "host.get", "item.get", "history.get", "trend.get", "trigger.get", "problem.get", "event.get", "valuemap.get"}
+)
 NUMERIC = {"0", "3"}
 SEVERITIES = ["Sınıflandırılmamış", "Bilgi", "Uyarı", "Ortalama", "Yüksek", "Felaket"]
-MODE_ALIASES = {"0": "metrics", "2": "itemvalues", "3": "itemid", "4": "problems", "5": "problems",
-                "metrics": "metrics", "itemvalues": "itemvalues", "text": "itemvalues", "itemid": "itemid",
-                "problems": "problems", "triggers": "problems"}
+MODE_ALIASES = {
+    "0": "metrics",
+    "2": "itemvalues",
+    "3": "itemid",
+    "4": "problems",
+    "5": "problems",
+    "metrics": "metrics",
+    "itemvalues": "itemvalues",
+    "text": "itemvalues",
+    "itemid": "itemid",
+    "problems": "problems",
+    "triggers": "problems",
+}
 _META_CACHE = TTLCache(ttl=60, size=2048)
 
 
@@ -42,16 +53,20 @@ def validate_url(url, allow_http=False):
     except ValueError as exc:
         raise DataSourceError("Invalid Zabbix URL") from exc
     schemes = ("https", "http") if allow_http else ("https",)
-    if parsed.scheme not in schemes or not parsed.hostname or parsed.username or parsed.password \
-            or parsed.fragment or not parsed.path.endswith("api_jsonrpc.php"):
-        raise DataSourceError("Zabbix URL must be https://<host>/.../api_jsonrpc.php"
-                              + (" (http allowed by administrator)" if allow_http else ""))
+    if (
+        parsed.scheme not in schemes
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.fragment
+        or not parsed.path.endswith("api_jsonrpc.php")
+    ):
+        raise DataSourceError("Zabbix URL must be https://<host>/.../api_jsonrpc.php" + (" (http allowed by administrator)" if allow_http else ""))
     return url
 
 
 class ZabbixApi:
-    def __init__(self, url, token="", *, auth_mode="bearer", ca_pem="", timeout=30,
-                 max_bytes=64_000_000, allow_http=False, transport=None):
+    def __init__(self, url, token="", *, auth_mode="bearer", ca_pem="", timeout=30, max_bytes=64_000_000, allow_http=False, transport=None):
         self.url = validate_url(url, allow_http) if transport is None else url
         self.token = token
         self.auth_mode = auth_mode if auth_mode in ("bearer", "body") else "bearer"
@@ -75,8 +90,7 @@ class ZabbixApi:
                 body["auth"] = self.token
             else:
                 headers["Authorization"] = "Bearer " + self.token
-        request = urllib.request.Request(self.url, json.dumps(body, separators=(",", ":")).encode(),
-                                         headers, method="POST")
+        request = urllib.request.Request(self.url, json.dumps(body, separators=(",", ":")).encode(), headers, method="POST")
         handlers = [_NoRedirect()]
         if self.url.startswith("https://"):
             try:
@@ -121,8 +135,9 @@ def normalize_target(target):
         out["itemTag"] = {"filter": out["application"]["filter"]}
     options = dict(target.get("options") or {})
     use_trends = options.get("useTrends", target.get("mode"))
-    options["mode"] = {"true": "trends", True: "trends", "false": "history", False: "history",
-                       "trends": "trends", "history": "history", "raw": "history"}.get(use_trends, "auto")
+    options["mode"] = {"true": "trends", True: "trends", "false": "history", False: "history", "trends": "trends", "history": "history", "raw": "history"}.get(
+        use_trends, "auto"
+    )
     out["options"] = options
     out["functions"] = list(target.get("functions") or [])
     return out
@@ -134,12 +149,14 @@ def _tag_filter(text):
     if not text:
         return lambda tags: True
     predicate = compile_filter(text)
+
     def match(tags):
         for tag in tags or []:
             label = f"{tag.get('tag', '')}: {tag.get('value', '')}" if tag.get("value") else tag.get("tag", "")
             if predicate(label) or predicate(tag.get("tag", "")):
                 return True
         return False
+
     return match
 
 
@@ -182,8 +199,9 @@ class InventoryResolver:
                 continue
             items.append(item)
         if len(items) > max_items:
-            raise DataSourceError(f"Sorgu {len(items)} item ile eşleşti; güvenlik sınırı {max_items}. "
-                                  "Grup/host/item filtresini daraltın veya fonksiyonlarla toplulaştırın.")
+            raise DataSourceError(
+                f"Sorgu {len(items)} item ile eşleşti; güvenlik sınırı {max_items}. Grup/host/item filtresini daraltın veya fonksiyonlarla toplulaştırın."
+            )
         for host in hosts:
             host["_groups"] = [group_names[g] for g in host.get("_groupids", []) if g in group_names]
         return items, host_map, [] if items else ["Filtreyle eşleşen sayısal item yok"]
@@ -191,23 +209,34 @@ class InventoryResolver:
 
 def series_labels(item, host):
     groups = host.get("_groups") or []
-    return {"host": host.get("name", ""), "host_technical": host.get("host", ""), "hostid": str(host["hostid"]),
-            "item": item.get("name", ""), "item_key": item.get("key_", ""), "itemid": str(item["itemid"]),
-            **({"group": groups[0]} if groups else {})}
+    return {
+        "host": host.get("name", ""),
+        "host_technical": host.get("host", ""),
+        "hostid": str(host["hostid"]),
+        "item": item.get("name", ""),
+        "item_key": item.get("key_", ""),
+        "itemid": str(item["itemid"]),
+        **({"group": groups[0]} if groups else {}),
+    }
 
 
-def items_to_frames(items, host_map, points_by_item, ref_id, resolution, interval_ms, max_points, consolidate,
-                    anchor_ms=0):
+def items_to_frames(items, host_map, points_by_item, ref_id, resolution, interval_ms, max_points, consolidate, anchor_ms=0):
     frames = []
     for item in items:
         host = host_map[item["hostid"]]
         points = points_by_item.get(str(item["itemid"]), [])
         if len(points) > max_points * 1.2:
             points = bucket_average(points, interval_ms, consolidate, anchor_ms)
-        frames.append(ts_frame(f"{host.get('name', '')}: {item.get('name', '')}", points,
-                               labels=series_labels(item, host), unit=item.get("units", ""), ref_id=ref_id,
-                               meta={"resolution": resolution, "itemid": str(item["itemid"]),
-                                     "delay": item.get("delay", ""), "value_type": str(item.get("value_type"))}))
+        frames.append(
+            ts_frame(
+                f"{host.get('name', '')}: {item.get('name', '')}",
+                points,
+                labels=series_labels(item, host),
+                unit=item.get("units", ""),
+                ref_id=ref_id,
+                meta={"resolution": resolution, "itemid": str(item["itemid"]), "delay": item.get("delay", ""), "value_type": str(item.get("value_type"))},
+            )
+        )
     return frames
 
 
@@ -218,13 +247,23 @@ def value_table(items, host_map, ref_id):
         raw = item.get("lastvalue")
         value = finite(raw) if str(item.get("value_type")) in NUMERIC else raw
         clock = int(item.get("lastclock") or 0)
-        rows.append([host.get("name", ""), item.get("name", ""), value if clock else None,
-                     item.get("units", ""), clock * 1000 if clock else None, item.get("key_", "")])
-    return table_frame("Son değerler", [
-        {"name": "Host", "type": "string"}, {"name": "Item", "type": "string"},
-        {"name": "Değer", "type": "number"}, {"name": "Birim", "type": "string"},
-        {"name": "Son veri", "type": "time"}, {"name": "Anahtar", "type": "string"}], rows, ref_id=ref_id,
-        meta={"rowUnits": [r[3] for r in rows]})
+        rows.append(
+            [host.get("name", ""), item.get("name", ""), value if clock else None, item.get("units", ""), clock * 1000 if clock else None, item.get("key_", "")]
+        )
+    return table_frame(
+        "Son değerler",
+        [
+            {"name": "Host", "type": "string"},
+            {"name": "Item", "type": "string"},
+            {"name": "Değer", "type": "number"},
+            {"name": "Birim", "type": "string"},
+            {"name": "Son veri", "type": "time"},
+            {"name": "Anahtar", "type": "string"},
+        ],
+        rows,
+        ref_id=ref_id,
+        meta={"rowUnits": [r[3] for r in rows]},
+    )
 
 
 def problems_table(triggers, ref_id, now_ms):
@@ -233,28 +272,43 @@ def problems_table(triggers, ref_id, now_ms):
         hosts = ", ".join(h.get("name", "") for h in trigger.get("hosts", []))
         since = int(trigger.get("lastchange") or 0) * 1000
         priority = int(trigger.get("priority", 0))
-        rows.append([since, hosts, trigger.get("description", ""), SEVERITIES[min(priority, 5)],
-                     priority, (now_ms - since) / 1000 if since else None])
-    return table_frame("Aktif problemler", [
-        {"name": "Başlangıç", "type": "time"}, {"name": "Host", "type": "string"},
-        {"name": "Problem", "type": "string"}, {"name": "Önem", "type": "string"},
-        {"name": "Önem seviyesi", "type": "number"}, {"name": "Süre", "type": "number", "unit": "dtdurations"}],
-        rows, ref_id=ref_id)
+        rows.append([since, hosts, trigger.get("description", ""), SEVERITIES[min(priority, 5)], priority, (now_ms - since) / 1000 if since else None])
+    return table_frame(
+        "Aktif problemler",
+        [
+            {"name": "Başlangıç", "type": "time"},
+            {"name": "Host", "type": "string"},
+            {"name": "Problem", "type": "string"},
+            {"name": "Önem", "type": "string"},
+            {"name": "Önem seviyesi", "type": "number"},
+            {"name": "Süre", "type": "number", "unit": "dtdurations"},
+        ],
+        rows,
+        ref_id=ref_id,
+    )
 
 
 def parse_find_query(query):
     """``{group}{host}{item}`` text or structured ``{"type": "host", ...}``."""
     if isinstance(query, dict):
-        return {"type": query.get("type", "group"), "group": query.get("group", ""),
-                "host": query.get("host", ""), "item": query.get("item", ""),
-                "itemTag": query.get("itemTag", "")}
+        return {
+            "type": query.get("type", "group"),
+            "group": query.get("group", ""),
+            "host": query.get("host", ""),
+            "item": query.get("item", ""),
+            "itemTag": query.get("itemTag", ""),
+        }
     parts = re.findall(r"\{([^}]*)\}", str(query or ""))
     kinds = {1: "group", 2: "host", 3: "item", 4: "item"}
     if not parts:
         return {"type": "group", "group": "", "host": "", "item": "", "itemTag": ""}
-    parsed = {"type": kinds.get(len(parts), "item"), "group": parts[0],
-              "host": parts[1] if len(parts) > 1 else "", "itemTag": parts[2] if len(parts) == 4 else "",
-              "item": parts[3] if len(parts) == 4 else (parts[2] if len(parts) == 3 else "")}
+    parsed = {
+        "type": kinds.get(len(parts), "item"),
+        "group": parts[0],
+        "host": parts[1] if len(parts) > 1 else "",
+        "itemTag": parts[2] if len(parts) == 4 else "",
+        "item": parts[3] if len(parts) == 4 else (parts[2] if len(parts) == 3 else ""),
+    }
     return parsed
 
 
@@ -273,8 +327,7 @@ def find_values(resolver, query):
         return [{"text": n, "value": n} for n in names]
     items = resolver.items(tuple(sorted(h["hostid"] for h in hosts))) if hosts else []
     if spec["type"] in ("itemTag", "application"):
-        tags = sorted({f"{t['tag']}: {t['value']}" if t.get("value") else t["tag"]
-                       for i in items for t in (i.get("tags") or [])}, key=str.casefold)
+        tags = sorted({f"{t['tag']}: {t['value']}" if t.get("value") else t["tag"] for i in items for t in (i.get("tags") or [])}, key=str.casefold)
         return [{"text": t, "value": t} for t in tags]
     item_ok = compile_filter(spec["item"] or "")
     tag_ok = _tag_filter(spec["itemTag"])
@@ -293,8 +346,9 @@ class _ApiInventory(InventoryResolver):
         if not groupids:
             return []
         select = "selectHostGroups" if self.ds.version() >= (6, 2) else "selectGroups"
-        rows = self.ds.cached("host.get", {"groupids": list(groupids), "output": ["hostid", "host", "name", "status"],
-                                           "monitored_hosts": True, select: ["groupid"]})
+        rows = self.ds.cached(
+            "host.get", {"groupids": list(groupids), "output": ["hostid", "host", "name", "status"], "monitored_hosts": True, select: ["groupid"]}
+        )
         hosts = []
         for row in rows:
             membership = row.get("hostgroups") or row.get("groups") or []
@@ -304,9 +358,12 @@ class _ApiInventory(InventoryResolver):
     def items(self, hostids):
         if not hostids:
             return []
-        params = {"hostids": list(hostids), "monitored": True, "webitems": True,
-                  "output": ["itemid", "hostid", "name", "key_", "units", "value_type", "status", "state",
-                             "delay", "lastvalue", "lastclock"]}
+        params = {
+            "hostids": list(hostids),
+            "monitored": True,
+            "webitems": True,
+            "output": ["itemid", "hostid", "name", "key_", "units", "value_type", "status", "state", "delay", "lastvalue", "lastclock"],
+        }
         if self.ds.version() >= (5, 4):
             params["selectTags"] = ["tag", "value"]
         rows = self.ds.cached("item.get", params)
@@ -326,10 +383,15 @@ class ZabbixDataSource(DataSource):
                 token = Path(token_file).read_text(encoding="utf8").strip()
             except OSError as exc:
                 raise DataSourceError("Zabbix token file unavailable") from exc
-        self.api = ZabbixApi(self.url, token, auth_mode=self.options.get("auth_mode", "bearer"),
-                             ca_pem=self.options.get("ca_pem", ""), timeout=self.options.get("timeout", 30),
-                             allow_http=bool(getattr(settings, "allow_http_datasources", False)),
-                             transport=transport)
+        self.api = ZabbixApi(
+            self.url,
+            token,
+            auth_mode=self.options.get("auth_mode", "bearer"),
+            ca_pem=self.options.get("ca_pem", ""),
+            timeout=self.options.get("timeout", 30),
+            allow_http=bool(getattr(settings, "allow_http_datasources", False)),
+            transport=transport,
+        )
         self.cache_ttl = float(self.options.get("cache_ttl", 60))
         self.max_items = int(self.options.get("max_items", 500))
         self.resolver = resolver
@@ -372,14 +434,22 @@ class ZabbixDataSource(DataSource):
         fetched = 0
         for value_type, ids in by_type.items():
             for offset in range(0, len(ids), 200):
-                rows = self.api.call("history.get", {
-                    "history": int(value_type), "itemids": ids[offset:offset + 200],
-                    "time_from": int(start), "time_till": math.ceil(end) - 1, "sortfield": "clock",
-                    "sortorder": "ASC", "output": ["itemid", "clock", "value"], "limit": max_rows + 1})
+                rows = self.api.call(
+                    "history.get",
+                    {
+                        "history": int(value_type),
+                        "itemids": ids[offset : offset + 200],
+                        "time_from": int(start),
+                        "time_till": math.ceil(end) - 1,
+                        "sortfield": "clock",
+                        "sortorder": "ASC",
+                        "output": ["itemid", "clock", "value"],
+                        "limit": max_rows + 1,
+                    },
+                )
                 fetched += len(rows)
                 if len(rows) > max_rows or fetched > max_rows:
-                    raise DataSourceError("Ham history satır sınırı aşıldı; trend kullanın veya aralığı daraltın "
-                                          "(eksik grafik üretilmez).")
+                    raise DataSourceError("Ham history satır sınırı aşıldı; trend kullanın veya aralığı daraltın (eksik grafik üretilmez).")
                 for row in rows:
                     points[str(row["itemid"])].append([int(row["clock"]) * 1000, finite(row["value"])])
         return points
@@ -389,9 +459,16 @@ class ZabbixDataSource(DataSource):
         ids = [str(i["itemid"]) for i in items]
         fetched = 0
         for offset in range(0, len(ids), 200):
-            rows = self.api.call("trend.get", {
-                "itemids": ids[offset:offset + 200], "time_from": int(start), "time_till": math.ceil(end) - 1,
-                "output": ["itemid", "clock", "num", "value_min", "value_avg", "value_max"], "limit": max_rows + 1})
+            rows = self.api.call(
+                "trend.get",
+                {
+                    "itemids": ids[offset : offset + 200],
+                    "time_from": int(start),
+                    "time_till": math.ceil(end) - 1,
+                    "output": ["itemid", "clock", "num", "value_min", "value_avg", "value_max"],
+                    "limit": max_rows + 1,
+                },
+            )
             fetched += len(rows)
             if fetched > max_rows:
                 raise DataSourceError("Trend satır sınırı aşıldı; aralığı veya item sayısını azaltın.")
@@ -442,19 +519,23 @@ class ZabbixDataSource(DataSource):
             group_ok = compile_filter(items_target["group"].get("filter"))
             groups = [g["groupid"] for g in self.inventory.groups() if group_ok(g["name"])]
             if not groups:
-                return QueryResult([problems_table([], ref_id, int(ctx.end.timestamp() * 1000))],
-                                   ["Filtreyle eşleşen host grubu yok"])
+                return QueryResult([problems_table([], ref_id, int(ctx.end.timestamp() * 1000))], ["Filtreyle eşleşen host grubu yok"])
             host_ok = compile_filter(items_target["host"].get("filter"))
-            hosts = [h["hostid"] for h in self.inventory.hosts(tuple(sorted(groups)))
-                     if host_ok(h["name"])]
-            params = {"output": ["triggerid", "description", "priority", "lastchange", "value"],
-                      "selectHosts": ["hostid", "name"], "filter": {"value": 1}, "monitored": True,
-                      "skipDependent": True, "expandDescription": True, "sortfield": "lastchange",
-                      "sortorder": "DESC", "limit": 2000,
-                      "min_severity": int((target.get("options") or {}).get("minSeverity", 0))}
+            hosts = [h["hostid"] for h in self.inventory.hosts(tuple(sorted(groups))) if host_ok(h["name"])]
+            params = {
+                "output": ["triggerid", "description", "priority", "lastchange", "value"],
+                "selectHosts": ["hostid", "name"],
+                "filter": {"value": 1},
+                "monitored": True,
+                "skipDependent": True,
+                "expandDescription": True,
+                "sortfield": "lastchange",
+                "sortorder": "DESC",
+                "limit": 2000,
+                "min_severity": int((target.get("options") or {}).get("minSeverity", 0)),
+            }
             if not hosts:
-                return QueryResult([problems_table([], ref_id, int(ctx.end.timestamp() * 1000))],
-                                   ["Filtreyle eşleşen host yok"])
+                return QueryResult([problems_table([], ref_id, int(ctx.end.timestamp() * 1000))], ["Filtreyle eşleşen host yok"])
             params["hostids"] = hosts
             text_ok = compile_filter((target.get("trigger") or {}).get("filter", ""))
             triggers = [t for t in self.api.call("trigger.get", params) if text_ok(t.get("description", ""))]
@@ -463,11 +544,15 @@ class ZabbixDataSource(DataSource):
             ids = [i.strip() for i in str(target.get("itemids", "")).split(",") if i.strip()]
             if not ids or not all(i.isdigit() for i in ids) or len(ids) > self.max_items:
                 raise DataSourceError("Item ID modu virgülle ayrılmış sayısal item ID'leri ister")
-            rows = self.api.call("item.get", {"itemids": ids, "output": ["itemid", "hostid", "name", "key_", "units",
-                                 "value_type", "status", "delay", "lastvalue", "lastclock"],
-                                 "selectHosts": ["hostid", "host", "name"]})
-            items = [{**r, "itemid": str(r["itemid"]), "hostid": str(r["hostid"])} for r in rows
-                     if str(r.get("value_type")) in NUMERIC]
+            rows = self.api.call(
+                "item.get",
+                {
+                    "itemids": ids,
+                    "output": ["itemid", "hostid", "name", "key_", "units", "value_type", "status", "delay", "lastvalue", "lastclock"],
+                    "selectHosts": ["hostid", "host", "name"],
+                },
+            )
+            items = [{**r, "itemid": str(r["itemid"]), "hostid": str(r["hostid"])} for r in rows if str(r.get("value_type")) in NUMERIC]
             host_map = {}
             for r in rows:
                 for h in r.get("hosts", []):
@@ -477,8 +562,8 @@ class ZabbixDataSource(DataSource):
                 warnings.append(f"Bulunamayan veya sayısal olmayan item: {', '.join(sorted(missing))}")
         else:
             items, host_map, notes = self.inventory.resolve(
-                target, numeric_only=mode == "metrics", max_items=self.max_items,
-                include_disabled=bool(target["options"].get("showDisabledItems")))
+                target, numeric_only=mode == "metrics", max_items=self.max_items, include_disabled=bool(target["options"].get("showDisabledItems"))
+            )
             warnings.extend(notes)
             if mode == "itemvalues":
                 return QueryResult([value_table(items, host_map, ref_id)], warnings)
@@ -491,8 +576,7 @@ class ZabbixDataSource(DataSource):
         consolidate = query_option(target["functions"], "consolidateBy", "avg")
         max_rows = max(10_000, int(ctx.max_series_points))
         if self.options.get("history_source") == "sql":
-            points = self._history_sql(items, start, end, ctx.interval_s, trends, column, consolidate,
-                                       ctx.anchor_ms // 1000)
+            points = self._history_sql(items, start, end, ctx.interval_s, trends, column, consolidate, ctx.anchor_ms // 1000)
             resolution = "sql_trends" if trends else "sql_history"
         elif trends:
             points = self._trends_api(items, start, end, max_rows, column)
@@ -500,8 +584,7 @@ class ZabbixDataSource(DataSource):
         else:
             points = self._history_api(items, start, end, max_rows)
             resolution = "history"
-        frames = items_to_frames(items, host_map, points, ref_id, resolution, ctx.interval_ms, ctx.max_points,
-                                 consolidate, ctx.anchor_ms)
+        frames = items_to_frames(items, host_map, points, ref_id, resolution, ctx.interval_ms, ctx.max_points, consolidate, ctx.anchor_ms)
         empty = [f["labels"]["host"] for f in frames if not f["points"]]
         if empty:
             warnings.append(f"{len(empty)} seri için seçilen aralıkta veri yok (NO DATA)")
@@ -513,5 +596,4 @@ class ZabbixDataSource(DataSource):
     def health(self):
         version = self.api.call("apiinfo.version", {})
         groups = self.api.call("hostgroup.get", {"output": ["groupid"], "limit": 1})
-        return {"status": "ok", "message": f"Zabbix API {version} bağlantısı başarılı; "
-                                           f"{'host grupları okunabiliyor' if groups else 'görünür host grubu yok'}"}
+        return {"status": "ok", "message": f"Zabbix API {version} bağlantısı başarılı; {'host grupları okunabiliyor' if groups else 'görünür host grubu yok'}"}

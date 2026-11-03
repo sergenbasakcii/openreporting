@@ -4,6 +4,7 @@ The JSON model intentionally follows Grafana's (``panels[].gridPos``,
 ``templating.list``, ``fieldConfig``) so existing Grafana + Zabbix-plugin
 dashboards can be imported and edited here.
 """
+
 import copy
 import json
 import re
@@ -12,13 +13,56 @@ from . import folder_access
 from .db import audit, connect, transaction, utcnow
 from .domain import DomainError, canonical, identity
 
-EXTRA_PANEL_TYPES = {'donut', 'radar', 'calendarheatmap', 'heatmap', 'polarbar', 'candlestick', 'histogram', 'scatter', 'funnel', 'treemap', 'boxplot', 'nodegraph', 'stackedarea', 'waterfall', 'stepchart', 'sunburst', 'rosepie', 'parallel', 'bubble', 'sankey'}
-PANEL_TYPES = EXTRA_PANEL_TYPES | {"timeseries", "barchart", "stat", "gauge", "bargauge", "table", "piechart", "text",
-               "statusgrid", "row", "heatmap", "statetimeline"}
-TYPE_ALIASES = {"graph": "timeseries", "singlestat": "stat", "grafana-singlestat-panel": "stat",
-                "table-old": "table", "grafana-piechart-panel": "piechart", "grafana-polystat-panel": "statusgrid",
-                "status-history": "statetimeline", "state-timeline": "statetimeline", "bargraph": "barchart",
-                "alexanderzobnin-zabbix-triggers-panel": "table", "news": "text", "dashlist": "text"}
+EXTRA_PANEL_TYPES = {
+    "donut",
+    "radar",
+    "calendarheatmap",
+    "heatmap",
+    "polarbar",
+    "candlestick",
+    "histogram",
+    "scatter",
+    "funnel",
+    "treemap",
+    "boxplot",
+    "nodegraph",
+    "stackedarea",
+    "waterfall",
+    "stepchart",
+    "sunburst",
+    "rosepie",
+    "parallel",
+    "bubble",
+    "sankey",
+}
+PANEL_TYPES = EXTRA_PANEL_TYPES | {
+    "timeseries",
+    "barchart",
+    "stat",
+    "gauge",
+    "bargauge",
+    "table",
+    "piechart",
+    "text",
+    "statusgrid",
+    "row",
+    "heatmap",
+    "statetimeline",
+}
+TYPE_ALIASES = {
+    "graph": "timeseries",
+    "singlestat": "stat",
+    "grafana-singlestat-panel": "stat",
+    "table-old": "table",
+    "grafana-piechart-panel": "piechart",
+    "grafana-polystat-panel": "statusgrid",
+    "status-history": "statetimeline",
+    "state-timeline": "statetimeline",
+    "bargraph": "barchart",
+    "alexanderzobnin-zabbix-triggers-panel": "table",
+    "news": "text",
+    "dashlist": "text",
+}
 VARIABLE_TYPES = {"query", "custom", "constant", "textbox", "interval", "datasource"}
 MAX_DASHBOARD_BYTES = 3_000_000
 MAX_PANELS = 400
@@ -72,8 +116,7 @@ def _graph_panel_field_config(panel):
         colors = panel.get("colors") or ["green", "orange", "red"]
         if thresholds:
             values = [float(v) for v in thresholds.split(",") if v.strip()]
-            steps = [{"color": colors[0], "value": None}] + [
-                {"color": colors[min(i + 1, len(colors) - 1)], "value": v} for i, v in enumerate(values)]
+            steps = [{"color": colors[0], "value": None}] + [{"color": colors[min(i + 1, len(colors) - 1)], "value": v} for i, v in enumerate(values)]
             defaults.setdefault("thresholds", {"mode": "absolute", "steps": steps})
     return defaults
 
@@ -108,16 +151,33 @@ def _panel(panel, index, ds_map, ids):
     kind = TYPE_ALIASES.get(original_type, original_type)
     out = copy.deepcopy(panel)
     if kind not in PANEL_TYPES:
-        out = {"type": "text", "title": panel.get("title", ""),
-               "options": {"mode": "markdown",
-                           "content": f"**Desteklenmeyen panel türü:** `{original_type}`.\n\n"
-                                      "Bu paneli desteklenen bir görselleştirmeyle yeniden oluşturun."}}
+        out = {
+            "type": "text",
+            "title": panel.get("title", ""),
+            "options": {
+                "mode": "markdown",
+                "content": f"**Desteklenmeyen panel türü:** `{original_type}`.\n\nBu paneli desteklenen bir görselleştirmeyle yeniden oluşturun.",
+            },
+        }
         kind = "text"
     out["type"] = kind
     if original_type in ("graph", "singlestat"):
         out.setdefault("fieldConfig", {})["defaults"] = _graph_panel_field_config(panel)
-        for key in ("yaxes", "xaxis", "lines", "bars", "points", "fill", "linewidth", "stack", "colors",
-                    "thresholds", "format", "seriesOverrides", "aliasColors"):
+        for key in (
+            "yaxes",
+            "xaxis",
+            "lines",
+            "bars",
+            "points",
+            "fill",
+            "linewidth",
+            "stack",
+            "colors",
+            "thresholds",
+            "format",
+            "seriesOverrides",
+            "aliasColors",
+        ):
             out.pop(key, None)
     if original_type == "alexanderzobnin-zabbix-triggers-panel":
         out["targets"] = [dict(t, queryType="problems") for t in panel.get("targets") or []]
@@ -213,8 +273,7 @@ def normalize(dashboard, ds_map=None):
         y = 0
         for row in out.pop("rows"):
             row_panels = row.get("panels") or []
-            panels.append({"type": "row", "title": row.get("title", ""), "gridPos": {"x": 0, "y": y, "w": 24, "h": 1},
-                           "collapsed": False})
+            panels.append({"type": "row", "title": row.get("title", ""), "gridPos": {"x": 0, "y": y, "w": 24, "h": 1}, "collapsed": False})
             y += 1
             x = 0
             for child in row_panels:
@@ -284,13 +343,18 @@ def viewer_variables(model, client_vars):
             value = [_clip(v) for v in value[:1000]]
         elif value is not None:
             value = _clip(value)
-        options = [{"text": _clip(o.get("text", "")), "value": _clip(o.get("value", ""))}
-                   for o in (sent.get("options") or [])[:10000] if isinstance(o, dict)]
+        options = [{"text": _clip(o.get("text", "")), "value": _clip(o.get("value", ""))} for o in (sent.get("options") or [])[:10000] if isinstance(o, dict)]
         if var.get("type") == "constant":
             value = str(var.get("query") or "")
-        result[name] = {"value": value, "text": _clip(sent.get("text") or ""), "options": options,
-                        "multi": bool(var.get("multi")), "includeAll": bool(var.get("includeAll")),
-                        "allValue": var.get("allValue") or None, "type": var.get("type")}
+        result[name] = {
+            "value": value,
+            "text": _clip(sent.get("text") or ""),
+            "options": options,
+            "multi": bool(var.get("multi")),
+            "includeAll": bool(var.get("includeAll")),
+            "allValue": var.get("allValue") or None,
+            "type": var.get("type"),
+        }
     return result
 
 
@@ -322,6 +386,7 @@ def import_map(settings_rows, dashboard):
 
 
 # --- persistence -------------------------------------------------------------
+
 
 def _folder_id(db, folder_uid):
     if not folder_uid:
@@ -355,54 +420,71 @@ def save(settings, user, dashboard, *, folder_uid=None, message="", overwrite=Fa
         if row:
             folder_access.require_folder(db, user, row["folder_id"], edit=True)
         folder_access.require_folder(db, user, folder_id, edit=True)
-        clash = db.execute("SELECT uid FROM dashboards WHERE title=? AND COALESCE(folder_id,'')=COALESCE(?,'') AND uid<>?",
-                           (model["title"], folder_id, model["uid"])).fetchone()
+        clash = db.execute(
+            "SELECT uid FROM dashboards WHERE title=? AND COALESCE(folder_id,'')=COALESCE(?,'') AND uid<>?", (model["title"], folder_id, model["uid"])
+        ).fetchone()
         if clash and not overwrite:
             raise VersionConflict("Bu klasörde aynı adlı bir dashboard var")
         if row:
             if expected_version is not None and expected_version != row["version"] and not overwrite:
                 raise VersionConflict("Dashboard başka biri tarafından değiştirildi; sayfayı yenileyin veya üzerine yazın")
             version = row["version"] + 1
-            db.execute("""UPDATE dashboards SET title=?,folder_id=?,tags_json=?,data_json=?,version=?,updated_at=?,
+            db.execute(
+                """UPDATE dashboards SET title=?,folder_id=?,tags_json=?,data_json=?,version=?,updated_at=?,
                           updated_by=? WHERE id=?""",
-                       (model["title"], folder_id, json.dumps(model["tags"]), canonical(model), version, now,
-                        user["id"], row["id"]))
+                (model["title"], folder_id, json.dumps(model["tags"]), canonical(model), version, now, user["id"], row["id"]),
+            )
             dashboard_id = row["id"]
         else:
             version = 1
             dashboard_id = identity()
-            db.execute("""INSERT INTO dashboards(id,uid,title,folder_id,tags_json,data_json,version,created_at,updated_at,
+            db.execute(
+                """INSERT INTO dashboards(id,uid,title,folder_id,tags_json,data_json,version,created_at,updated_at,
                           created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                       (dashboard_id, model["uid"], model["title"], folder_id, json.dumps(model["tags"]),
-                        canonical(model), version, now, now, user["id"], user["id"]))
-        db.execute("INSERT INTO dashboard_versions VALUES(?,?,?,?,?,?)",
-                   (dashboard_id, version, canonical(model), str(message or "")[:500], now, user["id"]))
-        db.execute("""DELETE FROM dashboard_versions WHERE dashboard_id=? AND version NOT IN
+                (dashboard_id, model["uid"], model["title"], folder_id, json.dumps(model["tags"]), canonical(model), version, now, now, user["id"], user["id"]),
+            )
+        db.execute("INSERT INTO dashboard_versions VALUES(?,?,?,?,?,?)", (dashboard_id, version, canonical(model), str(message or "")[:500], now, user["id"]))
+        db.execute(
+            """DELETE FROM dashboard_versions WHERE dashboard_id=? AND version NOT IN
                       (SELECT version FROM dashboard_versions WHERE dashboard_id=? ORDER BY version DESC LIMIT 50)""",
-                   (dashboard_id, dashboard_id))
+            (dashboard_id, dashboard_id),
+        )
         audit(db, user["id"], "dashboard.saved", "dashboard", model["uid"], {"version": version, "title": model["title"]})
     return {"uid": model["uid"], "version": version, "url": f"/d/{model['uid']}"}
 
 
 def get(settings, uid, user=None):
     with connect(settings) as db:
-        row = db.execute("""SELECT d.*,f.uid AS folder_uid,f.title AS folder_title,cu.username AS created_name,
+        row = db.execute(
+            """SELECT d.*,f.uid AS folder_uid,f.title AS folder_title,cu.username AS created_name,
                             uu.username AS updated_name FROM dashboards d LEFT JOIN folders f ON f.id=d.folder_id
                             LEFT JOIN users cu ON cu.id=d.created_by LEFT JOIN users uu ON uu.id=d.updated_by
-                            WHERE d.uid=?""", (uid,)).fetchone()
+                            WHERE d.uid=?""",
+            (uid,),
+        ).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
         folder_access.require_folder(db, user, row["folder_id"])
         can_edit = folder_access.allowed(db, user, row["folder_id"], edit=True)
-        starred = bool(user and db.execute("SELECT 1 FROM dashboard_stars WHERE user_id=? AND dashboard_id=?",
-                                           (user["id"], row["id"])).fetchone())
+        starred = bool(user and db.execute("SELECT 1 FROM dashboard_stars WHERE user_id=? AND dashboard_id=?", (user["id"], row["id"])).fetchone())
     model = json.loads(row["data_json"])
     model["version"] = row["version"]
-    return {"dashboard": model, "meta": {
-        "folderUid": row["folder_uid"], "folderTitle": row["folder_title"] or "Genel", "created": row["created_at"],
-        "updated": row["updated_at"], "createdBy": row["created_name"], "updatedBy": row["updated_name"],
-        "version": row["version"], "isStarred": starred, "canEdit": can_edit, "canSave": can_edit,
-        "url": f"/d/{uid}"}}
+    return {
+        "dashboard": model,
+        "meta": {
+            "folderUid": row["folder_uid"],
+            "folderTitle": row["folder_title"] or "Genel",
+            "created": row["created_at"],
+            "updated": row["updated_at"],
+            "createdBy": row["created_name"],
+            "updatedBy": row["updated_name"],
+            "version": row["version"],
+            "isStarred": starred,
+            "canEdit": can_edit,
+            "canSave": can_edit,
+            "url": f"/d/{uid}",
+        },
+    }
 
 
 def delete(settings, user, uid):
@@ -426,16 +508,25 @@ def versions(settings, uid, user=None):
         row = db.execute("SELECT id FROM dashboards WHERE uid=?", (uid,)).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
-        return [dict(r) for r in db.execute("""SELECT v.version,v.message,v.created_at,u.username AS created_by
+        return [
+            dict(r)
+            for r in db.execute(
+                """SELECT v.version,v.message,v.created_at,u.username AS created_by
                     FROM dashboard_versions v LEFT JOIN users u ON u.id=v.created_by
-                    WHERE v.dashboard_id=? ORDER BY v.version DESC""", (row["id"],))]
+                    WHERE v.dashboard_id=? ORDER BY v.version DESC""",
+                (row["id"],),
+            )
+        ]
 
 
 def version_data(settings, uid, version, user=None):
     with connect(settings) as db:
         folder_access.require_dashboard(db, user, uid)
-        row = db.execute("""SELECT v.data_json FROM dashboard_versions v JOIN dashboards d ON d.id=v.dashboard_id
-                            WHERE d.uid=? AND v.version=?""", (uid, int(version))).fetchone()
+        row = db.execute(
+            """SELECT v.data_json FROM dashboard_versions v JOIN dashboards d ON d.id=v.dashboard_id
+                            WHERE d.uid=? AND v.version=?""",
+            (uid, int(version)),
+        ).fetchone()
     if not row:
         raise DashboardError("Sürüm bulunamadı")
     return json.loads(row["data_json"])
@@ -445,8 +536,7 @@ def restore(settings, user, uid, version):
     model = version_data(settings, uid, version, user)
     current = get(settings, uid, user)
     model["version"] = current["dashboard"]["version"]
-    return save(settings, user, model, folder_uid=current["meta"]["folderUid"],
-                message=f"Sürüm {version} geri yüklendi")
+    return save(settings, user, model, folder_uid=current["meta"]["folderUid"], message=f"Sürüm {version} geri yüklendi")
 
 
 def star(settings, user, uid, value=True):
@@ -456,8 +546,11 @@ def star(settings, user, uid, value=True):
         if not row:
             raise DashboardError("Dashboard bulunamadı")
         if value:
-            db.execute("""INSERT INTO dashboard_stars(user_id,dashboard_id) VALUES(?,?)
-                          ON CONFLICT(user_id,dashboard_id) DO NOTHING""", (user["id"], row["id"]))
+            db.execute(
+                """INSERT INTO dashboard_stars(user_id,dashboard_id) VALUES(?,?)
+                          ON CONFLICT(user_id,dashboard_id) DO NOTHING""",
+                (user["id"], row["id"]),
+            )
         else:
             db.execute("DELETE FROM dashboard_stars WHERE user_id=? AND dashboard_id=?", (user["id"], row["id"]))
 
@@ -488,20 +581,37 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
         tags = json.loads(row["tags_json"])
         if tag and tag not in tags:
             continue
-        results.append({"uid": row["uid"], "title": row["title"], "tags": tags, "url": f"/d/{row['uid']}",
-                        "folderUid": row["folder_uid"], "folderTitle": row["folder_title"] or "Genel",
-                        "isStarred": bool(row["starred"]), "updated": row["updated_at"], "type": "dash-db"})
+        results.append(
+            {
+                "uid": row["uid"],
+                "title": row["title"],
+                "tags": tags,
+                "url": f"/d/{row['uid']}",
+                "folderUid": row["folder_uid"],
+                "folderTitle": row["folder_title"] or "Genel",
+                "isStarred": bool(row["starred"]),
+                "updated": row["updated_at"],
+                "type": "dash-db",
+            }
+        )
     return results
 
 
 def folders(settings, user=None):
     with connect(settings) as db:
         visible, values = folder_access.visible_sql(db, user, "f.id")
-        rows = db.execute("""SELECT f.id,f.uid,f.title,f.updated_at,
+        rows = db.execute(
+            """SELECT f.id,f.uid,f.title,f.updated_at,
                 (SELECT COUNT(*) FROM dashboards d WHERE d.folder_id=f.id) AS dashboard_count
-                FROM folders f WHERE """ + visible + " ORDER BY LOWER(f.title),f.uid", values).fetchall()
-        return [{**{k: r[k] for k in ("uid", "title", "updated_at", "dashboard_count")},
-                 "canEdit": folder_access.allowed(db, user, r["id"], edit=True)} for r in rows]
+                FROM folders f WHERE """
+            + visible
+            + " ORDER BY LOWER(f.title),f.uid",
+            values,
+        ).fetchall()
+        return [
+            {**{k: r[k] for k in ("uid", "title", "updated_at", "dashboard_count")}, "canEdit": folder_access.allowed(db, user, r["id"], edit=True)}
+            for r in rows
+        ]
 
 
 def save_folder(settings, user, title, uid=None):

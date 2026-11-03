@@ -3,6 +3,7 @@
 An omitted principal can read shared content only. Never use an implicit system
 administrator: workers carry the current initiating/approving account instead.
 """
+
 from fastapi import HTTPException
 
 from .db import audit, connect, transaction, utcnow
@@ -75,8 +76,14 @@ def policy(settings, user, uid):
         if not folder:
             raise HTTPException(404, "Klasör bulunamadı")
         row = db.execute("SELECT restricted,revision FROM folder_policy WHERE folder_id=?", (folder["id"],)).fetchone()
-        grants = [dict(r) for r in db.execute("""SELECT g.user_id,u.username,g.permission FROM folder_user_grants g
-            JOIN users u ON u.id=g.user_id WHERE g.folder_id=? ORDER BY u.username""", (folder["id"],))]
+        grants = [
+            dict(r)
+            for r in db.execute(
+                """SELECT g.user_id,u.username,g.permission FROM folder_user_grants g
+            JOIN users u ON u.id=g.user_id WHERE g.folder_id=? ORDER BY u.username""",
+                (folder["id"],),
+            )
+        ]
         return {"restricted": bool(row and row["restricted"]), "revision": row["revision"] if row else 0, "grants": grants}
 
 
@@ -94,16 +101,21 @@ def replace_policy(settings, user, uid, body):
         for grant in grants:
             if grant["permission"] not in ("view", "edit") or not db.execute("SELECT 1 FROM users WHERE id=? AND active=1", (grant["user_id"],)).fetchone():
                 raise HTTPException(422, "Etkin kullanıcı ve geçerli izin seçin")
-        changed = db.execute("UPDATE folder_policy SET restricted=?,revision=revision+1 WHERE folder_id=? AND revision=?",
-                             (int(body["restricted"]), fid, body["revision"]))
+        changed = db.execute(
+            "UPDATE folder_policy SET restricted=?,revision=revision+1 WHERE folder_id=? AND revision=?", (int(body["restricted"]), fid, body["revision"])
+        )
         if not changed.rowcount:
             raise HTTPException(409, "İzinler değişti; pencereyi yeniden açın")
         db.execute("DELETE FROM folder_user_grants WHERE folder_id=?", (fid,))
         for grant in grants:
             db.execute("INSERT INTO folder_user_grants(folder_id,user_id,permission) VALUES(?,?,?)", (fid, grant["user_id"], grant["permission"]))
         # Existing approvals must be reviewed after an access boundary changes.
-        db.execute("""UPDATE dash_report_schedules SET enabled=0,updated_at=? WHERE report_id IN
-            (SELECT r.id FROM dash_reports r JOIN dashboards d ON d.uid=r.dashboard_uid WHERE d.folder_id=?)""", (utcnow(), fid))
-        audit(db, user["id"], "folder.permissions_changed", "folder", uid,
-              {"restricted": body["restricted"], "revision": body["revision"] + 1, "grants": grants})
+        db.execute(
+            """UPDATE dash_report_schedules SET enabled=0,updated_at=? WHERE report_id IN
+            (SELECT r.id FROM dash_reports r JOIN dashboards d ON d.uid=r.dashboard_uid WHERE d.folder_id=?)""",
+            (utcnow(), fid),
+        )
+        audit(
+            db, user["id"], "folder.permissions_changed", "folder", uid, {"restricted": body["restricted"], "revision": body["revision"] + 1, "grants": grants}
+        )
     return policy(settings, user, uid)

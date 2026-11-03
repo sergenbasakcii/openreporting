@@ -4,22 +4,46 @@ A *time-series* frame carries ``points`` as ``[[epoch_ms, value_or_None], ...]``
 sorted by time. A *table* frame carries typed ``columns`` and ``rows``. Missing
 samples remain ``None``; nothing in the pipeline turns them into zero.
 """
+
 import math
 import statistics
 
 REDUCERS = {
-    "lastNotNull": "Son değer (boş olmayan)", "last": "Son değer", "firstNotNull": "İlk değer (boş olmayan)",
-    "first": "İlk değer", "mean": "Ortalama", "min": "En düşük", "max": "En yüksek", "sum": "Toplam",
-    "count": "Örnek sayısı", "range": "Aralık (max-min)", "delta": "Delta (sayaç)", "diff": "Fark (son-ilk)",
-    "median": "Medyan", "p90": "90. yüzdelik", "p95": "95. yüzdelik", "p99": "99. yüzdelik",
-    "stdDev": "Standart sapma", "changeCount": "Değişim sayısı", "distinctCount": "Farklı değer sayısı",
-    "allIsNull": "Tümü boş", "allIsZero": "Tümü sıfır", "nullCount": "Boş örnek sayısı",
+    "lastNotNull": "Son değer (boş olmayan)",
+    "last": "Son değer",
+    "firstNotNull": "İlk değer (boş olmayan)",
+    "first": "İlk değer",
+    "mean": "Ortalama",
+    "min": "En düşük",
+    "max": "En yüksek",
+    "sum": "Toplam",
+    "count": "Örnek sayısı",
+    "range": "Aralık (max-min)",
+    "delta": "Delta (sayaç)",
+    "diff": "Fark (son-ilk)",
+    "median": "Medyan",
+    "p90": "90. yüzdelik",
+    "p95": "95. yüzdelik",
+    "p99": "99. yüzdelik",
+    "stdDev": "Standart sapma",
+    "changeCount": "Değişim sayısı",
+    "distinctCount": "Farklı değer sayısı",
+    "allIsNull": "Tümü boş",
+    "allIsZero": "Tümü sıfır",
+    "nullCount": "Boş örnek sayısı",
 }
 
 
 def ts_frame(name, points, *, labels=None, unit="", ref_id="", meta=None):
-    return {"type": "timeseries", "name": str(name), "labels": dict(labels or {}), "unit": unit or "",
-            "refId": ref_id, "points": points, "meta": dict(meta or {})}
+    return {
+        "type": "timeseries",
+        "name": str(name),
+        "labels": dict(labels or {}),
+        "unit": unit or "",
+        "refId": ref_id,
+        "points": points,
+        "meta": dict(meta or {}),
+    }
 
 
 def table_frame(name, columns, rows, *, ref_id="", meta=None):
@@ -27,10 +51,8 @@ def table_frame(name, columns, rows, *, ref_id="", meta=None):
     for column in columns:
         if isinstance(column, str):
             column = {"name": column, "type": "string"}
-        normalized.append({"name": str(column["name"]), "type": column.get("type", "string"),
-                           **({"unit": column["unit"]} if column.get("unit") else {})})
-    return {"type": "table", "name": str(name), "refId": ref_id, "columns": normalized,
-            "rows": [list(row) for row in rows], "meta": dict(meta or {})}
+        normalized.append({"name": str(column["name"]), "type": column.get("type", "string"), **({"unit": column["unit"]} if column.get("unit") else {})})
+    return {"type": "table", "name": str(name), "refId": ref_id, "columns": normalized, "rows": [list(row) for row in rows], "meta": dict(meta or {})}
 
 
 def finite(value):
@@ -114,5 +136,4 @@ def display_name(frame):
 
 
 def total_points(frames):
-    return sum(len(f.get("points", ())) if f["type"] == "timeseries" else len(f.get("rows", ()))
-               for f in frames)
+    return sum(len(f.get("points", ())) if f["type"] == "timeseries" else len(f.get("rows", ())) for f in frames)

@@ -1,4 +1,5 @@
 """Schema upgrades must be atomic, repeatable and safe across web workers."""
+
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -32,10 +33,14 @@ def test_upgrade_failure_preserves_existing_data_and_can_retry(settings, monkeyp
     with db.connect(settings) as connection, db.transaction(connection):
         db.audit(connection, "test", "before.upgrade", "db", "state")
     monkeypatch.setattr(db, "CURRENT_VERSION", 2)
-    monkeypatch.setitem(db.MIGRATIONS, 2, (
-        "CREATE TABLE upgrade_probe(id INTEGER PRIMARY KEY)",
-        "INSERT INTO missing_table VALUES (1)",
-    ))
+    monkeypatch.setitem(
+        db.MIGRATIONS,
+        2,
+        (
+            "CREATE TABLE upgrade_probe(id INTEGER PRIMARY KEY)",
+            "INSERT INTO missing_table VALUES (1)",
+        ),
+    )
     with pytest.raises(sqlite3.OperationalError):
         db.init_db(settings)
     with db.connect(settings) as connection:

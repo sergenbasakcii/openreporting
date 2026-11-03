@@ -141,39 +141,53 @@ MIGRATIONS = {1: tuple(statement.strip() for statement in SCHEMA.split(";") if s
 _SOURCE_TYPES = "'zabbix','postgres','testdata','prometheus','loki','httpjson','csv'"
 _source_schema = next(s for s in MIGRATIONS[1] if s.startswith("CREATE TABLE IF NOT EXISTS datasources("))
 _source_schema = _source_schema.replace("datasources(", "datasources_v2(", 1).replace("'zabbix','postgres','testdata'", _SOURCE_TYPES)
-MIGRATIONS[2] = (_source_schema, "INSERT INTO datasources_v2 SELECT * FROM datasources", "DROP TABLE datasources", "ALTER TABLE datasources_v2 RENAME TO datasources")
-POSTGRES_MIGRATIONS = {1: postgres_store.bootstrap_statements(MIGRATIONS[1]), 2: (
-    "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
-    f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK(type IN ({_SOURCE_TYPES}))",
-)}
-MIGRATIONS[3] = ("""CREATE TABLE external_identities(
+MIGRATIONS[2] = (
+    _source_schema,
+    "INSERT INTO datasources_v2 SELECT * FROM datasources",
+    "DROP TABLE datasources",
+    "ALTER TABLE datasources_v2 RENAME TO datasources",
+)
+POSTGRES_MIGRATIONS = {
+    1: postgres_store.bootstrap_statements(MIGRATIONS[1]),
+    2: (
+        "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
+        f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK(type IN ({_SOURCE_TYPES}))",
+    ),
+}
+MIGRATIONS[3] = (
+    """CREATE TABLE external_identities(
  user_id TEXT PRIMARY KEY REFERENCES users(id), provider TEXT NOT NULL CHECK(provider='ldap'),
- subject TEXT NOT NULL, UNIQUE(provider,subject))""",)
+ subject TEXT NOT NULL, UNIQUE(provider,subject))""",
+)
 POSTGRES_MIGRATIONS[3] = postgres_store.widen_integers(MIGRATIONS[3])
-MIGRATIONS[4] = ("""CREATE TABLE user_mfa(
+MIGRATIONS[4] = (
+    """CREATE TABLE user_mfa(
  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  secret_json TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
  pending_expires_at TEXT NOT NULL DEFAULT '', setup_hash TEXT NOT NULL DEFAULT '', last_counter INTEGER NOT NULL DEFAULT -1,
  recovery_hashes TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)""",
- """CREATE TABLE mfa_sessions(token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE)""")
+    """CREATE TABLE mfa_sessions(token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE)""",
+)
 POSTGRES_MIGRATIONS[4] = postgres_store.widen_integers(MIGRATIONS[4])
-MIGRATIONS[5] = ("""CREATE TABLE folder_policy(
+MIGRATIONS[5] = (
+    """CREATE TABLE folder_policy(
  folder_id TEXT PRIMARY KEY REFERENCES folders(id) ON DELETE CASCADE,
  restricted INTEGER NOT NULL DEFAULT 0 CHECK(restricted IN (0,1)), revision INTEGER NOT NULL DEFAULT 0)""",
- """CREATE TABLE folder_user_grants(
+    """CREATE TABLE folder_user_grants(
  folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
- permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(folder_id,user_id))""")
+ permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(folder_id,user_id))""",
+)
 POSTGRES_MIGRATIONS[5] = postgres_store.widen_integers(MIGRATIONS[5])
 # Admin-UI settings layered over the environment file; secrets are Fernet-sealed per scope.
 # Rows are never deleted: a reset clears values and bumps the revision so caches stay monotonic.
-MIGRATIONS[6] = ("""CREATE TABLE app_settings(
+MIGRATIONS[6] = (
+    """CREATE TABLE app_settings(
  scope TEXT PRIMARY KEY CHECK(scope IN ('mail','ldap','security','limits','sources')),
  values_json TEXT NOT NULL DEFAULT '{}', secure_json TEXT NOT NULL DEFAULT '',
- revision INTEGER NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL)""",)
+ revision INTEGER NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL)""",
+)
 POSTGRES_MIGRATIONS[6] = postgres_store.widen_integers(MIGRATIONS[6])
-
-
 
 
 def init_db(settings: Settings):
@@ -204,7 +218,9 @@ def audit(db, actor, action, object_type, object_id, details=None):
     prev = prev_row[0] if prev_row else "0" * 64
     payload = (utcnow(), actor, action, object_type, object_id, json.dumps(details or {}, sort_keys=True, ensure_ascii=False))
     digest = hashlib.sha256(json.dumps([prev, *payload], ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
-    db.execute("INSERT INTO audit(happened_at,actor,action,object_type,object_id,details,prev_hash,entry_hash) VALUES(?,?,?,?,?,?,?,?)", (*payload, prev, digest))
+    db.execute(
+        "INSERT INTO audit(happened_at,actor,action,object_type,object_id,details,prev_hash,entry_hash) VALUES(?,?,?,?,?,?,?,?)", (*payload, prev, digest)
+    )
 
 
 def verify_audit(db):

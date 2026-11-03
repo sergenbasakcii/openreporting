@@ -1,4 +1,5 @@
 """Search filters and ordering must survive the application database migration."""
+
 from dataclasses import replace
 
 import pytest

@@ -1,4 +1,5 @@
 """Datasource administration and query endpoints."""
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -61,9 +62,14 @@ def viewer_payload(settings, body, user):
     if not panel or not panel.get("targets"):
         raise HTTPException(404, "Panel bulunamadı")
     payload = body.model_dump()
-    payload.update(targets=copy.deepcopy(panel["targets"]), transformations=panel.get("transformations") or [],
-                   datasource=panel.get("datasource"), minInterval=panel.get("interval"),
-                   variables=dashboards.viewer_variables(model, body.variables), dashboardTitle=model.get("title", ""))
+    payload.update(
+        targets=copy.deepcopy(panel["targets"]),
+        transformations=panel.get("transformations") or [],
+        datasource=panel.get("datasource"),
+        minInterval=panel.get("interval"),
+        variables=dashboards.viewer_variables(model, body.variables),
+        dashboardTitle=model.get("title", ""),
+    )
     return payload
 
 
@@ -128,9 +134,9 @@ def datasource_health(uid: str, request: Request, user=Depends(editor)):
 @router.post("/api/datasources/{uid}/metric-find")
 def metric_find(uid: str, body: MetricFindIn, request: Request, user=Depends(editor)):
     try:
-        values = query_engine.metric_find(settings_of(request), uid, body.query,
-                                          {"range": body.range, "timezone": body.timezone,
-                                           "variables": body.variables}, user=user["username"])
+        values = query_engine.metric_find(
+            settings_of(request), uid, body.query, {"range": body.range, "timezone": body.timezone, "variables": body.variables}, user=user["username"]
+        )
     except (DataSourceError, ValueError) as exc:
         raise HTTPException(422, str(exc)) from exc
     return {"values": values[:10000], "truncated": len(values) > 10000}
@@ -151,7 +157,9 @@ def run_query(body: QueryIn, request: Request, user=Depends(viewer_write)):
 
 @router.get("/api/query/catalog")
 def query_catalog(user=Depends(authenticate)):
-    return {"functions": series_functions.CATALOG, "transformations": transformations.CATALOG,
-            "reducers": [{"value": k, "label": v} for k, v in frames.REDUCERS.items()],
-            "units": [{"group": group, "units": [{"value": v, "label": label} for v, label in entries]}
-                      for group, entries in units.UNIT_CATALOG.items()]}
+    return {
+        "functions": series_functions.CATALOG,
+        "transformations": transformations.CATALOG,
+        "reducers": [{"value": k, "label": v} for k, v in frames.REDUCERS.items()],
+        "units": [{"group": group, "units": [{"value": v, "label": label} for v, label in entries]} for group, entries in units.UNIT_CATALOG.items()],
+    }

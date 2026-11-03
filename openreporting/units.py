@@ -3,6 +3,7 @@
 The browser has an equivalent implementation in ``static/app/units.js``; keep
 unit identifiers in sync so that a dashboard and its PDF read the same.
 """
+
 import math
 from datetime import datetime, timezone
 
@@ -11,27 +12,76 @@ IEC_PREFIXES = ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei"]
 
 # Zabbix unit strings mapped to Grafana unit identifiers ("auto" unit mode).
 ZABBIX_UNITS = {
-    "B": "bytes", "bps": "bps", "Bps": "Bps", "%": "percent", "s": "s",
-    "uptime": "dtdurations", "unixtime": "dateTimeAsIso", "rpm": "rpm",
-    "Hz": "hertz", "W": "watt", "V": "volt", "A": "amp", "C": "celsius",
-    "°C": "celsius", "dBm": "dBm", "ms": "ms", "pps": "pps", "iops": "iops",
+    "B": "bytes",
+    "bps": "bps",
+    "Bps": "Bps",
+    "%": "percent",
+    "s": "s",
+    "uptime": "dtdurations",
+    "unixtime": "dateTimeAsIso",
+    "rpm": "rpm",
+    "Hz": "hertz",
+    "W": "watt",
+    "V": "volt",
+    "A": "amp",
+    "C": "celsius",
+    "°C": "celsius",
+    "dBm": "dBm",
+    "ms": "ms",
+    "pps": "pps",
+    "iops": "iops",
 }
 
 UNIT_CATALOG = {
-    "Genel": [("none", "Yok"), ("short", "Kısa (k, Mn, Mr)"), ("percent", "Yüzde (0-100)"),
-              ("percentunit", "Yüzde (0.0-1.0)"), ("humidity", "Nem (%H)"), ("dB", "Desibel"),
-              ("dBm", "dBm")],
-    "Veri": [("bytes", "bayt (IEC)"), ("decbytes", "bayt (SI)"), ("bits", "bit (IEC)"),
-             ("decbits", "bit (SI)"), ("kbytes", "kibibayt"), ("mbytes", "mebibayt"),
-             ("gbytes", "gibibayt")],
-    "Veri hızı": [("bps", "bit/sn (SI)"), ("binbps", "bit/sn (IEC)"), ("Bps", "bayt/sn (SI)"),
-                  ("binBps", "bayt/sn (IEC)"), ("pps", "paket/sn"), ("iops", "G/Ç işlem/sn"),
-                  ("ops", "işlem/sn"), ("reqps", "istek/sn")],
-    "Zaman": [("ns", "nanosaniye"), ("µs", "mikrosaniye"), ("ms", "milisaniye"), ("s", "saniye"),
-              ("m", "dakika"), ("h", "saat"), ("d", "gün"), ("dtdurations", "süre (gün/saat)"),
-              ("dateTimeAsIso", "Tarih/saat (ISO)"), ("hertz", "hertz")],
-    "Fiziksel": [("celsius", "Santigrat (°C)"), ("fahrenheit", "Fahrenhayt (°F)"), ("watt", "Watt"),
-                 ("kwatt", "Kilowatt"), ("volt", "Volt"), ("amp", "Amper"), ("rpm", "RPM")],
+    "Genel": [
+        ("none", "Yok"),
+        ("short", "Kısa (k, Mn, Mr)"),
+        ("percent", "Yüzde (0-100)"),
+        ("percentunit", "Yüzde (0.0-1.0)"),
+        ("humidity", "Nem (%H)"),
+        ("dB", "Desibel"),
+        ("dBm", "dBm"),
+    ],
+    "Veri": [
+        ("bytes", "bayt (IEC)"),
+        ("decbytes", "bayt (SI)"),
+        ("bits", "bit (IEC)"),
+        ("decbits", "bit (SI)"),
+        ("kbytes", "kibibayt"),
+        ("mbytes", "mebibayt"),
+        ("gbytes", "gibibayt"),
+    ],
+    "Veri hızı": [
+        ("bps", "bit/sn (SI)"),
+        ("binbps", "bit/sn (IEC)"),
+        ("Bps", "bayt/sn (SI)"),
+        ("binBps", "bayt/sn (IEC)"),
+        ("pps", "paket/sn"),
+        ("iops", "G/Ç işlem/sn"),
+        ("ops", "işlem/sn"),
+        ("reqps", "istek/sn"),
+    ],
+    "Zaman": [
+        ("ns", "nanosaniye"),
+        ("µs", "mikrosaniye"),
+        ("ms", "milisaniye"),
+        ("s", "saniye"),
+        ("m", "dakika"),
+        ("h", "saat"),
+        ("d", "gün"),
+        ("dtdurations", "süre (gün/saat)"),
+        ("dateTimeAsIso", "Tarih/saat (ISO)"),
+        ("hertz", "hertz"),
+    ],
+    "Fiziksel": [
+        ("celsius", "Santigrat (°C)"),
+        ("fahrenheit", "Fahrenhayt (°F)"),
+        ("watt", "Watt"),
+        ("kwatt", "Kilowatt"),
+        ("volt", "Volt"),
+        ("amp", "Amper"),
+        ("rpm", "RPM"),
+    ],
 }
 
 
@@ -40,6 +90,7 @@ KNOWN_UNITS = frozenset(unit for entries in UNIT_CATALOG.values() for unit, _ in
 
 # Raw Zabbix units that collide with display time-unit ids (metres vs minutes etc.).
 AMBIGUOUS_SOURCE_UNITS = {"m", "h", "d"}
+
 
 def resolve_unit(unit: str | None, source_unit: str | None = None) -> str:
     """Panel unit wins; otherwise translate the Zabbix item unit."""
@@ -163,9 +214,9 @@ def format_value(value, unit: str | None = "short", decimals=None, no_value: str
     if unit == "kbytes":
         return _scaled(number * 1024, 1024, IEC_PREFIXES, "B", decimals)
     if unit == "mbytes":
-        return _scaled(number * 1024 ** 2, 1024, IEC_PREFIXES, "B", decimals)
+        return _scaled(number * 1024**2, 1024, IEC_PREFIXES, "B", decimals)
     if unit == "gbytes":
-        return _scaled(number * 1024 ** 3, 1024, IEC_PREFIXES, "B", decimals)
+        return _scaled(number * 1024**3, 1024, IEC_PREFIXES, "B", decimals)
     if unit == "decbytes":
         return _scaled(number, 1000, SI_PREFIXES, "B", decimals)
     if unit == "bits":

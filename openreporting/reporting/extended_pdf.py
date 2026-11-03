@@ -1,4 +1,5 @@
 """Vector PDF counterparts for distribution, XY and OHLC visualizations."""
+
 import math
 
 from reportlab.lib.colors import HexColor
@@ -65,13 +66,12 @@ def draw(pdf, panel, frames, x, y, w, h):
         if xhigh <= xlow:
             xhigh = xlow + 1
         c.setStrokeColor(HexColor(GRID))
-        c.setLineWidth(.5)
+        c.setLineWidth(0.5)
         for i in range(5):
             yy = py + ph * i / 4
             c.line(px, yy, px + pw, yy)
-            pdf.text(px - 5, yy - 2, f"{low + (high-low)*i/4:.4g}", 6, align="right")
-        return (lambda value: px + (value-xlow)/(xhigh-xlow)*pw,
-                lambda value: py + (value-low)/(high-low)*ph)
+            pdf.text(px - 5, yy - 2, f"{low + (high - low) * i / 4:.4g}", 6, align="right")
+        return (lambda value: px + (value - xlow) / (xhigh - xlow) * pw, lambda value: py + (value - low) / (high - low) * ph)
 
     if kind == "histogram":
         values = [p[1] for f in series for p in f["points"]]
@@ -84,7 +84,7 @@ def draw(pdf, panel, frames, x, y, w, h):
         sx, sy = axes(0, max(counts) or 1, edges[0], edges[-1])
         c.setFillColor(HexColor(BLUE))
         for left, right, count in zip(edges, edges[1:], counts):
-            c.rect(sx(left), py, max(.1, sx(right)-sx(left)-.5), sy(count)-py, stroke=0, fill=1)
+            c.rect(sx(left), py, max(0.1, sx(right) - sx(left) - 0.5), sy(count) - py, stroke=0, fill=1)
         for edge in (edges[0], edges[-1]):
             pdf.text(sx(edge), y + 7, f"{edge:.4g}", 6, align="center")
         return True
@@ -94,7 +94,7 @@ def draw(pdf, panel, frames, x, y, w, h):
         if table is None or len(columns) < needed:
             message("Tablo gerekir: OHLC için 4, XY için 2 sayısal sütun")
             return True
-        used = columns[:4 if kind == "candlestick" else 3 if kind == "bubble" else 2]
+        used = columns[: 4 if kind == "candlestick" else 3 if kind == "bubble" else 2]
         rows = [row for row in table["rows"] if all(numeric(row[i]) for i in used)]
         if not rows:
             message("Veri yok")
@@ -108,13 +108,13 @@ def draw(pdf, panel, frames, x, y, w, h):
             cell = pw / len(rows)
             label = next((i for i, col in enumerate(table["columns"]) if col["type"] != "number"), None)
             for i, (row, (op, close, low, high)) in enumerate(zip(rows, values)):
-                xx = px + (i + .5) * cell
+                xx = px + (i + 0.5) * cell
                 color = HexColor(GREEN if close >= op else RED)
                 c.setStrokeColor(color)
                 c.setFillColor(color)
                 c.line(xx, sy(low), xx, sy(high))
-                c.rect(xx-cell*.3, min(sy(op), sy(close)), cell*.6, max(.6, abs(sy(close)-sy(op))), stroke=1, fill=1)
-                pdf.text(xx, y + 7, str(row[label]) if label is not None else str(i+1), 6, align="center", max_width=max(4, cell-2))
+                c.rect(xx - cell * 0.3, min(sy(op), sy(close)), cell * 0.6, max(0.6, abs(sy(close) - sy(op))), stroke=1, fill=1)
+                pdf.text(xx, y + 7, str(row[label]) if label is not None else str(i + 1), 6, align="center", max_width=max(4, cell - 2))
         else:
             xs, ys = [r[used[0]] for r in rows], [r[used[1]] for r in rows]
             sx, sy = axes(min(0, min(ys)), max(0, max(ys)), min(0, min(xs)), max(0, max(xs)))
@@ -123,9 +123,9 @@ def draw(pdf, panel, frames, x, y, w, h):
                 radius = 2
                 if kind == "bubble":
                     size = row[used[2]] if len(used) > 2 else 1
-                    radius = max(2.5, min(10, math.sqrt(abs(size))*1.5))
+                    radius = max(2.5, min(10, math.sqrt(abs(size)) * 1.5))
                 c.circle(sx(row[used[0]]), sy(row[used[1]]), radius, stroke=0, fill=1)
-            pdf.text(px + pw/2, y + 6, table["columns"][used[0]]["name"], 6, align="center", max_width=pw)
+            pdf.text(px + pw / 2, y + 6, table["columns"][used[0]]["name"], 6, align="center", max_width=pw)
         return True
 
     groups = [(f["name"], [p[1] for p in f["points"] if numeric(p[1])]) for f in series]
@@ -138,13 +138,13 @@ def draw(pdf, panel, frames, x, y, w, h):
     _, sy = axes(min(v[0] for _, v in groups), max(v[-1] for _, v in groups))
     cell = pw / len(groups)
     for i, (name, values) in enumerate(groups):
-        xx = px + (i+.5)*cell
-        q1, median, q3 = (quantile(values, p) for p in (.25, .5, .75))
+        xx = px + (i + 0.5) * cell
+        q1, median, q3 = (quantile(values, p) for p in (0.25, 0.5, 0.75))
         c.setStrokeColor(HexColor(BLUE))
         c.setFillColor(HexColor("#e3edff"))
         c.line(xx, sy(values[0]), xx, sy(values[-1]))
-        c.rect(xx-cell*.3, sy(q1), cell*.6, max(.5, sy(q3)-sy(q1)), stroke=1, fill=1)
+        c.rect(xx - cell * 0.3, sy(q1), cell * 0.6, max(0.5, sy(q3) - sy(q1)), stroke=1, fill=1)
         for value in (values[0], median, values[-1]):
-            c.line(xx-cell*.3, sy(value), xx+cell*.3, sy(value))
-        pdf.text(xx, y + 7, name, 6, align="center", max_width=max(4, cell-2))
+            c.line(xx - cell * 0.3, sy(value), xx + cell * 0.3, sy(value))
+        pdf.text(xx, y + 7, name, 6, align="center", max_width=max(4, cell - 2))
     return True

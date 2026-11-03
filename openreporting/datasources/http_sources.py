@@ -1,4 +1,5 @@
 """Read-only HTTP sources with fixed origins, bounded responses and verified TLS."""
+
 import csv
 import io
 import json
@@ -24,6 +25,7 @@ def _numeric(value):
         return finite(value) is not None
     return isinstance(value, str) and bool(DECIMAL.match(value.strip()))
 
+
 def validate_http_url(url, allow_http=False):
     try:
         p = urlsplit(url)
@@ -33,6 +35,7 @@ def validate_http_url(url, allow_http=False):
     except ValueError:
         raise DataSourceError("Geçerli HTTPS adresi gerekli; URL içinde parola, sorgu veya fragment kullanmayın") from None
     return url
+
 
 # Cloud metadata / host agent endpoints outside the link-local range.
 METADATA_ADDRESSES = {ipaddress.ip_address(a) for a in ("100.100.100.200", "168.63.129.16", "fd00:ec2::254")}
@@ -81,6 +84,7 @@ class SafeHTTP(http.client.HTTPConnection):
     def connect(self):
         super().connect()
         safe_peer(self.sock.getpeername()[0], self.allow_loopback)
+
 
 class HTTPSource(DataSource):
     def fetch(self, suffix="", params=None):
@@ -167,7 +171,9 @@ class HTTPSource(DataSource):
             numeric = bool(present) and all(_numeric(v) for v in present)
             columns.append({"name": str(k), "type": "number" if numeric else "string"})
         for record in records:
-            rows.append([finite(record.get(k)) if c["type"] == "number" else (None if record.get(k) is None else str(record[k])) for k, c in zip(keys, columns)])
+            rows.append(
+                [finite(record.get(k)) if c["type"] == "number" else (None if record.get(k) is None else str(record[k])) for k, c in zip(keys, columns)]
+            )
         return table_frame(self.name, columns, rows)
 
     def query(self, target, ctx):
@@ -183,7 +189,12 @@ class HTTPSource(DataSource):
             params.update(start=ctx.start.timestamp(), end=ctx.end.timestamp())
             text = self.fetch("/api/v1/query_range", params)
         else:
-            params.update(start=str(int(ctx.start.timestamp()*1e9)), end=str(int(ctx.end.timestamp()*1e9)), limit=min(self.settings.max_rows, 5000), direction="forward")
+            params.update(
+                start=str(int(ctx.start.timestamp() * 1e9)),
+                end=str(int(ctx.end.timestamp() * 1e9)),
+                limit=min(self.settings.max_rows, 5000),
+                direction="forward",
+            )
             text = self.fetch("/loki/api/v1/query_range", params)
         try:
             payload = json.loads(text)
@@ -203,14 +214,14 @@ class HTTPSource(DataSource):
             rows = []
             for stream in result:
                 for timestamp, line in stream.get("values", []):
-                    rows.append([int(timestamp)//1_000_000, line, json.dumps(stream.get("stream", {}), ensure_ascii=False)])
+                    rows.append([int(timestamp) // 1_000_000, line, json.dumps(stream.get("stream", {}), ensure_ascii=False)])
             if len(rows) >= params["limit"]:
                 raise DataSourceError("Log satır sınırına ulaşıldı; zaman aralığını daraltın")
-            return QueryResult([table_frame(self.name, [{"name":"time","type":"time"},"line","labels"], sorted(rows), ref_id=target.get("refId", ""))])
+            return QueryResult([table_frame(self.name, [{"name": "time", "type": "time"}, "line", "labels"], sorted(rows), ref_id=target.get("refId", ""))])
         if data.get("resultType") != "matrix":
             raise DataSourceError("Kaynak zaman serisi matrisi döndürmelidir")
         for item in result:
-            points = [[int(float(t)*1000), finite(v)] for t, v in item.get("values", [])]
+            points = [[int(float(t) * 1000), finite(v)] for t, v in item.get("values", [])]
             count += len(points)
             if count > ctx.max_series_points:
                 raise DataSourceError("Nokta bütçesi aşıldı; zaman aralığını veya seri sayısını azaltın")
@@ -219,16 +230,20 @@ class HTTPSource(DataSource):
             frames.append(ts_frame(name, points, labels=labels, ref_id=target.get("refId", "")))
         return QueryResult(frames)
 
+
 class PrometheusDataSource(HTTPSource):
     type = "prometheus"
     default_format = "promql"
+
 
 class LokiDataSource(HTTPSource):
     type = "loki"
     default_format = "promql"
 
+
 class JSONDataSource(HTTPSource):
     type = "httpjson"
+
 
 class CSVDataSource(HTTPSource):
     type = "csv"

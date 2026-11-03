@@ -1,4 +1,5 @@
 """Datasource plugin contract and shared helpers."""
+
 import re
 import threading
 import time
@@ -40,6 +41,7 @@ class QueryResult:
 
 class DataSource:
     """A configured datasource instance. Never exposes secrets to callers."""
+
     type = ""
     default_format = None  # variable formatting used for interpolation
 

@@ -5,6 +5,7 @@ from editors and URL-controlled variable values. Python's ``re`` holds the GIL
 during catastrophic backtracking, so one pattern could freeze a web worker. The
 ``regex`` module supports a hard ``timeout`` per operation.
 """
+
 import regex
 
 from .domain import DomainError
@@ -72,8 +73,8 @@ def compile_slashed(text, *, default_flags=""):
     value = str(text or "")
     if len(value) >= 2 and value.startswith("/"):
         end = value.rfind("/")
-        if end > 0 and set(value[end + 1:]) <= set("imsx"):
-            return compile_user(value[1:end], value[end + 1:])
+        if end > 0 and set(value[end + 1 :]) <= set("imsx"):
+            return compile_user(value[1:end], value[end + 1 :])
     return compile_user(value, default_flags)
 
 
@@ -81,5 +82,5 @@ def is_slashed(text):
     value = str(text or "")
     if len(value) >= 2 and value.startswith("/"):
         end = value.rfind("/")
-        return end > 0 and set(value[end + 1:]) <= set("imsx")
+        return end > 0 and set(value[end + 1 :]) <= set("imsx")
     return False

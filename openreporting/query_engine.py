@@ -7,6 +7,7 @@ page are computed by the same code path.
 then always formatted safely for the target datasource (``${var:raw}`` cannot
 inject SQL) and datasource error details are replaced by generic messages.
 """
+
 import copy
 import logging
 import threading
@@ -77,11 +78,19 @@ def build_context(settings, request, *, user=""):
         raise QueryError("maxDataPoints must be 10..20000")
     interval_s = calculate_interval(start, end, max_points, request.get("minInterval") or None)
     variables = request.get("variables") or {}
-    builtins = builtin_variables(start, end, interval_s, dashboard=str(request.get("dashboardTitle", "")),
-                                 user=user, timezone_name=tz)
-    return QueryContext(start=start, end=end, interval_s=interval_s, max_points=max_points, timezone=tz,
-                        anchor_ms=local_midnight_ms(start, tz), variables=variables, builtins=builtins, user=user,
-                        max_series_points=settings.max_series_points)
+    builtins = builtin_variables(start, end, interval_s, dashboard=str(request.get("dashboardTitle", "")), user=user, timezone_name=tz)
+    return QueryContext(
+        start=start,
+        end=end,
+        interval_s=interval_s,
+        max_points=max_points,
+        timezone=tz,
+        anchor_ms=local_midnight_ms(start, tz),
+        variables=variables,
+        builtins=builtins,
+        user=user,
+        max_series_points=settings.max_series_points,
+    )
 
 
 def _run_target(settings, target, ctx, panel_ds, transport, trusted):
@@ -89,20 +98,19 @@ def _run_target(settings, target, ctx, panel_ds, transport, trusted):
     ds = datasources.get(settings, uid, transport=transport)
     if ds.default_format == "promql":
         validate_promql_variables(str(target.get("expr") or ""), ctx.variables, ctx.builtins)
-    prepared = interpolate_deep(copy.deepcopy(target), ctx.variables, default_format=ds.default_format,
-                                builtins=ctx.builtins, strict=not trusted)
+    prepared = interpolate_deep(copy.deepcopy(target), ctx.variables, default_format=ds.default_format, builtins=ctx.builtins, strict=not trusted)
     local_ctx = ctx
     min_interval = prepared.get("interval") or ds.options.get("time_interval")
     if min_interval:
-        local_ctx = QueryContext(**{**local_ctx.__dict__,
-                                    "interval_s": calculate_interval(ctx.start, ctx.end, ctx.max_points, min_interval)})
+        local_ctx = QueryContext(**{**local_ctx.__dict__, "interval_s": calculate_interval(ctx.start, ctx.end, ctx.max_points, min_interval)})
     shift = query_option(prepared.get("functions"), "timeShift")
     offset_ms = int(parse_duration(shift) * 1000) if shift else 0
     if offset_ms:
         # timeShift for every datasource: query the earlier window, then move points forward.
         delta = timedelta(milliseconds=offset_ms)
-        local_ctx = QueryContext(**{**local_ctx.__dict__, "start": local_ctx.start - delta, "end": local_ctx.end - delta,
-                                    "anchor_ms": local_ctx.anchor_ms - offset_ms})
+        local_ctx = QueryContext(
+            **{**local_ctx.__dict__, "start": local_ctx.start - delta, "end": local_ctx.end - delta, "anchor_ms": local_ctx.anchor_ms - offset_ms}
+        )
     slot = _slot(settings, ds.uid)
     if not slot.acquire(timeout=SLOT_WAIT_S):
         raise QueryError("Veri kaynağı meşgul; birazdan tekrar deneyin")
@@ -112,8 +120,7 @@ def _run_target(settings, target, ctx, panel_ds, transport, trusted):
         slot.release()
     frames = result.frames
     if offset_ms:
-        frames = [dict(f, points=[[t + offset_ms, v] for t, v in f["points"]]) if f["type"] == "timeseries" else f
-                  for f in frames]
+        frames = [dict(f, points=[[t + offset_ms, v] for t, v in f["points"]]) if f["type"] == "timeseries" else f for f in frames]
     frames = apply_functions(frames, prepared.get("functions"), local_ctx.interval_ms, ctx.anchor_ms)
     ref_id = target.get("refId", "A")
     for frame in frames:
@@ -196,16 +203,18 @@ def run(settings, request, *, user="", transport=None, trusted=True):
     except (DomainError, ValueError, TypeError, IndexError, KeyError) as exc:
         log.warning("Transformation failed: %s", exc)
         frames, transform_error = visible, str(exc) if isinstance(exc, DomainError) else "Dönüşüm uygulanamadı"
-    return {"frames": frames, "results": results, "transformError": transform_error,
-            "request": {"from": int(ctx.start.timestamp() * 1000), "to": end_ms,
-                        "intervalMs": ctx.interval_ms, "maxDataPoints": ctx.max_points}}
+    return {
+        "frames": frames,
+        "results": results,
+        "transformError": transform_error,
+        "request": {"from": int(ctx.start.timestamp() * 1000), "to": end_ms, "intervalMs": ctx.interval_ms, "maxDataPoints": ctx.max_points},
+    }
 
 
 def metric_find(settings, uid, query, request=None, *, user="", transport=None, trusted=True):
     ds = datasources.get(settings, uid, transport=transport)
     ctx = build_context(settings, request or {"range": {"from": "now-6h", "to": "now"}}, user=user)
-    prepared = interpolate_deep(copy.deepcopy(query), ctx.variables, default_format=ds.default_format,
-                                builtins=ctx.builtins, strict=not trusted)
+    prepared = interpolate_deep(copy.deepcopy(query), ctx.variables, default_format=ds.default_format, builtins=ctx.builtins, strict=not trusted)
     slot = _slot(settings, ds.uid)
     if not slot.acquire(timeout=SLOT_WAIT_S):
         raise QueryError("Veri kaynağı meşgul; birazdan tekrar deneyin")

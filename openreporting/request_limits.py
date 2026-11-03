@@ -1,4 +1,5 @@
 """Bound mutating request bodies before parsing or executing any endpoint."""
+
 from starlette.responses import JSONResponse
 
 MAX_BODY_BYTES = 2_000_000

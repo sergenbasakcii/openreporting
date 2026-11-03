@@ -20,8 +20,8 @@ def test_histogram_constant_values_remain_in_one_bin():
 
 
 def test_quartiles_interpolate_without_inventing_missing_samples():
-    assert quantile([1, 3, 5, 7], .25) == 2.5
-    assert quantile([1, 3, 5, 7], .5) == 4
+    assert quantile([1, 3, 5, 7], 0.25) == 2.5
+    assert quantile([1, 3, 5, 7], 0.5) == 4
     assert not numeric(None)
     assert not numeric(True)
 
@@ -30,20 +30,25 @@ def test_quartiles_interpolate_without_inventing_missing_samples():
 def test_real_vector_commands_are_emitted_for_valid_table(kind):
     class Recorder(Canvas):
         marks = 0
+
         def rect(self, *args, **kwargs):
             self.marks += 1
             return super().rect(*args, **kwargs)
+
         def circle(self, *args, **kwargs):
             self.marks += 1
             return super().circle(*args, **kwargs)
+
     output = BytesIO()
     canvas = Recorder(output)
     messages = []
-    pdf = SimpleNamespace(c=canvas, text=lambda x,y,value,*a,**kw: messages.append(str(value)))
-    frame = table_frame("Test", [{"name":"label","type":"string"},
-        *[{"name":name,"type":"number"} for name in ("open","close","low","high")]],
-        [["A",10,12,8,15],["B",12,9,7,16]])
-    assert draw(pdf,{"type":kind},[frame],20,20,500,250)
+    pdf = SimpleNamespace(c=canvas, text=lambda x, y, value, *a, **kw: messages.append(str(value)))
+    frame = table_frame(
+        "Test",
+        [{"name": "label", "type": "string"}, *[{"name": name, "type": "number"} for name in ("open", "close", "low", "high")]],
+        [["A", 10, 12, 8, 15], ["B", 12, 9, 7, 16]],
+    )
+    assert draw(pdf, {"type": kind}, [frame], 20, 20, 500, 250)
     assert canvas.marks > 0
     assert not any("gerekir" in text or "Veri yok" in text for text in messages)
     canvas.save()

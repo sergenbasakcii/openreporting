@@ -4,6 +4,7 @@
 evaluated through a strict whitelist — never ``eval``. Series are matched by
 labels (host first), a single series is broadcast against many.
 """
+
 import ast
 import math
 import re
@@ -14,14 +15,36 @@ from .series_functions import bucketize
 from .timerange import parse_duration
 
 _REF = re.compile(r"\$\{?([A-Z][A-Z0-9_]{0,15})\}?")
-_FUNCS = {"abs": abs, "log": math.log, "log10": math.log10, "exp": math.exp, "sqrt": math.sqrt,
-          "round": round, "floor": math.floor, "ceil": math.ceil, "min": min, "max": max,
-          "is_null": None}
-_BIN = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b, ast.Mult: lambda a, b: a * b,
-        ast.Div: lambda a, b: a / b, ast.Mod: lambda a, b: a % b, ast.Pow: lambda a, b: a ** b,
-        ast.FloorDiv: lambda a, b: a // b}
-_CMP = {ast.Gt: lambda a, b: a > b, ast.GtE: lambda a, b: a >= b, ast.Lt: lambda a, b: a < b,
-        ast.LtE: lambda a, b: a <= b, ast.Eq: lambda a, b: a == b, ast.NotEq: lambda a, b: a != b}
+_FUNCS = {
+    "abs": abs,
+    "log": math.log,
+    "log10": math.log10,
+    "exp": math.exp,
+    "sqrt": math.sqrt,
+    "round": round,
+    "floor": math.floor,
+    "ceil": math.ceil,
+    "min": min,
+    "max": max,
+    "is_null": None,
+}
+_BIN = {
+    ast.Add: lambda a, b: a + b,
+    ast.Sub: lambda a, b: a - b,
+    ast.Mult: lambda a, b: a * b,
+    ast.Div: lambda a, b: a / b,
+    ast.Mod: lambda a, b: a % b,
+    ast.Pow: lambda a, b: a**b,
+    ast.FloorDiv: lambda a, b: a // b,
+}
+_CMP = {
+    ast.Gt: lambda a, b: a > b,
+    ast.GtE: lambda a, b: a >= b,
+    ast.Lt: lambda a, b: a < b,
+    ast.LtE: lambda a, b: a <= b,
+    ast.Eq: lambda a, b: a == b,
+    ast.NotEq: lambda a, b: a != b,
+}
 
 
 class ExpressionError(DomainError):
@@ -58,8 +81,7 @@ def compile_math(expression: str):
             if isinstance(node, ast.BinOp) and type(node.op) not in _BIN:
                 raise ExpressionError("Unsupported operator")
             continue
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _FUNCS \
-                and not node.keywords and len(node.args) <= 2:
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _FUNCS and not node.keywords and len(node.args) <= 2:
             continue
         raise ExpressionError(f"Unsupported syntax in expression: {type(node).__name__}")
     return tree.body
@@ -137,8 +159,7 @@ def evaluate_math(expression, inputs, interval_ms, ref_id, anchor_ms=0):
     missing = [r for r in refs if r not in inputs]
     if missing:
         raise ExpressionError(f"Expression references unknown query: {', '.join(missing)}")
-    aligned = {r: [dict(f, points=bucketize(f["points"], interval_ms, "avg", anchor_ms)) for f in inputs[r]
-                   if f["type"] == "timeseries"] for r in refs}
+    aligned = {r: [dict(f, points=bucketize(f["points"], interval_ms, "avg", anchor_ms)) for f in inputs[r] if f["type"] == "timeseries"] for r in refs}
     if not refs:
         raise ExpressionError("Expression must reference at least one query, e.g. $A")
     driver = max(refs, key=lambda r: len(aligned[r]))
@@ -167,8 +188,7 @@ def evaluate_math(expression, inputs, interval_ms, ref_id, anchor_ms=0):
             except RecursionError as exc:
                 raise ExpressionError("İfade çok derin") from exc
             name = base["name"] if len(aligned[driver]) > 1 else expression
-            frames.append(ts_frame(name, points, labels=base.get("labels"), unit=base.get("unit", ""), ref_id=ref_id,
-                                   meta={"expression": expression}))
+            frames.append(ts_frame(name, points, labels=base.get("labels"), unit=base.get("unit", ""), ref_id=ref_id, meta={"expression": expression}))
     return frames, warnings
 
 
@@ -188,8 +208,7 @@ def evaluate(expr_target, inputs, interval_ms, end_ms, anchor_ms=0):
         output = []
         for f in frames:
             value = reduce_values([p[1] for p in f["points"]], reducer)
-            output.append(ts_frame(f["name"], [[end_ms, value]], labels=f.get("labels"), unit=f.get("unit", ""),
-                                   ref_id=ref_id, meta={"reducer": reducer}))
+            output.append(ts_frame(f["name"], [[end_ms, value]], labels=f.get("labels"), unit=f.get("unit", ""), ref_id=ref_id, meta={"reducer": reducer}))
         return output, []
     if kind == "resample":
         window = parse_duration(expr_target.get("window", "5m")) * 1000

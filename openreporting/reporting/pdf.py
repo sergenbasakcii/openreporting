@@ -4,6 +4,7 @@ Draws every visualization type the dashboard supports, lays panels out on the
 same 24-column grid (or a simple one-panel-per-row flow), paginates long
 tables, and adds a cover page with variables, time range and table of contents.
 """
+
 import io
 import math
 from datetime import datetime, timezone
@@ -20,15 +21,31 @@ from ..portable import unicode_bold_font_path, unicode_font_path
 from ..timerange import zone
 from ..units import format_value, resolve_unit
 from .collect import variable_summary
-from .fieldcfg import (contrast, display_name, field_config, fmt, mapped, options, reduced_items,
-                       series_color, threshold_color, color as named_color)
+from .fieldcfg import contrast, display_name, field_config, fmt, mapped, options, reduced_items, series_color, threshold_color, color as named_color
 
 PAPERS = {"A4": A4, "A3": A3, "Letter": LETTER}
 FONT, BOLD = "OpenReporting-Sans", "OpenReporting-Sans-Bold"
 INK, MUTED, FAINT, GRID, PANEL_BG, BRAND = "#1f2328", "#5b6472", "#8a93a3", "#e3e6ec", "#ffffff", "#ff7f00"
-SHORT_CALCS = {"mean": "Ort.", "max": "Maks.", "min": "Min.", "lastNotNull": "Son", "last": "Son", "sum": "Toplam",
-               "count": "Sayı", "firstNotNull": "İlk", "first": "İlk", "range": "Aralık", "delta": "Delta", "diff": "Fark",
-               "median": "Medyan", "p90": "p90", "p95": "p95", "p99": "p99", "stdDev": "Std.", "nullCount": "Boş"}
+SHORT_CALCS = {
+    "mean": "Ort.",
+    "max": "Maks.",
+    "min": "Min.",
+    "lastNotNull": "Son",
+    "last": "Son",
+    "sum": "Toplam",
+    "count": "Sayı",
+    "firstNotNull": "İlk",
+    "first": "İlk",
+    "range": "Aralık",
+    "delta": "Delta",
+    "diff": "Fark",
+    "median": "Medyan",
+    "p90": "p90",
+    "p95": "p95",
+    "p99": "p99",
+    "stdDev": "Std.",
+    "nullCount": "Boş",
+}
 TIME_STEPS = [60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 172800, 604800, 1209600, 2592000]
 MARGIN, HEADER_H, FOOTER_H = 26, 30, 16
 
@@ -43,7 +60,7 @@ def _fonts():
 
 def _rgb(value, alpha=1.0):
     hexv = named_color(value).lstrip("#")
-    r, g, b = (int(hexv[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    r, g, b = (int(hexv[i : i + 2], 16) / 255 for i in (0, 2, 4))
     return Color(r, g, b, alpha=alpha)
 
 
@@ -146,15 +163,13 @@ class Pdf:
             lw, lh = _fit(*self.logo.getSize(), 96, HEADER_H - 8)
             c.drawImage(self.logo, right - lw, self.top + 6 + (HEADER_H - 8 - lh) / 2, lw, lh, mask="auto")
             right -= lw + 12
-        self.text(right, self.page_h - MARGIN - 12,
-                  f"{self._fmt_time(self.collected.start)} – {self._fmt_time(self.collected.end)}", 8.5, MUTED, align="right")
+        self.text(right, self.page_h - MARGIN - 12, f"{self._fmt_time(self.collected.start)} – {self._fmt_time(self.collected.end)}", 8.5, MUTED, align="right")
         self.text(right, self.page_h - MARGIN - 24, self.collected.timezone, 7.5, FAINT, align="right")
         c.setStrokeColor(_rgb(GRID))
         c.setLineWidth(0.6)
         c.line(MARGIN, self.top + 2, self.page_w - MARGIN, self.top + 2)
         footer = self.config.get("footer_text") or "OpenReporting raporu"
-        self.text(MARGIN, MARGIN, f"{footer} · oluşturulma {self._fmt_time(self.generated, '%d.%m.%Y %H:%M')}", 7, FAINT,
-                  max_width=self.content_w * 0.7)
+        self.text(MARGIN, MARGIN, f"{footer} · oluşturulma {self._fmt_time(self.generated, '%d.%m.%Y %H:%M')}", 7, FAINT, max_width=self.content_w * 0.7)
         self.text(self.page_w - MARGIN, MARGIN, f"Sayfa {self.page}", 7, FAINT, align="right")
 
     # -- cover ----------------------------------------------------------------
@@ -184,10 +199,12 @@ class Pdf:
         dash_title = self.collected.dashboard.get("title", "")
         self.text(MARGIN + 4, self.page_h - 136, f"Dashboard: {dash_title}", 9.5, "#c7cbd6", max_width=text_w)
         y = self.page_h - 190
-        rows = [("Rapor dönemi", f"{self._fmt_time(self.collected.start)} – {self._fmt_time(self.collected.end)}"),
-                ("Saat dilimi", self.collected.timezone),
-                ("Oluşturulma", self._fmt_time(self.generated, "%d.%m.%Y %H:%M:%S")),
-                ("Bölüm sayısı", str(len(self.collected.sections)))]
+        rows = [
+            ("Rapor dönemi", f"{self._fmt_time(self.collected.start)} – {self._fmt_time(self.collected.end)}"),
+            ("Saat dilimi", self.collected.timezone),
+            ("Oluşturulma", self._fmt_time(self.generated, "%d.%m.%Y %H:%M:%S")),
+            ("Bölüm sayısı", str(len(self.collected.sections))),
+        ]
         if self.config.get("split_by"):
             rows.append(("Bölümleme", f"${self.config['split_by']} değişkeninin her değeri için ayrı bölüm"))
         rows += [(str(name), value) for name, value in variable_summary(self.collected.variables)]
@@ -202,10 +219,17 @@ class Pdf:
             c.setStrokeColor(_rgb("#f5b73d"))
             c.roundRect(MARGIN, y - 30, self.content_w, 34, 4, stroke=1, fill=1)
             self.text(MARGIN + 10, y - 10, "Kısmi veri uyarısı", 9, "#8a5a00", bold=True)
-            issues = self.collected.warnings + [f"{p.title or p.panel.get('type')}: {(p.errors or p.warnings)[0]}"
-                                                for s in self.collected.sections for p in s.panels if p.errors or p.warnings]
-            self.text(MARGIN + 10, y - 22, f"{len(issues)} panelde hata/eksik veri var. İlk: {issues[0] if issues else ''}", 8,
-                      "#8a5a00", max_width=self.content_w - 20)
+            issues = self.collected.warnings + [
+                f"{p.title or p.panel.get('type')}: {(p.errors or p.warnings)[0]}" for s in self.collected.sections for p in s.panels if p.errors or p.warnings
+            ]
+            self.text(
+                MARGIN + 10,
+                y - 22,
+                f"{len(issues)} panelde hata/eksik veri var. İlk: {issues[0] if issues else ''}",
+                8,
+                "#8a5a00",
+                max_width=self.content_w - 20,
+            )
             y -= 44
         if toc_pages and len(self.collected.sections) > 1:
             y -= 8
@@ -222,8 +246,7 @@ class Pdf:
                 xx = MARGIN + 4 + col * col_w
                 self.text(xx, yy, title, 8.5, INK, max_width=col_w - 50)
                 self.text(xx + col_w - 12, yy, str(page), 8.5, MUTED, align="right")
-        self.text(MARGIN, MARGIN, "Bu rapor salt-okunur kaynaklardan otomatik üretilmiştir. Veri olmayan noktalar sıfır kabul edilmez.",
-                  7, FAINT)
+        self.text(MARGIN, MARGIN, "Bu rapor salt-okunur kaynaklardan otomatik üretilmiştir. Veri olmayan noktalar sıfır kabul edilmez.", 7, FAINT)
         self.text(self.page_w - MARGIN, MARGIN, f"Sayfa {self.page}", 7, FAINT, align="right")
 
     # -- panels -----------------------------------------------------------------
@@ -259,22 +282,23 @@ class Pdf:
             return
         frames = result.frames
         if result.errors and not frames:
-            for i, line in enumerate(self.wrap("; ".join(result.errors), 7.5, bw - 10)[:max(1, int(bh // 10))]):
+            for i, line in enumerate(self.wrap("; ".join(result.errors), 7.5, bw - 10)[: max(1, int(bh // 10))]):
                 self.text(bx + bw / 2, by + bh / 2 + 6 - i * 10, line, 7.5, "#c4162a", align="center")
             return
         if kind == "text":
             self.draw_text(result.panel, bx, by, bw, bh)
             return
-        if not frames or all((f["type"] == "timeseries" and not f["points"]) or (f["type"] == "table" and not f["rows"])
-                             for f in frames):
+        if not frames or all((f["type"] == "timeseries" and not f["points"]) or (f["type"] == "table" and not f["rows"]) for f in frames):
             self.text(bx + bw / 2, by + bh / 2 - 3, "Veri yok", 10, FAINT, align="center")
             return
         has_series = any(f["type"] == "timeseries" for f in frames)
         try:
             from .extended_pdf import draw as draw_extended
+
             if draw_extended(self, result.panel, frames, bx, by, bw, bh):
                 return
             from .categorical_pdf import draw as draw_categorical
+
             if draw_categorical(self, result.panel, frames, bx, by, bw, bh):
                 return
             if kind in ("timeseries",) and has_series:
@@ -304,6 +328,7 @@ class Pdf:
                 self.draw_statusgrid(result.panel, frames, bx, by, bw, bh)
             else:
                 from ..dashboards import EXTRA_PANEL_TYPES
+
                 if kind in EXTRA_PANEL_TYPES:
                     self.text(bx, by + bh - 8, "Grafik verisi · tablo görünümü", 7, MUTED)
                     bh -= 16
@@ -340,11 +365,22 @@ class Pdf:
                     v += stack_base.get(key, 0)
                     stack_base[key] = v
                 points.append((ts, v))
-            entries.append({"name": cfg.get("displayName") or name, "color": series_color(cfg, index, last), "unit": unit,
-                            "cfg": cfg, "points": points, "values": values, "negative": negative,
-                            "draw": custom.get("drawStyle", "line"), "fill": custom.get("fillOpacity", 10),
-                            "width": custom.get("lineWidth", 1), "span": custom.get("spanNulls", False),
-                            "step": custom.get("lineInterpolation") == "stepAfter"})
+            entries.append(
+                {
+                    "name": cfg.get("displayName") or name,
+                    "color": series_color(cfg, index, last),
+                    "unit": unit,
+                    "cfg": cfg,
+                    "points": points,
+                    "values": values,
+                    "negative": negative,
+                    "draw": custom.get("drawStyle", "line"),
+                    "fill": custom.get("fillOpacity", 10),
+                    "width": custom.get("lineWidth", 1),
+                    "span": custom.get("spanNulls", False),
+                    "step": custom.get("lineInterpolation") == "stepAfter",
+                }
+            )
         if not entries:
             self.text(x + w / 2, y + h / 2, "Veri yok", 10, FAINT, align="center")
             return
@@ -478,7 +514,7 @@ class Pdf:
         size = max(1, math.ceil(len(points) / max(1, buckets)))
         out = []
         for i in range(0, len(points), size):
-            chunk = [p for p in points[i:i + size] if p[1] is not None]
+            chunk = [p for p in points[i : i + size] if p[1] is not None]
             if not chunk:
                 out.append(points[i])
                 continue
@@ -495,11 +531,19 @@ class Pdf:
             name_w = w - col_w * len(calcs) - 14
             if calcs:
                 for i, calc in enumerate(calcs):
-                    self.text(x + 14 + name_w + col_w * (i + 1), line_y, SHORT_CALCS.get(calc, REDUCERS.get(calc, calc)), 6.5,
-                              "#1f60c4", bold=True, align="right", max_width=col_w - 4)
+                    self.text(
+                        x + 14 + name_w + col_w * (i + 1),
+                        line_y,
+                        SHORT_CALCS.get(calc, REDUCERS.get(calc, calc)),
+                        6.5,
+                        "#1f60c4",
+                        bold=True,
+                        align="right",
+                        max_width=col_w - 4,
+                    )
                 line_y -= 9.5
                 rows_fit -= 1
-            shown = entries[:rows_fit] if len(entries) <= rows_fit else entries[:rows_fit - 1]
+            shown = entries[:rows_fit] if len(entries) <= rows_fit else entries[: rows_fit - 1]
             for e in shown:
                 self.c.setFillColor(_rgb(e["color"]))
                 self.c.rect(x + 2, line_y + 1, 8, 3, stroke=0, fill=1)
@@ -560,8 +604,9 @@ class Pdf:
             size = max(8, min(30, ch * 0.42, (cw - 8) / max(1, len(value_text)) * 1.7))
             center_y = cy + ch / 2 - size / 3 + (4 if show_name else 0)
             if show_name:
-                self.text(cx + cw / 2, cy + ch - 11, item["name"], 7, text_color if color_mode.startswith("background") else MUTED,
-                          max_width=cw - 6, align="center")
+                self.text(
+                    cx + cw / 2, cy + ch - 11, item["name"], 7, text_color if color_mode.startswith("background") else MUTED, max_width=cw - 6, align="center"
+                )
             if text_mode != "name":
                 self.text(cx + cw / 2, center_y, value_text, size, text_color, bold=True, align="center", max_width=cw - 4)
 
@@ -656,7 +701,7 @@ class Pdf:
         if not items:
             return
         row_h = max(9, min(22, h / len(items)))
-        visible = items[:max(1, int(h // row_h))]
+        visible = items[: max(1, int(h // row_h))]
         name_w = min(w * 0.32, max(self.width(i["name"], 7) for i in visible) + 6)
         value_w = 58
         bar_w = w - name_w - value_w - 6
@@ -690,7 +735,11 @@ class Pdf:
         angle = 90.0
         for index, item in enumerate(items):
             extent = -360 * abs(item["value"]) / total
-            colr = item["color"] if (item["cfg"].get("color") or {}).get("mode") == "thresholds" else series_color({"color": {"mode": "palette-classic"}}, index, None)
+            colr = (
+                item["color"]
+                if (item["cfg"].get("color") or {}).get("mode") == "thresholds"
+                else series_color({"color": {"mode": "palette-classic"}}, index, None)
+            )
             item["_color"] = colr
             self.c.setFillColor(_rgb(colr))
             self.c.setStrokeColor(_rgb("#ffffff"))
@@ -702,7 +751,7 @@ class Pdf:
             self.c.circle(cx, cy, radius * 0.55, stroke=0, fill=1)
         if legend_w:
             line_y = y + h - 9
-            for item in items[:max(1, int(h // 10))]:
+            for item in items[: max(1, int(h // 10))]:
                 self.c.setFillColor(_rgb(item["_color"]))
                 self.c.rect(x + w - legend_w, line_y + 1, 7, 5, stroke=0, fill=1)
                 pct = abs(item["value"]) / total * 100
@@ -745,7 +794,7 @@ class Pdf:
         end = self.collected.end.timestamp() * 1000
         row_h = max(8, min(20, (h - 10) / max(1, len(series))))
         name_w = min(w * 0.28, 130)
-        for index, frame in enumerate(series[:int((h - 10) // row_h)]):
+        for index, frame in enumerate(series[: int((h - 10) // row_h)]):
             name = display_name(frame)
             cfg = field_config(panel, frame, name)
             yy = y + h - (index + 1) * row_h
@@ -756,8 +805,15 @@ class Pdf:
                 x0 = x + name_w + (max(ts, start) - start) / (end - start or 1) * (w - name_w)
                 x1 = x + name_w + (min(nxt, end) - start) / (end - start or 1) * (w - name_w)
                 hit = mapped(value, cfg.get("mappings"))
-                colr = "#d4d8e0" if value is None else (named_color(hit["color"]) if hit and hit.get("color") else
-                                                        threshold_color(value, cfg.get("thresholds"), cfg.get("min") or 0, cfg.get("max") or 100))
+                colr = (
+                    "#d4d8e0"
+                    if value is None
+                    else (
+                        named_color(hit["color"])
+                        if hit and hit.get("color")
+                        else threshold_color(value, cfg.get("thresholds"), cfg.get("min") or 0, cfg.get("max") or 100)
+                    )
+                )
                 self.c.setFillColor(_rgb(colr or "#5794F2"))
                 self.c.rect(x0, yy + row_h * 0.15, max(0.3, x1 - x0), row_h * 0.7, stroke=0, fill=1)
 
@@ -792,9 +848,11 @@ class Pdf:
             series = [f for f in frames if f["type"] == "timeseries"]
             stamps = sorted({p[0] for f in series for p in f["points"]}, reverse=True)
             lookups = [dict(f["points"]) for f in series]
-            table = {"columns": [{"name": "Zaman", "type": "time"}] + [
-                {"name": display_name(f), "type": "number", "unit": f.get("unit", "")} for f in series],
-                "rows": [[t] + [lk.get(t) for lk in lookups] for t in stamps], "meta": {}}
+            table = {
+                "columns": [{"name": "Zaman", "type": "time"}] + [{"name": display_name(f), "type": "number", "unit": f.get("unit", "")} for f in series],
+                "rows": [[t] + [lk.get(t) for lk in lookups] for t in stamps],
+                "meta": {},
+            }
         cfgs = [field_config(panel, table, c["name"]) for c in table["columns"]]
         visible = [i for i, cfg in enumerate(cfgs) if not (cfg.get("custom") or {}).get("hidden")]
         row_units = (table.get("meta") or {}).get("rowUnits") or []
@@ -809,17 +867,24 @@ class Pdf:
                 elif column["type"] == "number":
                     unit = resolve_unit(cfg.get("unit"), column.get("unit") or (row_units[ri] if ri < len(row_units) else ""))
                     cell_mode = ((cfg.get("custom") or {}).get("cellOptions") or {}).get("type", "auto")
-                    colr = threshold_color(value, cfg.get("thresholds"), cfg.get("min") or 0, cfg.get("max") or 100) \
-                        if cell_mode in ("color-text", "color-background", "gauge") and value is not None else None
+                    colr = (
+                        threshold_color(value, cfg.get("thresholds"), cfg.get("min") or 0, cfg.get("max") or 100)
+                        if cell_mode in ("color-text", "color-background", "gauge") and value is not None
+                        else None
+                    )
                     hit = mapped(value, cfg.get("mappings"))
                     if hit and hit.get("color"):
                         colr = named_color(hit["color"])
-                    cells.append((fmt(value, cfg, unit) if value is not None else (cfg.get("noValue") or "—"),
-                                  (colr, cell_mode), "right"))
+                    cells.append((fmt(value, cfg, unit) if value is not None else (cfg.get("noValue") or "—"), (colr, cell_mode), "right"))
                 else:
                     hit = mapped(value, cfg.get("mappings"))
-                    cells.append((hit.get("text") if hit and hit.get("text") else ("" if value is None else str(value)),
-                                  (named_color(hit["color"]), "color-text") if hit and hit.get("color") else None, "left"))
+                    cells.append(
+                        (
+                            hit.get("text") if hit and hit.get("text") else ("" if value is None else str(value)),
+                            (named_color(hit["color"]), "color-text") if hit and hit.get("color") else None,
+                            "left",
+                        )
+                    )
             rendered.append(cells)
         headers = [cfgs[i].get("displayName") or table["columns"][i]["name"] for i in visible]
         return headers, rendered
@@ -849,7 +914,7 @@ class Pdf:
             self.text(cx + 3, line_y + 1.5, head, 7, "#1f60c4", bold=True, max_width=width - 6)
             cx += width
         capacity = max(0, int((h - row_h - 10) // row_h))
-        chunk = rows[start_row:start_row + capacity]
+        chunk = rows[start_row : start_row + capacity]
         for index, cells in enumerate(chunk):
             line_y -= row_h
             if index % 2:
@@ -906,8 +971,18 @@ def plan_grid(pdf, section):
     return placements, page_index + 1
 
 
-SIMPLE_HEIGHTS = {"timeseries": 200, "statetimeline": 150, "barchart": 190, "bargauge": 170, "piechart": 190, "gauge": 140,
-                  "stat": 95, "statusgrid": 150, "text": 90, "row": 24}
+SIMPLE_HEIGHTS = {
+    "timeseries": 200,
+    "statetimeline": 150,
+    "barchart": 190,
+    "bargauge": 170,
+    "piechart": 190,
+    "gauge": 140,
+    "stat": 95,
+    "statusgrid": 150,
+    "text": 90,
+    "row": 24,
+}
 
 
 def paginate(pdf, config, sections):
@@ -931,8 +1006,7 @@ def paginate(pdf, config, sections):
         if config.get("layout", "grid") == "grid":
             placements, page_count = plan_grid(pdf, section)
             first_h = max((top + ph for pi, _, _, top, _, ph in placements if pi == 0), default=20)
-            if (state["cursor"] is None or config.get("section_page_break") or page_count > 1
-                    or state["cursor"] + header_h + first_h > usable):
+            if state["cursor"] is None or config.get("section_page_break") or page_count > 1 or state["cursor"] + header_h + first_h > usable:
                 if not (state["cursor"] == 0 and pages and not pages[-1]["ops"]):
                     new_page(section.title)
             toc.append((section.title, first_page + len(pages) - 1))
@@ -977,8 +1051,9 @@ def paginate(pdf, config, sections):
                     capacity = max(1, int((available - 31) // 11))
                     shown = min(capacity, remaining)
                     need = 32 + shown * 11
-                    pages[-1]["ops"].append(("table", result, (headers, rows), start, state["cursor"], need,
-                                             result.title if first else f"{result.title} (devam)"))
+                    pages[-1]["ops"].append(
+                        ("table", result, (headers, rows), start, state["cursor"], need, result.title if first else f"{result.title} (devam)")
+                    )
                     state["cursor"] += need + 8
                     start += shown
                     first = False

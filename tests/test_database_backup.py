@@ -1,4 +1,5 @@
 """Database backups must preserve WAL writes and never replace user files."""
+
 import sqlite3
 from dataclasses import replace
 

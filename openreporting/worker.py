@@ -1,4 +1,5 @@
 """Single-purpose worker: no web server and no in-process APScheduler."""
+
 import logging
 import os
 import tempfile
@@ -83,6 +84,7 @@ def exclusive_worker(settings):
     """One scheduler/SMTP owner per PostgreSQL database or local SQLite volume."""
     if settings.database_url:
         from . import postgres_store
+
         # Extra replicas (Kubernetes) wait as hot standby instead of crash-looping.
         last = [None]
 
@@ -90,8 +92,8 @@ def exclusive_worker(settings):
             if last[0] is None or time.monotonic() - last[0] > 300:
                 last[0] = time.monotonic()
                 log.info("Another report worker is active; waiting as standby")
-        with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms,
-                                             standby_poll_s=STANDBY_POLL_S, on_standby=standby):
+
+        with postgres_store.exclusive_worker(settings.database_url, timeout_ms=settings.query_timeout_ms, standby_poll_s=STANDBY_POLL_S, on_standby=standby):
             yield
         return
     with exclusive_local_lock(settings.data_dir / "worker.lock"):
@@ -100,17 +102,20 @@ def exclusive_worker(settings):
 
 def update_worker_heartbeat(settings, worker_id, started_at, error=""):
     with connect(settings) as db, transaction(db):
-        db.execute("""INSERT INTO worker_runtime(singleton_id,worker_id,started_at,last_tick,tick_count,last_error)
+        db.execute(
+            """INSERT INTO worker_runtime(singleton_id,worker_id,started_at,last_tick,tick_count,last_error)
               VALUES(1,?,?,?,1,?) ON CONFLICT(singleton_id) DO UPDATE SET
               worker_id=excluded.worker_id,started_at=excluded.started_at,last_tick=excluded.last_tick,
               tick_count=CASE WHEN worker_runtime.worker_id=excluded.worker_id THEN worker_runtime.tick_count+1 ELSE 1 END,
               last_error=excluded.last_error""",
-              (worker_id,started_at,utcnow(),error[:400]))
+            (worker_id, started_at, utcnow(), error[:400]),
+        )
 
 
 def run_forever(settings, once=False, interval=10):
     from .db import init_db
     from .reporting import service as dash_reports
+
     init_db(settings)
     with exclusive_worker(settings):
         # Exclusive ownership means unfinished jobs predate this worker. An
@@ -124,6 +129,7 @@ class _Heartbeat:
 
     def __init__(self, settings, worker_id, started_at, period=30):
         import threading
+
         self.settings, self.worker_id, self.started_at, self.period = settings, worker_id, started_at, period
         self.error = ""
         self._stop = threading.Event()
@@ -148,6 +154,7 @@ class _Heartbeat:
 def _run_locked(settings, once, interval):
     from .reporting import service as dash_reports
     from .runtime_settings import effective
+
     worker_id = identity()
     started_at = utcnow()
     last_retention = 0.0

@@ -1,4 +1,5 @@
 """Shared domain helpers: errors, identifiers, canonical hashing, time parsing, recipient checks."""
+
 import hashlib
 import json
 import re

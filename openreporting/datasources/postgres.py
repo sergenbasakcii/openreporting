@@ -11,6 +11,7 @@ SELECT-only — this is defence in depth, not a substitute):
 * the session starts with ``default_transaction_read_only=on`` and
   ``statement_timeout`` via connection options, plus a READ ONLY transaction.
 """
+
 import hashlib
 import logging
 import math
@@ -26,8 +27,10 @@ from .base import DataSource, DataSourceError, QueryResult
 log = logging.getLogger(__name__)
 
 SSL_MODES = ("disable", "require", "verify-ca", "verify-full")
-_MACRO = re.compile(r"\$__(timeFilter|timeGroupAlias|timeGroup|unixEpochFilter|unixEpochGroupAlias|"
-                    r"unixEpochGroup|timeFrom|timeTo|unixEpochFrom|unixEpochTo|interval_s|interval)\b(\(([^()]*)\))?")
+_MACRO = re.compile(
+    r"\$__(timeFilter|timeGroupAlias|timeGroup|unixEpochFilter|unixEpochGroupAlias|"
+    r"unixEpochGroup|timeFrom|timeTo|unixEpochFrom|unixEpochTo|interval_s|interval)\b(\(([^()]*)\))?"
+)
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
 _WRITE_CTE = re.compile(r"\bas\s*\(\s*(insert|update|delete|merge)\b", re.I)
 
@@ -48,7 +51,7 @@ def _segments(sql):
                         continue
                     break
                 j += 1
-            out.append((False, sql[i:j + 1]))
+            out.append((False, sql[i : j + 1]))
             i = start = j + 1
         elif sql.startswith("--", i) or sql.startswith("/*", i):
             if i > start:
@@ -186,9 +189,13 @@ def rows_to_frames(columns, rows, fmt, ref_id):
         types = []
         for index, _ in enumerate(columns):
             sample = next((r[index] for r in rows if r[index] is not None), None)
-            types.append("time" if isinstance(sample, datetime) else
-                         "number" if isinstance(sample, (int, float)) or (sample is not None and finite(sample) is not None
-                                                                         and not isinstance(sample, str)) else "string")
+            types.append(
+                "time"
+                if isinstance(sample, datetime)
+                else "number"
+                if isinstance(sample, (int, float)) or (sample is not None and finite(sample) is not None and not isinstance(sample, str))
+                else "string"
+            )
         table_rows = []
         for row in rows:
             converted = []
@@ -200,8 +207,7 @@ def rows_to_frames(columns, rows, fmt, ref_id):
                 else:
                     converted.append(None if value is None else str(value))
             table_rows.append(converted)
-        return [table_frame("Sorgu sonucu", [{"name": c, "type": t} for c, t in zip(columns, types)],
-                            table_rows, ref_id=ref_id)]
+        return [table_frame("Sorgu sonucu", [{"name": c, "type": t} for c, t in zip(columns, types)], table_rows, ref_id=ref_id)]
     time_index = names.index("time")
     metric_index = names.index("metric") if "metric" in names else None
     value_indexes = [i for i in range(len(columns)) if i not in (time_index, metric_index)]
@@ -233,19 +239,28 @@ class PostgresDataSource(DataSource):
 
     def _conninfo(self):
         from psycopg import conninfo
+
         options = self.options
         sslmode = options.get("sslmode", "verify-full")
         if sslmode not in SSL_MODES:
             raise DataSourceError("Invalid sslmode")
-        params = {"host": options.get("host", ""), "port": int(options.get("port", 5432) or 5432),
-                  "dbname": options.get("database", ""), "user": options.get("user", ""),
-                  "sslmode": sslmode, "connect_timeout": 10, "application_name": "openreporting-readonly"}
+        params = {
+            "host": options.get("host", ""),
+            "port": int(options.get("port", 5432) or 5432),
+            "dbname": options.get("database", ""),
+            "user": options.get("user", ""),
+            "sslmode": sslmode,
+            "connect_timeout": 10,
+            "application_name": "openreporting-readonly",
+        }
         if not params["host"] or not params["dbname"] or not params["user"]:
             raise DataSourceError("PostgreSQL host, database and user are required")
         if self.secure.get("password"):
             params["password"] = self.secure["password"]
-        params["options"] = (f"-c statement_timeout={self.timeout_ms} -c default_transaction_read_only=on "
-                             f"-c idle_in_transaction_session_timeout={max(self.timeout_ms * 2, 60000)}")
+        params["options"] = (
+            f"-c statement_timeout={self.timeout_ms} -c default_transaction_read_only=on "
+            f"-c idle_in_transaction_session_timeout={max(self.timeout_ms * 2, 60000)}"
+        )
         if options.get("ca_pem"):
             cert_dir = Path(self.settings.data_dir) / "certs"
             cert_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -259,6 +274,7 @@ class PostgresDataSource(DataSource):
 
     def _connect(self):
         import psycopg
+
         try:
             connection = psycopg.connect(self._conninfo())
         except psycopg.Error as exc:
@@ -270,6 +286,7 @@ class PostgresDataSource(DataSource):
     def execute(self, sql, params=()):
         """Run an internal, parameterised query (extended protocol) with the row cap."""
         import psycopg
+
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 try:
@@ -289,35 +306,39 @@ class PostgresDataSource(DataSource):
         rejects any attempt to smuggle a second statement past the lexical guard.
         """
         body = guard_sql(sql)
-        log.info("SQL query datasource=%s user=%s sha256=%s", self.uid, user or "-",
-                 hashlib.sha256(body.encode()).hexdigest()[:16])
+        log.info("SQL query datasource=%s user=%s sha256=%s", self.uid, user or "-", hashlib.sha256(body.encode()).hexdigest()[:16])
         wrapped = "SELECT * FROM (\n" + body.replace("%", "%%") + "\n) AS openreporting_q LIMIT %s"
         return self.execute(wrapped, (self.max_rows + 1,))
 
     # Fixed aggregate expressions; trend sum/count use num so SQL and API paths agree.
     HISTORY_MODES = {
-        "history_avg": "AVG(value::double precision)", "history_min": "MIN(value::double precision)",
-        "history_max": "MAX(value::double precision)", "history_sum": "SUM(value::double precision)",
+        "history_avg": "AVG(value::double precision)",
+        "history_min": "MIN(value::double precision)",
+        "history_max": "MAX(value::double precision)",
+        "history_sum": "SUM(value::double precision)",
         "history_count": "COUNT(value)::double precision",
         # Fixed expressions (no user input): honour last/first/median instead of averaging them.
         "history_last": "(ARRAY_AGG(value::double precision ORDER BY clock DESC))[1]",
         "history_first": "(ARRAY_AGG(value::double precision ORDER BY clock ASC))[1]",
         "history_median": "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY value::double precision)",
         "trend_avg": "SUM(value_avg::double precision * num) / NULLIF(SUM(num), 0)",
-        "trend_min": "MIN(value_min::double precision)", "trend_max": "MAX(value_max::double precision)",
-        "trend_sum": "SUM(value_avg::double precision * num)", "trend_count": "SUM(num)::double precision",
+        "trend_min": "MIN(value_min::double precision)",
+        "trend_max": "MAX(value_max::double precision)",
+        "trend_sum": "SUM(value_avg::double precision * num)",
+        "trend_count": "SUM(num)::double precision",
     }
 
     def bucketed_history(self, table, mode, itemids, start, end, bucket, anchor=0):
         from psycopg import sql as pgsql
+
         if not _IDENT.match(table):
             raise DataSourceError("Invalid history table configuration")
         expression = self.HISTORY_MODES.get(mode)
         if expression is None:
             raise DataSourceError("Invalid aggregate")
-        query = pgsql.SQL("SELECT itemid, %s + ((clock - %s) / %s) * %s AS t, {} FROM {} "
-                          "WHERE itemid = ANY(%s) AND clock >= %s AND clock < %s GROUP BY 1, 2 ORDER BY 1, 2").format(
-            pgsql.SQL(expression), pgsql.Identifier(*table.split(".")))
+        query = pgsql.SQL(
+            "SELECT itemid, %s + ((clock - %s) / %s) * %s AS t, {} FROM {} WHERE itemid = ANY(%s) AND clock >= %s AND clock < %s GROUP BY 1, 2 ORDER BY 1, 2"
+        ).format(pgsql.SQL(expression), pgsql.Identifier(*table.split(".")))
         _, rows = self.execute(query, (anchor, anchor, bucket, bucket, list(itemids), start, end))
         return rows
 
@@ -327,8 +348,7 @@ class PostgresDataSource(DataSource):
         expanded = expand_macros(body, ctx.start, ctx.end, ctx.interval_s)
         columns, rows = self.execute_user_sql(expanded, ctx.user)
         frames = rows_to_frames(columns, rows, target.get("format", "time_series"), target.get("refId", "A"))
-        return QueryResult(frames, [] if rows else ["Sorgu satır döndürmedi (NO DATA)"],
-                           {"executedQueryString": expanded, "rows": len(rows)})
+        return QueryResult(frames, [] if rows else ["Sorgu satır döndürmedi (NO DATA)"], {"executedQueryString": expanded, "rows": len(rows)})
 
     def metric_find(self, query, ctx=None):
         text = query.get("rawSql") if isinstance(query, dict) else str(query or "")
@@ -348,8 +368,6 @@ class PostgresDataSource(DataSource):
         return values
 
     def health(self):
-        columns, rows = self.execute("SELECT version(), current_user, "
-                                     "current_setting('transaction_read_only')")
+        columns, rows = self.execute("SELECT version(), current_user, current_setting('transaction_read_only')")
         version, user, read_only = rows[0]
-        return {"status": "ok", "message": f"{str(version).split(',')[0]} · kullanıcı {user} · "
-                                           f"salt-okunur oturum: {read_only}"}
+        return {"status": "ok", "message": f"{str(version).split(',')[0]} · kullanıcı {user} · salt-okunur oturum: {read_only}"}

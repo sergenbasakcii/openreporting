@@ -1,4 +1,5 @@
 """Admin UI for runtime settings (SMTP, LDAP, security policy, limits, source policy)."""
+
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -39,6 +40,7 @@ def _scope(scope):
 def _server_info(base):
     """Process-level settings: shown read-only because changing them needs a service restart."""
     from ..secrets_store import key_path
+
     rows = [
         ("Genel adres", "OPENREPORTING_PUBLIC_URL", base.public_url or "—"),
         ("Ek host adları", "OPENREPORTING_ALLOWED_HOSTS", ", ".join(base.allowed_hosts) or "—"),
@@ -58,18 +60,18 @@ def _server_info(base):
 @router.get("/api/admin/settings")
 def read_settings(request: Request, user=Depends(admin_read)):
     base = request.app.state.settings
-    return {"scopes": runtime_settings.admin_view(base), "server": _server_info(base),
-            **_restart_hint()}
+    return {"scopes": runtime_settings.admin_view(base), "server": _server_info(base), **_restart_hint()}
 
 
 def _restart_hint():
     if os.getenv("OPENREPORTING_CONTAINER") == "1":
-        return {"env_file": "deploy/docker/openreporting.env (Docker Compose)",
-                "restart": "docker compose up -d   # değişen ayarla konteynerleri yeniden oluşturur"}
+        return {
+            "env_file": "deploy/docker/openreporting.env (Docker Compose)",
+            "restart": "docker compose up -d   # değişen ayarla konteynerleri yeniden oluşturur",
+        }
     if os.name == "nt":
         return {"env_file": "windows/Settings.local.ps1", "restart": "Start-OpenReporting.ps1 penceresini kapatıp yeniden çalıştırın"}
-    return {"env_file": "/etc/openreporting/openreporting.env",
-            "restart": "sudo systemctl restart openreporting-web openreporting-worker"}
+    return {"env_file": "/etc/openreporting/openreporting.env", "restart": "sudo systemctl restart openreporting-web openreporting-worker"}
 
 
 def _guard_self_lockout(settings, user, scope, values):
@@ -115,6 +117,7 @@ def reset_settings(scope: str, body: ScopeReset, request: Request, user=Depends(
 def test_settings(scope: str, body: ScopeTest, request: Request, user=Depends(admin)):
     """Try the form values before saving. Nothing is stored; SMTP never sends a message."""
     from .. import directory_auth, mail_transport
+
     if _scope(scope) not in runtime_settings.FAIL_CLOSED:
         raise HTTPException(404, "Bu bölüm için bağlantı testi yok")
     # The test authenticates with stored service credentials: same step-up as saving them.
@@ -129,6 +132,5 @@ def test_settings(scope: str, body: ScopeTest, request: Request, user=Depends(ad
     except Exception:  # Never expose directory/SMTP responses, challenges or secrets.
         message, ok = "Bağlantı doğrulanamadı. Sunucu adı, port, sertifika ve hesap bilgilerini kontrol edin.", False
     with connect(settings_of(request)) as db, transaction(db):
-        audit(db, user["id"], "integration.checked", "integration", "ldap" if scope == "ldap" else "smtp",
-              {"ok": ok, "unsaved": True})
+        audit(db, user["id"], "integration.checked", "integration", "ldap" if scope == "ldap" else "smtp", {"ok": ok, "unsaved": True})
     return {"ok": ok, "message": message}

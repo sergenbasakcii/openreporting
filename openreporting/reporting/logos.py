@@ -4,6 +4,7 @@ Uploads are decoded with Pillow, checked (type, pixel count), downscaled and re-
 plain PNG. Only that re-encoded file is stored and embedded, so metadata, scripts or malformed
 chunks in the original never reach a PDF. Files are content-addressed: ``logos/<sha256>.png``.
 """
+
 import base64
 import binascii
 import hashlib

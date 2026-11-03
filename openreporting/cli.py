@@ -1,4 +1,5 @@
 """Production operations: admin bootstrap, API, worker, backup and health checks."""
+
 import argparse
 import getpass
 import logging
@@ -22,6 +23,7 @@ def backup(settings, target):
 def worker_health(settings, max_age):
     """Probe: never migrates or creates a store; any storage error counts as unhealthy."""
     from .domain import parse_utc
+
     try:
         if not settings.database_url and not settings.db_path.is_file():
             return 1
@@ -36,6 +38,7 @@ def worker_health(settings, max_age):
 def forwarded_allow_ips(value):
     """Proxies whose X-Forwarded-* headers are trusted: exact IPs/networks only, never a wildcard."""
     import ipaddress
+
     items = [item.strip() for item in (value or "127.0.0.1,::1").split(",") if item.strip()]
     for item in items:
         ipaddress.ip_network(item, strict=False)
@@ -46,6 +49,7 @@ def doctor(settings, *, check_integrations=False):
     """Human-readable installation check; returns a process exit code."""
     import json
     import stat
+
     problems = 0
 
     def report(ok, label, detail=""):
@@ -66,6 +70,7 @@ def doctor(settings, *, check_integrations=False):
     except OSError as exc:
         report(False, "Veri dizinine yazılabiliyor", str(exc))
     from .secrets_store import _fernet, key_path
+
     try:
         _fernet(settings)
         key_file = key_path(settings)
@@ -76,11 +81,13 @@ def doctor(settings, *, check_integrations=False):
     except Exception as exc:  # noqa: BLE001
         report(False, "Şifreleme anahtarı", str(exc))
     from .portable import unicode_bold_font_path, unicode_font_path
+
     try:
         report(True, "PDF yazı tipi", f"{unicode_font_path()} / {unicode_bold_font_path()}")
     except RuntimeError as exc:
         report(False, "PDF yazı tipi", f"{exc} (Ubuntu: apt install fonts-dejavu-core)")
     from .db import CURRENT_VERSION
+
     with connect(settings) as db:
         version = schema_version(db)
         report(version == CURRENT_VERSION, "Veritabanı şeması", f"v{version}")
@@ -95,17 +102,24 @@ def doctor(settings, *, check_integrations=False):
         worker = db.execute("SELECT last_tick FROM worker_runtime WHERE singleton_id=1").fetchone()
     if worker:
         from .domain import parse_utc
+
         age = (datetime.now(timezone.utc) - parse_utc(worker["last_tick"])).total_seconds()
         report(age < 120, "Rapor worker sinyali", f"{age:.0f} sn önce")
     else:
         report(False, "Rapor worker sinyali", "worker hiç çalışmadı (systemctl start openreporting-worker)")
-    report(not settings.mail_enabled or bool(settings.smtp_host and settings.recipient_domains), "SMTP yapılandırması",
-           "etkin" if settings.mail_enabled else "kapalı")
+    report(
+        not settings.mail_enabled or bool(settings.smtp_host and settings.recipient_domains),
+        "SMTP yapılandırması",
+        "etkin" if settings.mail_enabled else "kapalı",
+    )
     report(True, "LDAP yapılandırması", "etkin" if settings.ldap_enabled else "kapalı")
     if check_integrations:
         from . import directory_auth, mail_transport
-        for enabled, label, check in ((settings.ldap_enabled, "LDAP bağlantısı", directory_auth.check_connection),
-                                       (settings.mail_enabled, "SMTP bağlantısı", mail_transport.check_connection)):
+
+        for enabled, label, check in (
+            (settings.ldap_enabled, "LDAP bağlantısı", directory_auth.check_connection),
+            (settings.mail_enabled, "SMTP bağlantısı", mail_transport.check_connection),
+        ):
             if enabled:
                 try:
                     report(True, label, check(settings))
@@ -113,6 +127,7 @@ def doctor(settings, *, check_integrations=False):
                     report(False, label, "DNS, port, TLS sertifikası veya hesap doğrulanamadı; sırlar gösterilmedi")
     report(settings.secure_cookie or os.name == "nt", "Güvenli çerez (HTTPS)", str(settings.secure_cookie))
     from . import datasources
+
     for ds in datasources.list_all(settings):
         try:
             health = datasources.get(settings, ds["uid"]).health()
@@ -126,6 +141,7 @@ def doctor(settings, *, check_integrations=False):
 def export_dashboards(settings, directory):
     import json
     from . import dashboards
+
     target = Path(directory)
     target.mkdir(parents=True, exist_ok=True)
     admin = {"id": "cli", "role": "admin"}
@@ -141,6 +157,7 @@ def export_dashboards(settings, directory):
 def import_dashboards(settings, directory):
     import json
     from . import dashboards, datasources
+
     with connect(settings) as db:
         row = db.execute("SELECT id FROM users WHERE role='admin' AND active=1 ORDER BY created_at LIMIT 1").fetchone()
     if not row:
@@ -150,8 +167,7 @@ def import_dashboards(settings, directory):
     for path in sorted(Path(directory).glob("*.json")):
         model = json.loads(path.read_text(encoding="utf8"))
         mapping = dashboards.import_map(datasources.list_all(settings), model)
-        dashboards.save(settings, user, model, message=f"Provisioning: {path.name}", overwrite=True, ds_map=mapping,
-                        folder_uid=dashboards.KEEP_FOLDER)
+        dashboards.save(settings, user, model, message=f"Provisioning: {path.name}", overwrite=True, ds_map=mapping, folder_uid=dashboards.KEEP_FOLDER)
         count += 1
     print(f"{count} dashboard içe aktarıldı")
 
@@ -169,8 +185,7 @@ def main(argv=None):
     p_disable.add_argument("username")
     commands.add_parser("worker", help="Run the single background worker")
     commands.add_parser("worker-once", help="Run one background worker cycle")
-    p_mig = commands.add_parser("migrate-to-postgres",
-                                help="Offline one-way copy of a SQLite store into the empty PostgreSQL in OPENREPORTING_DATABASE_URL")
+    p_mig = commands.add_parser("migrate-to-postgres", help="Offline one-way copy of a SQLite store into the empty PostgreSQL in OPENREPORTING_DATABASE_URL")
     p_mig.add_argument("--source", required=True, help="Path of the SQLite state.sqlite3 to copy (opened read-only)")
     p_mig.add_argument("--services-stopped", action="store_true", help="Confirm every web process and worker is stopped")
     p_wh = commands.add_parser("worker-health", help="Exit 0 if the worker heartbeat is fresh (container/Kubernetes probe)")
@@ -178,12 +193,16 @@ def main(argv=None):
     p_serve = commands.add_parser("serve", help="Serve local API on loopback")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8810)
-    p_serve.add_argument("--workers", type=int, default=int(os.getenv("OPENREPORTING_WEB_WORKERS", "1")),
-                         help="uvicorn worker processes (Linux: 2-4 recommended behind nginx)")
-    p_serve.add_argument("--proxy-headers", action="store_true", default=os.getenv("OPENREPORTING_PROXY_HEADERS", "") in ("1", "true"),
-                         help="Trust X-Forwarded-* from the reverse proxy (127.0.0.1, or OPENREPORTING_FORWARDED_ALLOW_IPS)")
-    p_serve.add_argument("--allow-remote", action="store_true",
-                         help="Allow a non-loopback bind (containers only; always put TLS in front)")
+    p_serve.add_argument(
+        "--workers", type=int, default=int(os.getenv("OPENREPORTING_WEB_WORKERS", "1")), help="uvicorn worker processes (Linux: 2-4 recommended behind nginx)"
+    )
+    p_serve.add_argument(
+        "--proxy-headers",
+        action="store_true",
+        default=os.getenv("OPENREPORTING_PROXY_HEADERS", "") in ("1", "true"),
+        help="Trust X-Forwarded-* from the reverse proxy (127.0.0.1, or OPENREPORTING_FORWARDED_ALLOW_IPS)",
+    )
+    p_serve.add_argument("--allow-remote", action="store_true", help="Allow a non-loopback bind (containers only; always put TLS in front)")
     p_doctor = commands.add_parser("doctor", help="Check installation: paths, permissions, fonts, schema, worker, datasources")
     p_doctor.add_argument("--check-integrations", action="store_true", help="Check LDAP and SMTP TLS/authentication; never sends mail")
     p_ldap = commands.add_parser("check-ldap", help="Test a directory user's password and group mapping without provisioning a user")
@@ -193,7 +212,7 @@ def main(argv=None):
     p_import = commands.add_parser("import-dashboards", help="Import/overwrite dashboards from *.json files (provisioning)")
     p_import.add_argument("directory")
     commands.add_parser("verify-audit", help="Verify audit hash chain")
-    commands.add_parser('check-postgres', help='Read-only PostgreSQL schema, role and transport preflight; never initializes or migrates')
+    commands.add_parser("check-postgres", help="Read-only PostgreSQL schema, role and transport preflight; never initializes or migrates")
     p_backup = commands.add_parser("backup", help="Consistent SQLite backup")
     p_backup.add_argument("target")
     p_verify = commands.add_parser("verify-backup", help="Verify backup DB, audit, report files, logos and key in disposable storage")
@@ -201,16 +220,16 @@ def main(argv=None):
     p_verify.add_argument("--key-file", help="Separately held encryption key (never printed or copied into the backup)")
     p_verify.add_argument("--max-unpacked-mb", type=int, default=2048)
     p_verify.add_argument("--require-logos", action="store_true")
-    p_rotate = commands.add_parser('prepare-key-rotation',help='Create a new versioned key ring; active key and database stay unchanged')
-    p_rotate.add_argument('--output',required=True)
-    p_rekey = commands.add_parser('rekey-secrets',help='Offline SQLite maintenance: re-encrypt datasource credentials to the prepared primary key')
-    p_rekey.add_argument('--services-stopped',action='store_true',help='Acknowledge every web process and worker is stopped for maintenance')
-    p_retire = commands.add_parser('prepare-key-retirement',help='Create a primary-only ring after verifying every stored credential uses it')
-    p_retire.add_argument('--output',required=True)
-    p_retire.add_argument('--services-stopped',action='store_true')
-    p_mfa = commands.add_parser('reset-mfa',help='OS-operator factor recovery; revoke sessions without changing password')
-    p_mfa.add_argument('username')
-    p_mfa.add_argument('--reason',required=True,choices=['lost-device','compromise','recovery'])
+    p_rotate = commands.add_parser("prepare-key-rotation", help="Create a new versioned key ring; active key and database stay unchanged")
+    p_rotate.add_argument("--output", required=True)
+    p_rekey = commands.add_parser("rekey-secrets", help="Offline SQLite maintenance: re-encrypt datasource credentials to the prepared primary key")
+    p_rekey.add_argument("--services-stopped", action="store_true", help="Acknowledge every web process and worker is stopped for maintenance")
+    p_retire = commands.add_parser("prepare-key-retirement", help="Create a primary-only ring after verifying every stored credential uses it")
+    p_retire.add_argument("--output", required=True)
+    p_retire.add_argument("--services-stopped", action="store_true")
+    p_mfa = commands.add_parser("reset-mfa", help="OS-operator factor recovery; revoke sessions without changing password")
+    p_mfa.add_argument("username")
+    p_mfa.add_argument("--reason", required=True, choices=["lost-device", "compromise", "recovery"])
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -219,6 +238,7 @@ def main(argv=None):
         # Before init_db: the target must still be empty when the copy starts.
         import json
         from .pg_migrate import MigrationError, migrate
+
         try:
             result = migrate(args.source, os.getenv("OPENREPORTING_DATABASE_URL", "").strip(), services_stopped=args.services_stopped)
         except MigrationError as exc:
@@ -230,41 +250,48 @@ def main(argv=None):
     if args.action == "verify-backup":
         import json
         from .backup_verify import BackupVerificationError, verify_backup
+
         try:
-            result = verify_backup(args.directory,key_file=args.key_file,max_unpacked_bytes=args.max_unpacked_mb * 1024**2,
-                                   require_logos=args.require_logos)
+            result = verify_backup(args.directory, key_file=args.key_file, max_unpacked_bytes=args.max_unpacked_mb * 1024**2, require_logos=args.require_logos)
         except BackupVerificationError as exc:
             raise SystemExit(str(exc)) from None
         print(json.dumps(result))
         return  # Never initialize, migrate, replace or connect to the live application state.
     settings = Settings.from_env()
-    if args.action == 'check-postgres':
+    if args.action == "check-postgres":
         import json
         from .postgres_check import check
+
         result = check(settings)
         print(json.dumps(result))
-        raise SystemExit(0 if result['ok'] else 2)
-    if args.action=='reset-mfa':
+        raise SystemExit(0 if result["ok"] else 2)
+    if args.action == "reset-mfa":
         import json
         import sqlite3
         from psycopg import Error as PostgresError
         from .mfa import admin_reset
+
         try:
-            result = admin_reset(settings,args.username,args.reason)
+            result = admin_reset(settings, args.username, args.reason)
         except ValueError as exc:
             raise SystemExit(str(exc)) from None
-        except (sqlite3.Error,PostgresError,OSError):
-            raise SystemExit('Factor recovery storage unavailable; no implicit migration or replacement performed') from None
+        except (sqlite3.Error, PostgresError, OSError):
+            raise SystemExit("Factor recovery storage unavailable; no implicit migration or replacement performed") from None
         print(json.dumps(result))
         return  # Recovery must not migrate a live/older store implicitly.
-    if args.action in {'prepare-key-rotation','rekey-secrets','prepare-key-retirement'}:
+    if args.action in {"prepare-key-rotation", "rekey-secrets", "prepare-key-retirement"}:
         import json
-        from .key_rotation import prepare_rotation,prepare_retirement,rekey_secrets
+        from .key_rotation import prepare_rotation, prepare_retirement, rekey_secrets
         from .secrets_store import SecretError
+
         try:
-            result = (prepare_rotation(settings,args.output) if args.action=='prepare-key-rotation' else
-                      prepare_retirement(settings,args.output,services_stopped=args.services_stopped) if args.action=='prepare-key-retirement' else
-                      rekey_secrets(settings,services_stopped=args.services_stopped))
+            result = (
+                prepare_rotation(settings, args.output)
+                if args.action == "prepare-key-rotation"
+                else prepare_retirement(settings, args.output, services_stopped=args.services_stopped)
+                if args.action == "prepare-key-retirement"
+                else rekey_secrets(settings, services_stopped=args.services_stopped)
+            )
         except SecretError as exc:
             raise SystemExit(str(exc)) from None
         print(json.dumps(result))
@@ -314,31 +341,42 @@ def main(argv=None):
         print("User disabled and sessions invalidated")
     elif args.action in ("worker", "worker-once"):
         from .worker import run_forever
+
         run_forever(settings, once=args.action == "worker-once")
     elif args.action == "serve":
         if args.host not in ("127.0.0.1", "::1") and not args.allow_remote:
             raise SystemExit("API must bind to loopback; use an approved HTTPS reverse proxy for remote access")
         import uvicorn
         from .http_telemetry import logging_config
+
         workers = max(1, min(args.workers, 16))
         try:
             trusted_proxies = forwarded_allow_ips(os.getenv("OPENREPORTING_FORWARDED_ALLOW_IPS", ""))
         except ValueError:
             raise SystemExit("OPENREPORTING_FORWARDED_ALLOW_IPS must list exact proxy IP addresses or networks") from None
-        common = {"host": args.host, "port": args.port, "proxy_headers": args.proxy_headers,
-                  "forwarded_allow_ips": trusted_proxies if args.proxy_headers else None,
-                  "server_header": False, "date_header": True, "timeout_keep_alive": 15, "access_log": False,
-                  "log_config":logging_config()}
+        common = {
+            "host": args.host,
+            "port": args.port,
+            "proxy_headers": args.proxy_headers,
+            "forwarded_allow_ips": trusted_proxies if args.proxy_headers else None,
+            "server_header": False,
+            "date_header": True,
+            "timeout_keep_alive": 15,
+            "access_log": False,
+            "log_config": logging_config(),
+        }
         if workers > 1 and os.name != "nt":
             # Each worker builds its own app from the same environment.
             uvicorn.run("openreporting.web:create_app", factory=True, workers=workers, **common)
         else:
             from .web import create_app
+
             uvicorn.run(create_app(settings), workers=1, **common)
     elif args.action == "doctor":
         raise SystemExit(doctor(effective(settings), check_integrations=args.check_integrations))
     elif args.action == "check-ldap":
         from .directory_auth import authenticate as directory_login, DirectoryUnavailable
+
         try:
             result = directory_login(effective(settings), args.username.strip().lower(), getpass.getpass("Directory password: "))
         except DirectoryUnavailable as exc:

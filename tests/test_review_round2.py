@@ -1,4 +1,5 @@
 """Regression tests for the second review round (PR #1)."""
+
 import pytest
 
 from openreporting.datasources import validate as validate_datasource
@@ -12,24 +13,29 @@ from tests.test_reporting import env  # noqa: F401 - pytest fixture
 VARS = {"inst": {"value": "x"}}
 
 
-@pytest.mark.parametrize("query", [
-    'up{job=`x"`, instance=~$inst, z="a"}',   # a quote inside a raw string must not "open" a string
-    "up{job='$inst'}",                          # single quotes are not escaped by the promql format
-    'up{i="$inst}',                             # unterminated string
-    "rate(x[5m]) or $inst",
-])
+@pytest.mark.parametrize(
+    "query",
+    [
+        'up{job=`x"`, instance=~$inst, z="a"}',  # a quote inside a raw string must not "open" a string
+        "up{job='$inst'}",  # single quotes are not escaped by the promql format
+        'up{i="$inst}',  # unterminated string
+        "rate(x[5m]) or $inst",
+    ],
+)
 def test_promql_variables_rejected_outside_double_quotes(query):
     with pytest.raises(ValueError):
         validate_promql_variables(query, VARS, {})
 
 
-@pytest.mark.parametrize("query", ['up{instance=~"$inst"}', 'up{job="a\\"b", i="$inst"}', "up{job=`raw`, i=\"$inst\"}"])
+@pytest.mark.parametrize("query", ['up{instance=~"$inst"}', 'up{job="a\\"b", i="$inst"}', 'up{job=`raw`, i="$inst"}'])
 def test_promql_variables_allowed_inside_double_quotes(query):
     validate_promql_variables(query, VARS, {})
 
 
-@pytest.mark.parametrize("address", ["127.0.0.1", "::1", "::ffff:127.0.0.1", "64:ff9b::7f00:1", "2002:7f00:1::",
-                                     "169.254.169.254", "100.100.100.200", "168.63.129.16", "fd00:ec2::254"])
+@pytest.mark.parametrize(
+    "address",
+    ["127.0.0.1", "::1", "::ffff:127.0.0.1", "64:ff9b::7f00:1", "2002:7f00:1::", "169.254.169.254", "100.100.100.200", "168.63.129.16", "fd00:ec2::254"],
+)
 def test_http_sources_block_loopback_metadata_and_embedded_ipv4(address):
     with pytest.raises(DataSourceError):
         safe_peer(address)
@@ -53,8 +59,9 @@ def test_non_numeric_datasource_option_is_a_validation_error(env):  # noqa: F811
 
 def test_interrupted_mail_keeps_finished_report_downloadable(env):  # noqa: F811
     settings, _, user = env
-    created = service.save_report(settings, user, {"name": "Teslim", "dashboard_uid": "rep-test",
-                                                   "time_range": {"from": "now-6h", "to": "now"}, "formats": ["pdf"]})
+    created = service.save_report(
+        settings, user, {"name": "Teslim", "dashboard_uid": "rep-test", "time_range": {"from": "now-6h", "to": "now"}, "formats": ["pdf"]}
+    )
     finished = service.request_run(settings, user, created["id"], {})["run_id"]
     service.execute(settings, service.claim(settings))
     unfinished = service.request_run(settings, user, created["id"], {"time_range": {"from": "now-2h", "to": "now"}})["run_id"]

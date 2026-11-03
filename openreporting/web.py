@@ -21,14 +21,13 @@ from .api.deps import settings_of
 log = logging.getLogger(__name__)
 
 SESSION_COOKIE = "openreporting_session"
-SPA_PREFIXES = ("d/", "dashboards", "dashboard/", "explore", "datasources", "reports", "admin", "profile",
-                "login", "playlists", "alerting")
+SPA_PREFIXES = ("d/", "dashboards", "dashboard/", "explore", "datasources", "reports", "admin", "profile", "login", "playlists", "alerting")
 
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=80)
     password: str = Field(max_length=1024)
-    otp: str | None = Field(default=None,max_length=128)
+    otp: str | None = Field(default=None, max_length=128)
 
 
 def create_app(settings: Settings | None = None):
@@ -48,7 +47,7 @@ def create_app(settings: Settings | None = None):
         app.include_router(module.router)
     app.add_middleware(RequestBodyLimitMiddleware)
     app.add_middleware(OriginValidationMiddleware)
-    app.add_middleware(TrustedHostMiddleware,allowed_hosts=trusted_hosts(settings),www_redirect=False)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts(settings), www_redirect=False)
 
     @app.middleware("http")
     async def headers(request, call_next):
@@ -57,14 +56,16 @@ def create_app(settings: Settings | None = None):
         except Exception:
             # Request contents and exception messages can contain credentials.
             # The correlated HTTP 500 event is emitted by the outer telemetry layer.
-            response = JSONResponse({'detail': 'Internal server error'}, status_code=500)
+            response = JSONResponse({"detail": "Internal server error"}, status_code=500)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
-        response.headers["Content-Security-Policy"] = ("default-src 'self'; object-src 'none'; base-uri 'none'; "
-                                                       "frame-ancestors 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
-                                                       "img-src 'self' data: blob:; form-action 'self'")
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; object-src 'none'; base-uri 'none'; "
+            "frame-ancestors 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+            "img-src 'self' data: blob:; form-action 'self'"
+        )
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         if settings.secure_cookie:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -97,18 +98,25 @@ def create_app(settings: Settings | None = None):
                     audit_ok, broken_id = verify_audit(db)
         except Exception:  # A readiness probe must not expose storage exception details.
             database_ok = False
-        return JSONResponse({"state_database": "ready" if database_ok else "unavailable", "audit_chain_valid": audit_ok,
-                             "audit_broken_id": broken_id, "mail_enabled": settings.mail_enabled},
-                            status_code=200 if database_ok and audit_ok else 503)
+        return JSONResponse(
+            {
+                "state_database": "ready" if database_ok else "unavailable",
+                "audit_chain_valid": audit_ok,
+                "audit_broken_id": broken_id,
+                "mail_enabled": settings.mail_enabled,
+            },
+            status_code=200 if database_ok and audit_ok else 503,
+        )
 
     @app.post("/api/login")
-    def sign_in(body: Credentials, request: Request,response: Response):
+    def sign_in(body: Credentials, request: Request, response: Response):
         if body.otp:
             mfa_api.ensure_transport(request)
         settings = settings_of(request)
         token, csrf, expiry = login(settings, body.username, body.password, body.otp, request.client.host if request.client else None)
-        response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=settings.secure_cookie,
-                            samesite="strict", max_age=settings.session_hours * 3600, path="/")
+        response.set_cookie(
+            SESSION_COOKIE, token, httponly=True, secure=settings.secure_cookie, samesite="strict", max_age=settings.session_hours * 3600, path="/"
+        )
         return {"csrf": csrf, "expires_at": expiry}
 
     @app.post("/api/logout")
@@ -122,8 +130,11 @@ def create_app(settings: Settings | None = None):
     def session(user=Depends(authenticate)):
         # The CSRF token is minted on login and held in JS memory. A tab reload
         # logs the user into the same cookie session via a CSRF rotation endpoint.
-        return {"user": {"id": user["id"], "username": user["username"], "role": user["role"]},
-                "expires_at": user["expires_at"],'mfa_enrollment_required':user['mfa_enrollment_required']}
+        return {
+            "user": {"id": user["id"], "username": user["username"], "role": user["role"]},
+            "expires_at": user["expires_at"],
+            "mfa_enrollment_required": user["mfa_enrollment_required"],
+        }
 
     @app.post("/api/session/csrf")
     def csrf_refresh(request: Request, user=Depends(authenticate)):
@@ -143,8 +154,9 @@ def create_app(settings: Settings | None = None):
         limit = max(1, min(limit, 1000))
         with connect(settings) as db:
             if action:
-                rows = db.execute("SELECT * FROM audit WHERE action LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?",
-                                  (action.replace("%", "") + "%", limit, max(0, offset)))
+                rows = db.execute(
+                    "SELECT * FROM audit WHERE action LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?", (action.replace("%", "") + "%", limit, max(0, offset))
+                )
             else:
                 rows = db.execute("SELECT * FROM audit ORDER BY id DESC LIMIT ? OFFSET ?", (limit, max(0, offset)))
             return [dict(r) for r in rows]

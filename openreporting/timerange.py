@@ -4,6 +4,7 @@ Rounding (``/d``) is calendar aware and evaluated in the requested IANA time
 zone so that "today" in Europe/Istanbul is not "today" in UTC. ``to`` values
 round *up* to the end of the unit, exactly like Grafana's time picker.
 """
+
 import math
 import re
 from datetime import datetime, timedelta, timezone
@@ -11,12 +12,40 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .domain import DomainError
 
-UNIT_SECONDS = {"ms": 0.001, "s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800,
-                "M": 2592000, "y": 31536000}
+UNIT_SECONDS = {"ms": 0.001, "s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "M": 2592000, "y": 31536000}
 _DURATION = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w|M|y)\s*$")
 _MATH = re.compile(r"([+-])(\d+)(ms|s|m|h|d|w|M|y)|/(s|m|h|d|w|M|y)")
-NICE_INTERVALS = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 20, 30, 60, 120, 300, 600,
-                  900, 1200, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 604800, 2592000, 31536000)
+NICE_INTERVALS = (
+    0.01,
+    0.02,
+    0.05,
+    0.1,
+    0.2,
+    0.5,
+    1,
+    2,
+    5,
+    10,
+    15,
+    20,
+    30,
+    60,
+    120,
+    300,
+    600,
+    900,
+    1200,
+    1800,
+    3600,
+    7200,
+    10800,
+    21600,
+    43200,
+    86400,
+    604800,
+    2592000,
+    31536000,
+)
 MAX_RANGE_DAYS = 3660
 
 
@@ -97,8 +126,7 @@ def _add_months(local: datetime, months: int) -> datetime:
     month_index = local.year * 12 + (local.month - 1) + months
     year, month = divmod(month_index, 12)
     month += 1
-    days_in_month = [31, 29 if (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) else 28,
-                     31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+    days_in_month = [31, 29 if (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
     return local.replace(year=year, month=month, day=min(local.day, days_in_month))
 
 
@@ -190,16 +218,26 @@ def calculate_interval(start: datetime, end: datetime, max_points: int, min_inte
 def describe(frm: str, to: str) -> str:
     """Short Turkish label for common quick ranges, used on PDF covers."""
     labels = {
-        ("now-5m", "now"): "Son 5 dakika", ("now-15m", "now"): "Son 15 dakika",
-        ("now-30m", "now"): "Son 30 dakika", ("now-1h", "now"): "Son 1 saat",
-        ("now-3h", "now"): "Son 3 saat", ("now-6h", "now"): "Son 6 saat",
-        ("now-12h", "now"): "Son 12 saat", ("now-24h", "now"): "Son 24 saat",
-        ("now-2d", "now"): "Son 2 gün", ("now-7d", "now"): "Son 7 gün",
-        ("now-30d", "now"): "Son 30 gün", ("now-90d", "now"): "Son 90 gün",
-        ("now-1y", "now"): "Son 1 yıl", ("now/d", "now/d"): "Bugün",
-        ("now-1d/d", "now-1d/d"): "Dün", ("now/w", "now/w"): "Bu hafta",
-        ("now-1w/w", "now-1w/w"): "Geçen hafta", ("now/M", "now/M"): "Bu ay",
-        ("now-1M/M", "now-1M/M"): "Geçen ay", ("now/y", "now/y"): "Bu yıl",
+        ("now-5m", "now"): "Son 5 dakika",
+        ("now-15m", "now"): "Son 15 dakika",
+        ("now-30m", "now"): "Son 30 dakika",
+        ("now-1h", "now"): "Son 1 saat",
+        ("now-3h", "now"): "Son 3 saat",
+        ("now-6h", "now"): "Son 6 saat",
+        ("now-12h", "now"): "Son 12 saat",
+        ("now-24h", "now"): "Son 24 saat",
+        ("now-2d", "now"): "Son 2 gün",
+        ("now-7d", "now"): "Son 7 gün",
+        ("now-30d", "now"): "Son 30 gün",
+        ("now-90d", "now"): "Son 90 gün",
+        ("now-1y", "now"): "Son 1 yıl",
+        ("now/d", "now/d"): "Bugün",
+        ("now-1d/d", "now-1d/d"): "Dün",
+        ("now/w", "now/w"): "Bu hafta",
+        ("now-1w/w", "now-1w/w"): "Geçen hafta",
+        ("now/M", "now/M"): "Bu ay",
+        ("now-1M/M", "now-1M/M"): "Geçen ay",
+        ("now/y", "now/y"): "Bu yıl",
         ("now-1y/y", "now-1y/y"): "Geçen yıl",
     }
     return labels.get((str(frm), str(to)), f"{frm} → {to}")

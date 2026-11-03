@@ -1,4 +1,5 @@
 """Real local HTTP fixtures: fixed-origin GET, bounds and frame conversion."""
+
 import json
 import threading
 from dataclasses import replace
@@ -16,25 +17,31 @@ from openreporting.datasources.http_sources import safe_peer, validate_http_url
 @pytest.fixture
 def fixture_source(tmp_path):
     requests = []
+
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             requests.append((self.path, self.headers.get("Authorization")))
             status = 200
             if self.path.startswith("/api/v1/query_range"):
-                payload = {"status":"success","data":{"resultType":"matrix","result":[{"metric":{"job":"test"},"values":[[1000,"2"],[1001,"NaN"]]}]}}
+                payload = {
+                    "status": "success",
+                    "data": {"resultType": "matrix", "result": [{"metric": {"job": "test"}, "values": [[1000, "2"], [1001, "NaN"]]}]},
+                }
             elif self.path.startswith("/loki/api/v1/query_range"):
-                payload = {"status":"success","data":{"resultType":"streams","result":[{"stream":{"job":"test"},"values":[["1000000000","hello"]]}]}}
+                payload = {"status": "success", "data": {"resultType": "streams", "result": [{"stream": {"job": "test"}, "values": [["1000000000", "hello"]]}]}}
             elif self.path == "/csv":
                 payload = "name,value\nalpha,2\nbeta,\n"
             elif self.path == "/redirect":
                 status, payload = 302, "redirect"
             else:
-                payload = {"data":[{"name":"alpha","value":2},{"name":"beta","value":None}]}
+                payload = {"data": [{"name": "alpha", "value": 2}, {"name": "beta", "value": None}]}
             self.send_response(status)
             self.end_headers()
             self.wfile.write((json.dumps(payload) if isinstance(payload, dict) else payload).encode())
+
         def log_message(self, *args):
             pass
+
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -50,20 +57,21 @@ def fixture_source(tmp_path):
 
 
 def create(settings, base, kind, path="", **options):
-    saved = datasources.save(settings, "test", {"name":kind,"type":kind,"url":base+path,
-        "jsonData":options,"secureJsonData":{"token":"fixture-token"}})
+    saved = datasources.save(
+        settings, "test", {"name": kind, "type": kind, "url": base + path, "jsonData": options, "secureJsonData": {"token": "fixture-token"}}
+    )
     return datasources.get(settings, saved)
 
 
 def context():
     end = datetime.now(timezone.utc)
-    return QueryContext(end-timedelta(hours=1), end, 60, 100)
+    return QueryContext(end - timedelta(hours=1), end, 60, 100)
 
 
 def test_prometheus_real_get_frames_and_fixed_origin(fixture_source):
     settings, base, requests = fixture_source
     source = create(settings, base, "prometheus")
-    result = source.query({"refId":"A","expr":"up","url":"https://other.example.com"}, context())
+    result = source.query({"refId": "A", "expr": "up", "url": "https://other.example.com"}, context())
     assert result.frames[0]["points"] == [[1000000, 2.0], [1001000, None]]
     assert requests[0][0].startswith("/api/v1/query_range?")
     assert requests[0][1] == "Bearer fixture-token"
@@ -74,8 +82,8 @@ def test_prometheus_real_get_frames_and_fixed_origin(fixture_source):
 def test_loki_and_json_csv_conversion(fixture_source):
     settings, base, _ = fixture_source
     loki = create(settings, base, "loki")
-    assert loki.query({"expr":'{job="test"}'}, context()).frames[0]["rows"][0][:2] == [1000, "hello"]
-    for kind, path, options in (("httpjson", "/json", {"root":"data"}), ("csv", "/csv", {})):
+    assert loki.query({"expr": '{job="test"}'}, context()).frames[0]["rows"][0][:2] == [1000, "hello"]
+    for kind, path, options in (("httpjson", "/json", {"root": "data"}), ("csv", "/csv", {})):
         source = create(settings, base, kind, path, **options)
         frame = source.query({}, context()).frames[0]
         assert frame["columns"][1]["type"] == "number"
@@ -85,6 +93,7 @@ def test_loki_and_json_csv_conversion(fixture_source):
 
 def test_redirect_and_response_budget_are_fail_closed(fixture_source, monkeypatch):
     from openreporting.datasources import http_sources
+
     settings, base, _ = fixture_source
     source = create(settings, base, "httpjson", "/redirect")
     with pytest.raises(DataSourceError, match="302"):
@@ -108,7 +117,7 @@ def test_http_requires_explicit_opt_in_and_url_cannot_hold_secrets():
 
 
 def test_promql_variables_remain_quoted_and_cannot_be_inserted_as_syntax():
-    variables = {"job":{"value":'x"} or up{job="other'}}
+    variables = {"job": {"value": 'x"} or up{job="other'}}
     expr = 'up{job=~"$job"}'
     templating.validate_promql_variables(expr, variables, {})
     prepared = templating.interpolate(expr, variables, default_format="promql", strict=True)

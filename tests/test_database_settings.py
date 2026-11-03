@@ -1,4 +1,5 @@
 """Explicit backend selection must never silently use an unrelated SQLite file."""
+
 from dataclasses import replace
 
 import pytest
