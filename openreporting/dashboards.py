@@ -532,6 +532,15 @@ def version_data(settings, uid, version, user=None):
     return json.loads(row["data_json"])
 
 
+def version_diff(settings, uid, base, target, user=None):
+    """Human-readable changes from version ``base`` to ``target`` (``target=None``: current)."""
+    from .dashboard_diff import diff
+
+    old = version_data(settings, uid, base, user)
+    new = version_data(settings, uid, target, user) if target is not None else get(settings, uid, user)["dashboard"]
+    return {"from": int(base), "to": int(target) if target is not None else new.get("version"), "changes": diff(old, new)}
+
+
 def restore(settings, user, uid, version):
     model = version_data(settings, uid, version, user)
     current = get(settings, uid, user)

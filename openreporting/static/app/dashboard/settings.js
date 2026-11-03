@@ -132,15 +132,29 @@ function jsonTab(dash, onReplace) {
   } }), button('Panoya kopyala', { onClick: () => navigator.clipboard && navigator.clipboard.writeText(area.value).then(() => toast('Kopyalandı', 'ok')) })));
 }
 
+const CHANGE_BADGES = { added: ['ok', 'eklendi'], removed: ['err', 'kaldırıldı'], changed: ['warn', 'değişti'] };
+
+// What changed from a saved version to the current dashboard, in reviewer terms (no raw JSON).
+async function showDiff(uid, version) {
+  let result;
+  try { result = await get(`/api/dashboards/uid/${encodeURIComponent(uid)}/diff?base=${encodeURIComponent(version)}`); } catch (err) { toast(err.message, 'error'); return; }
+  const body = result.changes.length
+    ? h('ul', { class: 'diff-list' }, result.changes.map((c) => h('li', h('span', { class: `badge ${CHANGE_BADGES[c.kind][0]}`, text: CHANGE_BADGES[c.kind][1] }), ` ${c.text}`)))
+    : h('p', { class: 'muted', text: 'Bu sürüm ile güncel dashboard arasında fark yok.' });
+  const dlg = modal({ title: `Sürüm ${result.from} → ${result.to}`, body, footer: [button('Kapat', { onClick: () => dlg.close() })] });
+}
+
 async function versionsTab(uid, onRestore) {
   const wrap = h('div');
   if (!uid) { wrap.append(h('p', { class: 'muted', text: 'Dashboard henüz kaydedilmedi.' })); return wrap; }
   const list = await get(`/api/dashboards/uid/${encodeURIComponent(uid)}/versions`);
   const table = h('table', { class: 'list' }, h('tr', h('th', { text: 'Sürüm' }), h('th', { text: 'Tarih' }), h('th', { text: 'Kullanıcı' }), h('th', { text: 'Not' }), h('th')));
   list.forEach((v, i) => table.append(h('tr', h('td', { text: v.version }), h('td', { text: fmtDateTime(v.created_at) }), h('td', { text: v.created_by || '—' }), h('td', { text: v.message || '' }),
-    h('td', { class: 'actions' }, i === 0 ? h('span', { class: 'badge ok', text: 'güncel' }) : button('Geri yükle', { size: 'sm', onClick: async () => {
-      if (await confirmDialog('Sürümü geri yükle', `Sürüm ${v.version} yeni bir sürüm olarak geri yüklenecek.`)) onRestore(v.version);
-    } })))));
+    h('td', { class: 'actions' }, i === 0 ? h('span', { class: 'badge ok', text: 'güncel' }) : [
+      button('Değişiklikleri gör', { size: 'sm', onClick: () => showDiff(uid, v.version) }),
+      button('Geri yükle', { size: 'sm', onClick: async () => {
+        if (await confirmDialog('Sürümü geri yükle', `Sürüm ${v.version} yeni bir sürüm olarak geri yüklenecek.`)) onRestore(v.version);
+      } })]))));
   wrap.append(table);
   return wrap;
 }

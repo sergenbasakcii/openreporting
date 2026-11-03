@@ -11,7 +11,7 @@
 ## 2. Dashboard
 
 - **Yeni dashboard**: *Dashboard’lar → Yeni dashboard → Ekle → görselleştirme*. Panel başlığından sürükleyerek taşıyın,
-  sağ alt köşeden boyutlandırın. **Kaydet** (Ctrl+S) her kayıtta yeni sürüm oluşturur; *Ayarlar → Sürümler* ile geri dönün.
+  sağ alt köşeden boyutlandırın. **Kaydet** (Ctrl+S) her kayıtta yeni sürüm oluşturur; *Ayarlar → Sürümler* ile geri dönün. **Değişiklikleri gör** o sürümden bu yana neyin değiştiğini (panel sorgusu, değişken, eşik, başlık…) okunur biçimde listeler — değişen bir raporun zamanlamasını yeniden onaylamadan önce kullanın.
 - **Satırlar**: *Ekle → Satır*. Başlığa tıklayarak daraltın; satır ayarlarından “değişkene göre tekrarla” seçilirse
   satır ve altındaki paneller her değer (ör. her host) için çoğaltılır.
 - **Panel tekrarı**: Panel düzenleyici → *Panel seçenekleri → Değişkene göre tekrarla* → `host`. Yön (yatay/dikey) ve satır başına adet seçilebilir.

@@ -121,6 +121,15 @@ def dashboard_version(uid: str, version: int, request: Request, user=Depends(aut
         _fail(exc)
 
 
+@router.get("/api/dashboards/uid/{uid}/diff")
+def dashboard_diff(uid: str, request: Request, base: int, target: int | None = None, user=Depends(authenticate)):
+    """What changed between two saved versions (or a version and the current dashboard)."""
+    try:
+        return dashboards.version_diff(settings_of(request), uid, base, target, user)
+    except DomainError as exc:
+        _fail(exc)
+
+
 @router.post("/api/dashboards/uid/{uid}/restore")
 def restore_dashboard(uid: str, body: RestoreIn, request: Request, user=Depends(editor)):
     try:

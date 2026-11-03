@@ -361,3 +361,5 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .mfa-code { font-size: 20px; letter-spacing: 6px; text-align: center; max-width: 180px; }
 .notification-list { margin: 6px 0 0; padding-left: 18px; }
 .notification-list li { margin: 3px 0; }
+.diff-list { margin: 0; padding-left: 4px; list-style: none; }
+.diff-list li { margin: 6px 0; }

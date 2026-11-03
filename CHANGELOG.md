@@ -1,6 +1,8 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Dashboard sürüm farkı**: *Ayarlar → Sürümler → Değişiklikleri gör* bir sürümden güncele panel, değişken ve
+  dashboard düzeyindeki değişiklikleri Türkçe ve okunur biçimde gösterir (`GET /api/dashboards/uid/{uid}/diff`, klasör izni uygulanır).
 - **Rapor hatası bildirimleri**: başarısız çalışma, gönderilemeyen/belirsiz e-posta ve kendini kapatan
   zamanlamalar (değişiklik, yetki kaybı, hata, kaçırılan pencere) için olay, durumu değiştiren işlemle
   aynı veritabanı işleminde bir giden kutusuna yazılır; worker rapor sahibine ve zamanlamayı
