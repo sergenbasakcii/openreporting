@@ -14,6 +14,8 @@ API'yi, güvenlik kurallarını ve testleri anlatır. Kurulum ve işletim rehber
 | 07 | [Veri gölü ve yeni veri kaynakları](07-datalake-and-datasources.md) | Trino/Presto, Databricks, ClickHouse, Elasticsearch/OpenSearch, InfluxDB, Graphite |
 | 08 | [Keşfet, API sayfası ve arayüz düzeltmeleri](08-explore-api-ui.md) | Adım adım Keşfet, tek API sayfası, araç çubuğu, görselleştirme ikonları |
 | 09 | [Takımlar ve dashboard izinleri](09-teams-and-dashboard-permissions.md) | Kullanıcı grupları, takıma klasör izni, dashboard bazında kullanıcı/takım izni |
+| 10 | [Akıllı dashboard](10-smart-dashboard.md) | Canlı PDF sayfası, sürükle-bırak, anahtar kelime / drill-down, birebir PDF |
+| 11 | [PDF ve Excel çıktı tasarımı](11-export-design.md) | Marka paleti, kapak/başlık/tablo, Excel stilleri |
 
 ## İlgili belgeler
 

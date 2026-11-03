@@ -1,6 +1,10 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Akıllı dashboard**: A4/A3 sayfa tuvali, görselleştirmeyi sürükle-bırak, Grup/Host/Anahtar kelime drill-down
+  seçicileri, canlı veri, PDF'te birebir aynı yerleşim. Belge: `10-smart-dashboard.md`.
+- **Yeni PDF/Excel tasarımı**: marka paleti, yeni kapak ve sayfa başı, stilli Excel; PDF stat panelinde taşma düzeltildi.
+  Belge: `11-export-design.md`.
 - **Takımlar ve dashboard izinleri**: kullanıcı grupları, klasörlere takım izni, dashboard bazında kullanıcı/takım
   görüntüleme/düzenleme izni (klasörü daraltabilir veya tek dashboard'u paylaşabilir). Belge: `09-teams-and-dashboard-permissions.md`.
 - **Veri gölü ve 6 yeni veri kaynağı**: Trino/Presto/Starburst (Hive, Iceberg, Delta), Databricks SQL,

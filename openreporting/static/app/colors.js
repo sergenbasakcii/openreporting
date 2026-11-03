@@ -102,7 +102,8 @@ export function applyMappings(value, mappings) {
   return null;
 }
 
-export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+// `scope` lets a subtree with its own data-theme (e.g. the smart dashboard paper) resolve its own tokens.
+export function cssVar(name, scope = document.documentElement) { return getComputedStyle(scope).getPropertyValue(name).trim(); }
 
 // Adjust only text at render time; saved series/threshold colours stay unchanged.
 export function readableColor(value, background, minimum = 4.5) {

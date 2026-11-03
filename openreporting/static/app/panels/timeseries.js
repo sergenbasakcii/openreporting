@@ -31,7 +31,7 @@ function legendEl(entries, mode, calcs, onToggle, placement) {
 export function render(container, frames, panel, ctx) {
   const series = timeSeries(frames);
   if (!series.length || series.every((s) => !s.points.length)) { noData(container, frames.length ? 'Seçilen aralıkta veri yok' : 'Veri yok'); return { resize() {}, destroy() {} }; }
-  const theme = chartTheme();
+  const theme = chartTheme(container);
   const options = panel.options || {};
   const legendOpts = options.legend || {};
   const placement = legendOpts.placement === 'right' ? 'right' : 'bottom';

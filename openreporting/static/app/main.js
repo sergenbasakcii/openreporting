@@ -73,7 +73,8 @@ function shell(root) {
   const nav = h('nav', { class: 'nav-list', 'aria-label': 'Ana menü' },
     navItem('/', 'Ana sayfa', 'home', '^/$'),
     navItem('/dashboards', 'Dashboard’lar', 'apps', '^/(dashboards|d/)'),
-    canEdit ? navItem('/explore', 'Keşfet (Explore)', 'compass', '^/explore') : null,
+    navItem('/smart', 'Akıllı dashboard', 'report', '^/smart'),
+    canEdit ? navItem('/explore', 'Keşfet', 'compass', '^/explore') : null,
     navItem('/reports', 'Raporlar', 'report', '^/reports'),
     // The administration section only exists for admins; other roles have nothing under it.
     isAdmin ? [
@@ -146,6 +147,9 @@ function registerRoutes() {
   route('/d/:uid', lazy('./pages/dashboard.js', 'dashboardPage'));
   route('/d/:uid/:slug', lazy('./pages/dashboard.js', 'dashboardPage'));
   route('/explore', lazy('./pages/explore.js', 'explorePage'));
+  route('/smart', lazy('./pages/smart.js', 'smartListPage'));
+  route('/smart/new', lazy('./pages/smart.js', 'smartBuilderPage'));
+  route('/smart/:uid', lazy('./pages/smart.js', 'smartBuilderPage'));
   route('/datasources', lazy('./pages/datasources.js', 'datasourcesPage'));
   route('/datasources/new', lazy('./pages/datasources.js', 'datasourceEditPage'));
   route('/datasources/edit/:uid', lazy('./pages/datasources.js', 'datasourceEditPage'));

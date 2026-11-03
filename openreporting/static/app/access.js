@@ -17,7 +17,7 @@ function grantList(principals, choices) {
         h('span', { class: 'grant-icon' }, icon(p.kind === 'team' ? 'users' : 'user')),
         h('span', { class: 'grant-name' }, h('b', { text: p.label }), h('span', { class: 'hint', text: p.hint })),
         select(LEVELS.filter((l) => l.value !== 'edit' || !p.viewerOnly || choices.get(p.key) === 'edit'), choices.get(p.key) || '',
-          (v) => { if (v) choices.set(p.key, v); else choices.delete(p.key); }, { label: `${p.label} izni`, class: 'auto-width' })));
+          (v) => { if (v) choices.set(p.key, v); else choices.delete(p.key); }, { label: p.aria, class: 'auto-width' })));
     }
     if (!shown.length) rows.append(h('p', { class: 'muted', text: 'Eşleşen takım veya kullanıcı yok.' }));
   };
@@ -28,14 +28,17 @@ function grantList(principals, choices) {
 async function principalsOf() {
   const [users, teams] = await Promise.all([get('/api/users'), get('/api/teams')]);
   return [
-    ...teams.map((t) => ({ key: `team:${t.id}`, kind: 'team', id: t.id, label: t.name, hint: `Takım · ${t.members.length} üye` })),
-    ...users.filter((u) => u.active && u.role !== 'admin').map((u) => ({
-      key: `user:${u.id}`, kind: 'user', id: u.id, label: u.display_name || u.username,
+    ...teams.map((t) => ({ key: `team:${t.id}`, kind: 'team', id: t.id, label: t.name, aria: `${t.name} (takım)`, hint: `Takım · ${t.members.length} üye` })),
+    ...users.filter((u) => u.active && u.role !== 'admin' && !u.service_account).map((u) => ({
+      key: `user:${u.id}`, kind: 'user', id: u.id, label: u.display_name || u.username, aria: `${u.username} (${u.role})`,
       hint: `Kullanıcı · ${{ editor: 'Editör', viewer: 'İzleyici' }[u.role] || u.role}${u.role === 'viewer' ? ' (düzenleme rolü gerekir)' : ''}`, viewerOnly: u.role === 'viewer' })),
   ];
 }
 
 function dialog({ title, intro, restrictLabel, policy, choices, principals, save }) {
+  // Grants of principals that can no longer receive access (disabled users) are dropped on save.
+  const known = new Set(principals.map((p) => p.key));
+  for (const key of [...choices.keys()]) if (!known.has(key)) choices.delete(key);
   let restricted = policy.restricted;
   const list = grantList(principals, choices);
   const show = () => { list.hidden = !restricted; };
@@ -51,7 +54,7 @@ export async function folderPermissionsDialog(folder, refresh) {
   try {
     const [policy, principals] = await Promise.all([get(`/api/folders/${folder.uid}/permissions`), principalsOf()]);
     const choices = new Map([...policy.grants.map((g) => [`user:${g.user_id}`, g.permission]), ...(policy.team_grants || []).map((g) => [`team:${g.team_id}`, g.permission])]);
-    dialog({ title: `Klasör izinleri · ${folder.title}`, restrictLabel: 'Klasöre erişimi kısıtla', policy, choices, principals,
+    dialog({ title: `Klasör izinleri: ${folder.title}`, restrictLabel: 'Klasör erişimini kısıtla', policy, choices, principals,
       intro: 'Paylaşılan klasörü herkes görür. Kısıtlı klasöre yalnızca seçtiğiniz takımlar ve kullanıcılar erişir.',
       save: async (restricted) => {
         const grants = [...choices].filter(([k]) => k.startsWith('user:')).map(([k, permission]) => ({ user_id: k.slice(5), permission }));
@@ -66,7 +69,7 @@ export async function dashboardPermissionsDialog(dash) {
   try {
     const [policy, principals] = await Promise.all([get(`/api/dashboards/uid/${encodeURIComponent(dash.uid)}/permissions`), principalsOf()]);
     const choices = new Map(policy.grants.map((g) => [`${g.principal_type}:${g.principal_id}`, g.permission]));
-    dialog({ title: `Dashboard izinleri · ${dash.title}`, restrictLabel: 'Bu dashboard’u yalnız seçilenlere aç', policy, choices, principals,
+    dialog({ title: `Dashboard izinleri: ${dash.title}`, restrictLabel: 'Bu dashboard’u yalnız seçilenlere aç', policy, choices, principals,
       intro: 'Kapalıyken dashboard klasörünün izinlerini izler. Açıkken yalnızca seçtiğiniz takımlar ve kullanıcılar görür veya düzenler (klasör kısıtlı olsa bile).',
       save: async (restricted) => {
         const grants = [...choices].map(([k, permission]) => { const [principal_type, ...rest] = k.split(':'); return { principal_type, principal_id: rest.join(':'), permission }; });

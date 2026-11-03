@@ -9,7 +9,7 @@ import copy
 import json
 import re
 
-from . import folder_access
+from . import folder_access, smart_layout
 from .db import audit, connect, transaction, utcnow
 from .domain import DomainError, canonical, identity
 
@@ -294,6 +294,7 @@ def normalize(dashboard, ds_map=None):
     if count > MAX_PANELS:
         raise DashboardError(f"Dashboard has too many panels (max {MAX_PANELS})")
     out["panels"] = normalized
+    smart_layout.normalize(out)
     templating = out.get("templating") or {}
     variables = templating.get("list") or []
     if len(variables) > 50:

@@ -18,7 +18,7 @@ function controller(chart, theme) {
 }
 
 export function renderBarchart(container, frames, panel) {
-  const theme = chartTheme();
+  const theme = chartTheme(container);
   const opts = panel.options || {};
   let categories = [];
   let series = [];
@@ -62,7 +62,7 @@ export function renderBarchart(container, frames, panel) {
 }
 
 export function renderPiechart(container, frames, panel) {
-  const theme = chartTheme();
+  const theme = chartTheme(container);
   const items = reducedValues(frames, panel).filter((i) => i.value !== null && i.value !== undefined);
   if (!items.length) { noData(container); return { resize() {}, destroy() {} }; }
   const opts = panel.options || {};
@@ -87,7 +87,7 @@ export function renderPiechart(container, frames, panel) {
 }
 
 export function renderGauge(container, frames, panel) {
-  const theme = chartTheme();
+  const theme = chartTheme(container);
   const items = reducedValues(frames, panel);
   if (!items.length) { noData(container); return { resize() {}, destroy() {} }; }
   const box = wrap(container);
@@ -125,7 +125,7 @@ export function renderGauge(container, frames, panel) {
 }
 
 export function renderStateTimeline(container, frames, panel, ctx) {
-  const theme = chartTheme();
+  const theme = chartTheme(container);
   const series = timeSeries(frames);
   if (!series.length) { noData(container); return { resize() {}, destroy() {} }; }
   const chart = initChart(wrap(container));

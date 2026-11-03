@@ -211,7 +211,7 @@ export function renderStatusGrid(container, frames, panel) {
   if (opts.sort === 'name') items.sort((a, b) => String(a.labels[labelField] || a.name).localeCompare(String(b.labels[labelField] || b.name), 'tr', { numeric: true }));
   const grid = h('div', { class: 'statusgrid' });
   grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${Number(opts.minCellWidth) || 130}px, 1fr))`;
-  const theme = chartTheme();
+  const theme = chartTheme(container);
   for (const item of items) {
     const d = display(item.value, item);
     const c = d.color ? color(d.color) : item.value === null ? 'rgba(128,128,128,.35)' : item.color;

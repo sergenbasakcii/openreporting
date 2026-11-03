@@ -115,9 +115,12 @@ export function display(value, item) {
   return { text: formatValue(value, item.unit, item.cfg.decimals), color: null };
 }
 
-export function chartTheme() {
-  return { text: cssVar('--text') || '#ccccdc', muted: cssVar('--text-muted') || '#999', grid: cssVar('--grid-line') || 'rgba(204,204,220,.1)',
-    bg: cssVar('--bg-panel') || '#181b1f', tooltipBg: cssVar('--bg-elevated') || '#22252b', border: cssVar('--border-strong') || '#444' };
+// Colours for canvas charts, read from the container so a themed subtree (smart dashboard paper) wins.
+export function chartTheme(container) {
+  const scope = container && container.isConnected ? container : document.documentElement;
+  const v = (name) => cssVar(name, scope);
+  return { text: v('--text') || '#ccccdc', muted: v('--text-muted') || '#999', grid: v('--grid-line') || 'rgba(204,204,220,.1)',
+    bg: v('--bg-panel') || '#181b1f', tooltipBg: v('--bg-elevated') || '#22252b', border: v('--border-strong') || '#444' };
 }
 
 export function initChart(container) {

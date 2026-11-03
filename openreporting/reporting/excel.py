@@ -82,12 +82,23 @@ def render_xlsx(config, collected, title):
     anchor = local_midnight_ms(collected.start, collected.timezone)
     summary = wb.active
     summary.title = "Özet"
+    from openpyxl.styles import Border, Side
+
     bold = Font(bold=True)
-    head_fill = PatternFill("solid", fgColor="1F2937")
+    # OpenReporting brand: teal headers, light banding, ink title (matches the PDF palette).
+    head_fill = PatternFill("solid", fgColor="0F766E")
     head_font = Font(bold=True, color="FFFFFF")
+    band_fill = PatternFill("solid", fgColor="F2F8F7")
+    label_font = Font(bold=True, color="566074")
+    title_font = Font(bold=True, size=16, color="0B1020")
+    thin = Side(style="thin", color="E3E6EC")
+    grid = Border(left=thin, right=thin, top=thin, bottom=thin)
+    ok_font, bad_font = Font(color="15803D", bold=True), Font(color="BE123C", bold=True)
     tz = zone(collected.timezone)
     summary.append(["OpenReporting raporu", _safe(title)])
-    summary["A1"].font = Font(bold=True, size=14)
+    summary["A1"].font = title_font
+    summary["B1"].font = Font(bold=True, size=13, color="0F766E")
+    summary.row_dimensions[1].height = 26
     summary.append(["Dashboard", _safe(collected.dashboard.get("title", ""))])
     summary.append(["Dönem başlangıcı", collected.start.astimezone(tz).replace(tzinfo=None)])
     summary.append(["Dönem bitişi", collected.end.astimezone(tz).replace(tzinfo=None)])
@@ -97,9 +108,11 @@ def render_xlsx(config, collected, title):
         summary.append([f"${name}", _safe(value)])
     summary.append([])
     summary.append(["Bölüm", "Panel", "Tür", "Durum", "Sayfa"])
+    index_header = summary.max_row
     for cell in summary[summary.max_row]:
         cell.font = head_font
         cell.fill = head_fill
+        cell.border = grid
     used = {"özet"}
     sheets = 0
     for section in collected.sections:
@@ -115,19 +128,29 @@ def render_xlsx(config, collected, title):
                 ws = wb.create_sheet(sheet_name)
                 sheets += 1
                 ws.append([_safe(f"{section.title} · {result.title}" if section.title else result.title)])
-                ws["A1"].font = Font(bold=True, size=12)
+                ws["A1"].font = Font(bold=True, size=14, color="0B1020")
+                ws.row_dimensions[1].height = 22
                 for block_title, headers, rows, units in blocks:
                     ws.append([])
                     ws.append([_safe(block_title)])
                     ws.cell(ws.max_row, 1).font = bold
                     ws.append([_safe(f"{h} ({u})" if u and u not in ("short", "none") else h) for h, u in zip(headers, units)])
+                    header_row = ws.max_row
                     for cell in ws[ws.max_row]:
                         cell.font = head_font
                         cell.fill = head_fill
+                        cell.border = grid
+                        cell.alignment = Alignment(vertical="center", wrap_text=True)
                     # The cap is per sheet (Excel's hard row limit), and a cut is always stated in the file.
                     room = max(0, MAX_ROWS_PER_SHEET - ws.max_row - 1)
-                    for row in rows[:room]:
+                    for number, row in enumerate(rows[:room]):
                         ws.append([_safe(v) for v in row])
+                        for cell in ws[ws.max_row]:
+                            cell.border = grid
+                            if number % 2:
+                                cell.fill = band_fill
+                    if rows and len(blocks) == 1:
+                        ws.auto_filter.ref = f"A{header_row}:{get_column_letter(len(headers))}{header_row + min(len(rows), room)}"
                     if len(rows) > room:
                         ws.append([f"Tablo {room:,} satırla sınırlandı (toplam {len(rows):,}); tüm satırlar için CSV biçimini kullanın.".replace(",", ".")])
                         ws.cell(ws.max_row, 1).font = bold
@@ -140,11 +163,19 @@ def render_xlsx(config, collected, title):
                         elif isinstance(cell.value, float):
                             cell.number_format = "#,##0.###"
                 ws.freeze_panes = "A5"
+                ws.page_setup.orientation = "landscape"
+                ws.page_setup.fitToWidth = 1
+                ws.sheet_properties.pageSetUpPr.fitToPage = True
             summary.append([_safe(section.title or "—"), _safe(result.title or kind), _safe(kind), _safe(status[:300]), _safe(sheet_name) or "—"])
     for col, width in zip("ABCDE", (28, 46, 14, 60, 28)):
         summary.column_dimensions[col].width = width
-    for row in summary.iter_rows(min_row=1, max_row=6):
-        row[0].font = bold
+    for row in summary.iter_rows(min_row=index_header + 1, max_row=summary.max_row):
+        for cell in row:
+            cell.border = grid
+        row[3].font = ok_font if row[3].value == "Tamam" else bad_font
+    summary.freeze_panes = f"A{index_header + 1}"
+    for row in summary.iter_rows(min_row=2, max_row=6):
+        row[0].font = label_font
         if isinstance(row[1].value, datetime):
             row[1].number_format = "yyyy-mm-dd hh:mm"
         row[1].alignment = Alignment(horizontal="left")

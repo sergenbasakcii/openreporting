@@ -7,6 +7,7 @@ tables, and adds a cover page with variables, time range and table of contents.
 
 import io
 import math
+from .. import smart_layout
 from datetime import datetime, timezone
 
 from reportlab.lib.colors import Color
@@ -25,7 +26,9 @@ from .fieldcfg import contrast, display_name, field_config, fmt, mapped, options
 
 PAPERS = {"A4": A4, "A3": A3, "Letter": LETTER}
 FONT, BOLD = "OpenReporting-Sans", "OpenReporting-Sans-Bold"
-INK, MUTED, FAINT, GRID, PANEL_BG, BRAND = "#1f2328", "#5b6472", "#8a93a3", "#e3e6ec", "#ffffff", "#ff7f00"
+# OpenReporting print palette (Porcelain theme): ink text, teal signal colour, indigo secondary.
+INK, MUTED, FAINT, GRID, PANEL_BG, BRAND = "#141a2a", "#566074", "#8a93a3", "#e3e6ec", "#ffffff", "#0d9488"
+BRAND_2, NIGHT, TINT, BRAND_INK = "#4f46e5", "#0b1020", "#eaf6f4", "#0f766e"
 SHORT_CALCS = {
     "mean": "Ort.",
     "max": "Maks.",
@@ -48,6 +51,7 @@ SHORT_CALCS = {
 }
 TIME_STEPS = [60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 172800, 604800, 1209600, 2592000]
 MARGIN, HEADER_H, FOOTER_H = 26, 30, 16
+STAT_MIN_W, STAT_MIN_H = 64, 34
 
 
 def _fonts():
@@ -79,6 +83,16 @@ def _nice_ticks(low, high, count=5):
         ticks.append(round(value, 12))
         value += step
     return ticks
+
+
+def _gradient(c, x, y, w, h, start=BRAND, end=BRAND_2, steps=48):
+    """Horizontal brand gradient made of thin slices (PDF viewers render it identically)."""
+    a, b = _rgb(start), _rgb(end)
+    step = w / steps
+    for i in range(steps):
+        t = i / (steps - 1) if steps > 1 else 0.0
+        c.setFillColor(Color(a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t, a.blue + (b.blue - a.blue) * t))
+        c.rect(x + i * step, y, step + 0.4, h, stroke=0, fill=1)
 
 
 def _fit(width, height, box_w, box_h):
@@ -152,11 +166,18 @@ class Pdf:
             self.c.showPage()
         self.page += 1
         c = self.c
-        c.setFillColor(_rgb(BRAND))
-        c.rect(0, self.page_h - 4, self.page_w, 4, stroke=0, fill=1)
-        self.text(MARGIN, self.page_h - MARGIN - 12, self.title, 11, INK, bold=True, max_width=self.content_w * 0.55)
+        _gradient(c, 0, self.page_h - 4, self.page_w, 4)
+        # Brand mark: rounded tile with the initial, then the report title.
+        mark_y = self.page_h - MARGIN - 17
+        _gradient(c, MARGIN, mark_y, 16, 16)
+        c.setFillColor(_rgb("#ffffff"))
+        c.setStrokeColor(_rgb("#ffffff"))
+        c.setLineWidth(2.2)
+        c.roundRect(MARGIN - 1.1, mark_y - 1.1, 18.2, 18.2, 5, stroke=1, fill=0)
+        self.text(MARGIN + 8, mark_y + 4.2, "O", 9, "#ffffff", bold=True, align="center")
+        self.text(MARGIN + 22, self.page_h - MARGIN - 12, self.title, 11, INK, bold=True, max_width=self.content_w * 0.55)
         if self.section_title:
-            self.text(MARGIN, self.page_h - MARGIN - 24, self.section_title, 8.5, MUTED, max_width=self.content_w * 0.55)
+            self.text(MARGIN + 22, self.page_h - MARGIN - 24, self.section_title, 8.5, MUTED, max_width=self.content_w * 0.55)
         right = self.page_w - MARGIN
         if self.logo and self.config.get("logo_on_pages", True):
             # Header logo: right-aligned in the header band, at most 22pt high / 96pt wide.
@@ -176,10 +197,14 @@ class Pdf:
     def cover(self, toc_pages):
         self.page += 1
         c = self.c
-        c.setFillColor(_rgb("#111217"))
+        c.setFillColor(_rgb(NIGHT))
         c.rect(0, self.page_h - 150, self.page_w, 150, stroke=0, fill=1)
-        c.setFillColor(_rgb(BRAND))
-        c.rect(0, self.page_h - 154, self.page_w, 4, stroke=0, fill=1)
+        # Soft glow circles in the band (brand colours at low alpha) and the brand stripe below it.
+        c.setFillColor(_rgb(BRAND, 0.18))
+        c.circle(self.page_w * 0.18, self.page_h - 10, 120, stroke=0, fill=1)
+        c.setFillColor(_rgb(BRAND_2, 0.2))
+        c.circle(self.page_w * 0.9, self.page_h - 30, 110, stroke=0, fill=1)
+        _gradient(c, 0, self.page_h - 154, self.page_w, 4)
         text_w = self.content_w - 10
         if self.logo and self.config.get("logo_on_cover", True):
             # Cover logo: white card on the right of the dark band, so dark and transparent logos stay visible.
@@ -192,7 +217,7 @@ class Pdf:
             c.roundRect(card_x, card_y, card_w, card_h, 6, stroke=0, fill=1)
             c.drawImage(self.logo, card_x + pad, card_y + pad, lw, lh, mask="auto")
             text_w = card_x - MARGIN - 24
-        self.text(MARGIN + 4, self.page_h - 50, "OPENREPORTING · RAPOR", 9, "#ff9830", bold=True)
+        self.text(MARGIN + 4, self.page_h - 50, "OPENREPORTING · RAPOR", 9, "#2dd4bf", bold=True)
         lines = self.wrap(self.title, 22, text_w, bold=True)[:2]
         for i, line in enumerate(lines):
             self.text(MARGIN + 4, self.page_h - 82 - i * 26, line, 22, "#ffffff", bold=True)
@@ -208,8 +233,15 @@ class Pdf:
         if self.config.get("split_by"):
             rows.append(("Bölümleme", f"${self.config['split_by']} değişkeninin her değeri için ayrı bölüm"))
         rows += [(str(name), value) for name, value in variable_summary(self.collected.variables)]
+        # Metadata block on a tinted card with a brand accent edge.
+        card_h = 14 + sum(min(3, len(self.wrap(v, 9, self.content_w - 160)) or 1) * 11 + 6 for _, v in rows)
+        c.setFillColor(_rgb(TINT))
+        c.roundRect(MARGIN, y - card_h + 14, self.content_w, card_h, 8, stroke=0, fill=1)
+        c.setFillColor(_rgb(BRAND))
+        c.rect(MARGIN, y - card_h + 22, 3, card_h - 16, stroke=0, fill=1)
+        y -= 4
         for key, value in rows:
-            self.text(MARGIN + 4, y, key, 9, MUTED)
+            self.text(MARGIN + 14, y, key, 9, MUTED)
             for i, line in enumerate(self.wrap(value, 9, self.content_w - 160)[:3]):
                 self.text(MARGIN + 150, y - i * 11, line, 9, INK, bold=i == 0 and key == "Rapor dönemi")
             y -= 15 + 11 * max(0, min(2, len(self.wrap(value, 9, self.content_w - 160)) - 1))
@@ -257,10 +289,12 @@ class Pdf:
             c.setFillColor(_rgb(PANEL_BG))
             c.setStrokeColor(_rgb(GRID))
             c.setLineWidth(0.6)
-            c.roundRect(x, y, w, h, 3, stroke=1, fill=1)
+            c.roundRect(x, y, w, h, 6, stroke=1, fill=1)
         title = result.title
         if title:
-            self.text(x + 7, y + h - 12, title, 8.5, INK, bold=True, max_width=w - 26)
+            c.setFillColor(_rgb(BRAND))
+            c.roundRect(x + 7, y + h - 12.5, 2.4, 8, 1.2, stroke=0, fill=1)
+            self.text(x + 13, y + h - 12, title, 8.5, INK, bold=True, max_width=w - 32)
         if result.errors or result.warnings:
             mark = "!" if result.errors else "i"
             fill = "#d10e5c" if result.errors else "#f5b73d"
@@ -585,7 +619,13 @@ class Pdf:
         color_mode = options(panel, "colorMode", "value")
         graph = options(panel, "graphMode", "area")
         text_mode = options(panel, "textMode", "auto")
-        cols, rows = self._grid(len(items), w, h)
+        # Each value needs a readable cell; beyond that the rest is summarised instead of overprinted.
+        capacity = max(1, int(w // STAT_MIN_W) * int(h // STAT_MIN_H))
+        hidden = 0
+        if len(items) > capacity:
+            hidden = len(items) - (capacity - 1)
+            items = items[: capacity - 1]
+        cols, rows = self._grid(len(items) + (1 if hidden else 0), w, h)
         cw, ch = w / cols, h / rows
         for index, item in enumerate(items):
             col, row = index % cols, index // cols
@@ -609,6 +649,12 @@ class Pdf:
                 )
             if text_mode != "name":
                 self.text(cx + cw / 2, center_y, value_text, size, text_color, bold=True, align="center", max_width=cw - 4)
+        if hidden:
+            index = len(items)
+            col, row = index % cols, index // cols
+            cx, cy = x + col * cw, y + h - (row + 1) * ch
+            self.text(cx + cw / 2, cy + ch / 2 + 2, f"+{hidden} değer daha", 8, MUTED, bold=True, align="center", max_width=cw - 4)
+            self.text(cx + cw / 2, cy + ch / 2 - 9, "tam liste Excel/CSV’de", 6.5, FAINT, align="center", max_width=cw - 4)
 
     def _sparkline(self, points, x, y, w, h, colr):
         values = [(t, v) for t, v in points if v is not None]
@@ -907,18 +953,18 @@ class Pdf:
         widths = self.column_widths(headers, rows, w)
         row_h = 11
         line_y = y + h - row_h
-        self.c.setFillColor(_rgb("#f1f3f7"))
-        self.c.rect(x, line_y - 2, w, row_h, stroke=0, fill=1)
+        self.c.setFillColor(_rgb(TINT))
+        self.c.roundRect(x, line_y - 2, w, row_h, 2, stroke=0, fill=1)
         cx = x
         for head, width in zip(headers, widths):
-            self.text(cx + 3, line_y + 1.5, head, 7, "#1f60c4", bold=True, max_width=width - 6)
+            self.text(cx + 3, line_y + 1.5, head, 7, BRAND_INK, bold=True, max_width=width - 6)
             cx += width
         capacity = max(0, int((h - row_h - 10) // row_h))
         chunk = rows[start_row : start_row + capacity]
         for index, cells in enumerate(chunk):
             line_y -= row_h
             if index % 2:
-                self.c.setFillColor(_rgb("#fafbfc"))
+                self.c.setFillColor(_rgb("#f7f9fb"))
                 self.c.rect(x, line_y - 2, w, row_h, stroke=0, fill=1)
             cx = x
             for (text, style, align), width in zip(cells, widths):
@@ -952,6 +998,10 @@ def _grid_metrics(pdf):
 
 def plan_grid(pdf, section):
     """Assign each panel to (page offset, x, y_top, w, h) using dashboard gridPos."""
+    dashboard = pdf.collected.dashboard
+    if smart_layout.is_smart(dashboard) and all("smartPos" in r.panel for r in section.panels):
+        # Smart dashboards print exactly what the page canvas showed: fixed pages, 24 × rows cells.
+        return smart_layout.plan(section.panels, dashboard["smart"]["rows"], pdf.content_w / smart_layout.COLUMNS, pdf.top - pdf.bottom)
     col_w, unit = _grid_metrics(pdf)
     usable = pdf.top - pdf.bottom - 20
     placements = []
@@ -1072,6 +1122,8 @@ def paginate(pdf, config, sections):
 
 
 def render_pdf(config, collected, title, logo=None):
+    if smart_layout.is_smart(collected.dashboard):
+        config = {**config, **smart_layout.report_overrides(collected.dashboard)}
     pdf = Pdf(config, collected, title, logo=logo)
     pages, toc = paginate(pdf, config, collected.sections)
     if config.get("cover", True):
@@ -1085,10 +1137,9 @@ def render_pdf(config, collected, title, logo=None):
             if kind == "section":
                 _, text, top = op
                 y = pdf.top - top - 14
-                pdf.c.setFillColor(_rgb("#f3f4f7"))
-                pdf.c.rect(MARGIN, y - 4, pdf.content_w, 16, stroke=0, fill=1)
-                pdf.c.setFillColor(_rgb(BRAND))
-                pdf.c.rect(MARGIN, y - 4, 3, 16, stroke=0, fill=1)
+                pdf.c.setFillColor(_rgb(TINT))
+                pdf.c.roundRect(MARGIN, y - 4, pdf.content_w, 16, 4, stroke=0, fill=1)
+                _gradient(pdf.c, MARGIN, y - 4, 3, 16, BRAND, BRAND, steps=1)
                 pdf.text(MARGIN + 9, y + 1, text, 9.5, INK, bold=True, max_width=pdf.content_w - 20)
             elif kind == "note":
                 _, text, top = op

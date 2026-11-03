@@ -114,7 +114,7 @@ function valueFormat(frames,panel){
 export function renderExtended(container,frames,panel,ctx={}){
  const option=extendedOption(frames,panel,ctx.timezone);
  if(option?.fallback==='timeseries')return renderTimeSeries(container,frames,{...panel,type:'timeseries'},ctx);if(!option||option.message){noData(container,option?.message||'Veri yok');return{resize(){},destroy(){}};}
- const theme=chartTheme();
+ const theme=chartTheme(container);
  const fmt=valueFormat(frames,panel);
  if(option.yAxis&&!Array.isArray(option.yAxis)&&option.yAxis.type==='value')option.yAxis={...option.yAxis,axisLabel:{...option.yAxis.axisLabel,formatter:fmt}};
  if(option.legend)option.legend={textStyle:{color:theme.text},...option.legend};

@@ -23,7 +23,7 @@ from . import messages
 log = logging.getLogger(__name__)
 
 SESSION_COOKIE = "openreporting_session"
-SPA_PREFIXES = ("d/", "dashboards", "dashboard/", "explore", "datasources", "reports", "admin", "profile", "login", "playlists", "alerting")
+SPA_PREFIXES = ("d/", "dashboards", "dashboard/", "explore", "smart", "datasources", "reports", "admin", "profile", "login", "playlists", "alerting")
 
 
 class Credentials(BaseModel):
