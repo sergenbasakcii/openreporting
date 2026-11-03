@@ -79,7 +79,8 @@ function shell(root) {
     isAdmin ? [
       h('div', { class: 'nav-section', text: 'Yönetim' }),
       navItem('/datasources', 'Veri kaynakları', 'database', '^/datasources'),
-      navItem('/admin/users', 'Kullanıcılar', 'users', '^/admin/users'),
+      navItem('/admin/users', 'Kullanıcılar', 'user', '^/admin/users'),
+      navItem('/admin/teams', 'Takımlar', 'users', '^/admin/teams'),
       navItem('/admin/settings', 'Sistem ayarları', 'settings', '^/admin/settings'),
       navItem('/admin/api', 'API', 'code', '^/admin/(api-keys|api)$'),
       navItem('/admin/plugins', 'Eklentiler', 'layers', '^/admin/plugins'),
@@ -152,6 +153,7 @@ function registerRoutes() {
   route('/reports/new', lazy('./pages/reports.js', 'reportEditPage'));
   route('/reports/:id', lazy('./pages/reports.js', 'reportEditPage'));
   route('/admin/users', lazy('./pages/admin.js', 'usersPage'));
+  route('/admin/teams', lazy('./pages/teams.js', 'teamsPage'));
   route('/admin/settings', lazy('./pages/settings.js', 'settingsPage'));
   route('/admin/api-keys', lazy('./pages/apikeys.js', 'apiKeysPage'));
   route('/admin/plugins', lazy('./pages/plugins.js', 'pluginsPage'));

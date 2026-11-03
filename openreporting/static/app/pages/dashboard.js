@@ -10,6 +10,7 @@ import { openPanelEditor } from '../dashboard/editor.js';
 import { openSettings } from '../dashboard/settings.js';
 import { newPanel, PLUGINS, ORDER } from '../panels/registry.js';
 import { navigate, setLeaveGuard, clearLeaveGuard, setBreadcrumbs } from '../router.js';
+import { dashboardPermissionsDialog } from '../access.js';
 
 let groupSeq = 0;
 
@@ -497,6 +498,7 @@ export async function dashboardPage(root, { uid, query, app }) {
       } }]) }) : null;
     const more = button('', { icon: 'dots', title: 'Diğer', class: 'hide-kiosk', onClick: (e) => menu(e.currentTarget, [
       !meta.isNew && { label: 'Paylaş', icon: 'share', onClick: () => shareDialog(location.href, dash.title) },
+      !meta.isNew && app.user.role === 'admin' && { label: 'İzinler', icon: 'lock', onClick: () => dashboardPermissionsDialog(dash) },
       { label: 'JSON dışa aktar', icon: 'download', onClick: () => downloadBlob(`${dash.title.replace(/[^\w-]+/g, '_')}.json`, JSON.stringify({ ...dash, id: undefined }, null, 2), 'application/json') },
       !meta.isNew && { label: 'PDF olarak indir', icon: 'download', onClick: () => exportAs('pdf') },
       !meta.isNew && { label: 'Excel olarak indir', icon: 'download', onClick: () => exportAs('xlsx') },

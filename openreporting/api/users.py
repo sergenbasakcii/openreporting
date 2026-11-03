@@ -65,7 +65,9 @@ def list_users(request: Request, user=Depends(admin_read)):
             dict(r)
             for r in db.execute("""SELECT u.id,username,role,active,email,display_name,created_at,last_login_at,
                                                COALESCE(e.provider,'local') AS auth_provider,
-                                               COALESCE(m.enabled,0) AS mfa_enabled
+                                               COALESCE(m.enabled,0) AS mfa_enabled,
+                                               CASE WHEN u.password_hash='!service' THEN 1 ELSE 0 END AS service_account,
+                                               (SELECT COUNT(*) FROM team_members tm WHERE tm.user_id=u.id) AS team_count
                                                FROM users u LEFT JOIN external_identities e ON e.user_id=u.id
                                                LEFT JOIN user_mfa m ON m.user_id=u.id ORDER BY username""")
         ]

@@ -421,7 +421,7 @@ def save(settings, user, dashboard, *, folder_uid=None, message="", overwrite=Fa
             folder_id = _folder_id(db, folder_uid)
         row = db.execute("SELECT * FROM dashboards WHERE uid=?", (model["uid"],)).fetchone()
         if row:
-            folder_access.require_folder(db, user, row["folder_id"], edit=True)
+            folder_access.require_dashboard(db, user, row["uid"], edit=True)
         folder_access.require_folder(db, user, folder_id, edit=True)
         clash = db.execute(
             "SELECT uid FROM dashboards WHERE title=? AND COALESCE(folder_id,'')=COALESCE(?,'') AND uid<>?", (model["title"], folder_id, model["uid"])
@@ -467,8 +467,8 @@ def get(settings, uid, user=None):
         ).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
-        folder_access.require_folder(db, user, row["folder_id"])
-        can_edit = folder_access.allowed(db, user, row["folder_id"], edit=True)
+        folder_access.require_dashboard(db, user, uid)
+        can_edit = folder_access.dashboard_allowed(db, user, uid, edit=True)
         starred = bool(user and db.execute("SELECT 1 FROM dashboard_stars WHERE user_id=? AND dashboard_id=?", (user["id"], row["id"])).fetchone())
     model = json.loads(row["data_json"])
     model["version"] = row["version"]
@@ -495,7 +495,7 @@ def delete(settings, user, uid):
         row = db.execute("SELECT id,title,folder_id FROM dashboards WHERE uid=?", (uid,)).fetchone()
         if not row:
             raise DashboardError("Dashboard bulunamadı")
-        folder_access.require_folder(db, user, row["folder_id"], edit=True)
+        folder_access.require_dashboard(db, user, uid, edit=True)
         if db.execute("SELECT 1 FROM dash_reports WHERE dashboard_uid=?", (uid,)).fetchone():
             raise DashboardError("Bu dashboard'u kullanan raporlar var; önce raporları silin")
         db.execute("DELETE FROM annotations WHERE dashboard_uid=?", (uid,))
@@ -585,7 +585,7 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
         sql += " AND EXISTS(SELECT 1 FROM dashboard_stars s WHERE s.dashboard_id=d.id AND s.user_id=?)"
         params.append(user["id"])
     with connect(settings) as db:
-        visible, values = folder_access.visible_sql(db, user, "d.folder_id")
+        visible, values = folder_access.visible_dashboards_sql(db, user, "d")
         sql += " AND " + visible + " ORDER BY LOWER(d.title),d.uid LIMIT ?"
         rows = db.execute(sql, [*params, *values, max(1, min(int(limit), 5000))]).fetchall()
     results = []
@@ -661,7 +661,7 @@ def delete_folder(settings, user, uid):
 def tags(settings, user=None):
     with connect(settings) as db:
         counts = {}
-        visible, values = folder_access.visible_sql(db, user, "d.folder_id")
+        visible, values = folder_access.visible_dashboards_sql(db, user, "d")
         for row in db.execute("SELECT tags_json FROM dashboards d WHERE " + visible, values):
             for tag in json.loads(row["tags_json"]):
                 counts[tag] = counts.get(tag, 0) + 1

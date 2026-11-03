@@ -260,10 +260,16 @@ class GrantIn(BaseModel):
     permission: str = Field(pattern="^(view|edit)$")
 
 
+class TeamGrantIn(BaseModel):
+    team_id: str = Field(min_length=1, max_length=64)
+    permission: str = Field(pattern="^(view|edit)$")
+
+
 class FolderPolicyIn(BaseModel):
     restricted: bool
     revision: int = Field(ge=0)
     grants: list[GrantIn] = Field(default_factory=list, max_length=500)
+    team_grants: list[TeamGrantIn] = Field(default_factory=list, max_length=500)
 
 
 @router.get("/api/folders/{uid}/permissions")

@@ -1,6 +1,8 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Takımlar ve dashboard izinleri**: kullanıcı grupları, klasörlere takım izni, dashboard bazında kullanıcı/takım
+  görüntüleme/düzenleme izni (klasörü daraltabilir veya tek dashboard'u paylaşabilir). Belge: `09-teams-and-dashboard-permissions.md`.
 - **Veri gölü ve 6 yeni veri kaynağı**: Trino/Presto/Starburst (Hive, Iceberg, Delta), Databricks SQL,
   ClickHouse, Elasticsearch/OpenSearch, InfluxDB, Graphite; sürücüsüz, salt-okunur korumalı, lehçeli SQL makroları.
   Teknik belge: `docs/technical/07-datalake-and-datasources.md`.

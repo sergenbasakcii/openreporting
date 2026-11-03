@@ -132,7 +132,7 @@ CREATE INDEX IF NOT EXISTS dash_report_runs_report_idx ON dash_report_runs(repor
 """
 
 # Schema changes are appended as numbered steps; a database is upgraded step by step on start.
-CURRENT_VERSION = 9
+CURRENT_VERSION = 10
 
 # Each migration is a tuple of complete statements, executed in one transaction.
 # Only the initial schema is split here; later migrations may contain triggers or
@@ -245,6 +245,31 @@ POSTGRES_MIGRATIONS[9] = (
     "ALTER TABLE datasources DROP CONSTRAINT datasources_type_check",
     f"ALTER TABLE datasources ADD CONSTRAINT datasources_type_check CHECK({_PLUGIN_TYPES_V4})",
 )
+
+# Teams (user groups) with folder grants, and per-dashboard policies granted to users or teams.
+_TEAMS = (
+    """CREATE TABLE teams(
+ id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '',
+ created_at TEXT NOT NULL, created_by TEXT NOT NULL)""",
+    """CREATE TABLE team_members(
+ team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+ user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(team_id,user_id))""",
+    "CREATE INDEX team_members_user_idx ON team_members(user_id)",
+    """CREATE TABLE folder_team_grants(
+ folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+ team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+ permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(folder_id,team_id))""",
+    """CREATE TABLE dashboard_policy(
+ dashboard_id TEXT PRIMARY KEY REFERENCES dashboards(id) ON DELETE CASCADE,
+ restricted INTEGER NOT NULL DEFAULT 0 CHECK(restricted IN (0,1)), revision INTEGER NOT NULL DEFAULT 0)""",
+    """CREATE TABLE dashboard_grants(
+ dashboard_id TEXT NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+ principal_type TEXT NOT NULL CHECK(principal_type IN ('user','team')), principal_id TEXT NOT NULL,
+ permission TEXT NOT NULL CHECK(permission IN ('view','edit')), PRIMARY KEY(dashboard_id,principal_type,principal_id))""",
+    "CREATE INDEX dashboard_grants_principal_idx ON dashboard_grants(principal_type,principal_id)",
+)
+MIGRATIONS[10] = _TEAMS
+POSTGRES_MIGRATIONS[10] = postgres_store.widen_integers(_TEAMS)
 
 
 def init_db(settings: Settings):

@@ -67,8 +67,8 @@ def _run_authorized(db, settings, run):
         actor_id = approval["approved_by"] if approval else None
     if not actor_id or not report:
         return False
-    dashboard = db.execute("SELECT folder_id FROM dashboards WHERE uid=?", (report["dashboard_uid"],)).fetchone()
-    if not dashboard or not folder_access.allowed(db, {"id": actor_id}, dashboard["folder_id"], edit=True):
+    dashboard = db.execute("SELECT uid,folder_id FROM dashboards WHERE uid=?", (report["dashboard_uid"],)).fetchone()
+    if not dashboard or not folder_access.dashboard_allowed(db, {"id": actor_id}, dashboard["uid"], edit=True):
         return False
     if run["schedule_id"]:
         schedule = db.execute("SELECT * FROM dash_report_schedules WHERE id=?", (run["schedule_id"],)).fetchone()
@@ -169,7 +169,7 @@ def _row(row):
 
 def list_reports(settings, user=None):
     with connect(settings) as db:
-        visible, values = folder_access.visible_sql(db, user, "d.folder_id")
+        visible, values = folder_access.visible_dashboards_sql(db, user, "d")
         rows = db.execute(
             """SELECT r.*, d.title AS dashboard_title,
                (SELECT COUNT(*) FROM dash_report_schedules s WHERE s.report_id=r.id AND s.enabled=1) AS active_schedules,
@@ -374,7 +374,7 @@ def list_schedules(settings, report_id=None, user=None):
     with connect(settings) as db:
         if report_id:
             folder_access.require_report(db, user, report_id)
-        visible, values = folder_access.visible_sql(db, user, "d.folder_id")
+        visible, values = folder_access.visible_dashboards_sql(db, user, "d")
         rows = db.execute(sql + " AND " + visible + " ORDER BY s.next_due", [*params, *values]).fetchall()
     return [{**dict(r), "recipients": json.loads(r["recipients_json"])} for r in rows]
 
@@ -442,7 +442,7 @@ def list_runs(settings, report_id=None, limit=200, user=None):
     with connect(settings) as db:
         if report_id:
             folder_access.require_report(db, user, report_id)
-        visible, values = folder_access.visible_sql(db, user, "d.folder_id")
+        visible, values = folder_access.visible_dashboards_sql(db, user, "d")
         sql += " AND " + visible + " ORDER BY x.created_at DESC LIMIT ?"
         rows = db.execute(sql, [*params, *values, max(1, min(int(limit), 1000))]).fetchall()
     return [

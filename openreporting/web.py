@@ -41,7 +41,7 @@ API_DESCRIPTION = (
 def create_app(settings: Settings | None = None):
     from . import __version__, datasources as datasource_registry
     from .api import dashboards as dashboards_api, datasources as datasources_api, reports as reports_api
-    from .api import system as system_api, users as users_api, mfa as mfa_api, settings as settings_api, tokens as tokens_api
+    from .api import system as system_api, users as users_api, mfa as mfa_api, settings as settings_api, tokens as tokens_api, teams as teams_api
 
     settings = settings or Settings.from_env()
     init_db(settings)
@@ -59,7 +59,7 @@ def create_app(settings: Settings | None = None):
     app.state.http_metrics = HttpMetrics()
     static = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
-    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api, mfa_api, settings_api, tokens_api):
+    for module in (datasources_api, dashboards_api, users_api, reports_api, system_api, mfa_api, settings_api, tokens_api, teams_api):
         app.include_router(module.router)
     app.add_middleware(RequestBodyLimitMiddleware)
     app.add_middleware(OriginValidationMiddleware)

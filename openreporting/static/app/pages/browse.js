@@ -4,6 +4,7 @@ import { icon } from '../icons.js';
 import { get, post, put, del, invalidate } from '../api.js';
 import { navigate, setBreadcrumbs } from '../router.js';
 import { sampleDashboards } from './samples.js';
+import { folderPermissionsDialog } from '../access.js';
 
 export async function browsePage(root, { app, query, folderUid }) {
   const params = new URLSearchParams(query || '');
@@ -112,33 +113,4 @@ export async function importPage(root, { app }) {
 export { loading };
 
 
-async function permissionsDialog(folder, refresh) {
-  try {
-    const [policy, users] = await Promise.all([get(`/api/folders/${folder.uid}/permissions`), get('/api/users')]);
-    let restricted = policy.restricted;
-    const eligible = users.filter(u => u.active && u.role !== 'admin');
-    const ids = new Set(eligible.map(u => u.id));
-    const choices = new Map(policy.grants.filter(g => ids.has(g.user_id)).map(g => [g.user_id, g.permission]));
-    const list = h('div');
-    for (const user of eligible) {
-      list.append(field(`${user.display_name || user.username} (${user.role})`, select([
-        { value: '', label: 'İzin yok' }, { value: 'view', label: 'Görüntüleme' },
-        ...(user.role === 'editor' || choices.get(user.id) === 'edit' ? [{ value: 'edit', label: user.role === 'viewer' ? 'Düzenleme (izleyici rolü nedeniyle etkisiz)' : 'Düzenleme' }] : [])
-      ], choices.get(user.id) || '', v => { if (v) choices.set(user.id, v); else choices.delete(user.id); })));
-    }
-    const show = () => { list.hidden = !restricted; };
-    show();
-    const body = h('div', h('p', { text: 'Paylaşılan klasörleri tüm kullanıcılar görebilir. Kısıtlı klasörlerde yalnızca seçilen kullanıcılar ve yöneticiler erişebilir.' }),
-      toggle('Klasör erişimini kısıtla', restricted, v => { restricted = v; show(); }), list,
-      h('p', { class: 'faint', text: 'İzin değişikliği rapor zamanlamalarını kapatır; yeniden yönetici onayı gerekir. Veri kaynağı ve uygulama rolleri ayrıca geçerlidir.' }));
-    const dialog = modal({ title: `Klasör izinleri: ${folder.title}`, body, footer: [
-      button('Vazgeç', { onClick: () => dialog.close() }),
-      button('Kaydet', { variant: 'primary', onClick: async () => {
-        try {
-          await put(`/api/folders/${folder.uid}/permissions`, { restricted, revision: policy.revision,
-            grants: [...choices].map(([user_id, permission]) => ({ user_id, permission })) });
-          invalidate(''); dialog.close(); toast('Klasör izinleri kaydedildi', 'ok'); refresh();
-        } catch (error) { toast(error.message, 'error'); }
-      } })] });
-  } catch (error) { toast(error.message, 'error'); }
-}
+const permissionsDialog = folderPermissionsDialog;

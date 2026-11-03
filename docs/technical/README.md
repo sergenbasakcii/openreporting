@@ -13,6 +13,7 @@ API'yi, güvenlik kurallarını ve testleri anlatır. Kurulum ve işletim rehber
 | 06 | [Tema sistemi ve görsel kimlik](06-themes.md) | Beş özgün tema, token mimarisi, WCAG kontrast testi |
 | 07 | [Veri gölü ve yeni veri kaynakları](07-datalake-and-datasources.md) | Trino/Presto, Databricks, ClickHouse, Elasticsearch/OpenSearch, InfluxDB, Graphite |
 | 08 | [Keşfet, API sayfası ve arayüz düzeltmeleri](08-explore-api-ui.md) | Adım adım Keşfet, tek API sayfası, araç çubuğu, görselleştirme ikonları |
+| 09 | [Takımlar ve dashboard izinleri](09-teams-and-dashboard-permissions.md) | Kullanıcı grupları, takıma klasör izni, dashboard bazında kullanıcı/takım izni |
 
 ## İlgili belgeler
 
