@@ -18,7 +18,7 @@ Hashli build/runtime QA ortamında yerelde **269 Python testi başarılı, 14 or
 Yeni Ubuntu kurulumu zorunlu admin MFA kurulumundan rapor üretimine, MFA seed anahtar
 değişimine ve yedek doğrulamaya kadar geçti; yerel/CI sonucu gerçek kurum kabulü değildir.
 Arayüzde 10 Node testi, ES modülü sözdizimi ve gerçek Chromium tema/klavye kontrolleri başarılı.
-Axe-core 4.14 ile giriş + sekiz yönetici rotasında koyu/açık toplam 17 taramada otomatik bulgu kalmadı;
+Axe-core 4.14 ile giriş + sekiz yönetici rotasında beş temada toplam 41 taramada ciddi/kritik otomatik bulgu kalmadı;
 bu sonuç tam WCAG veya gerçek ekran okuyucu kabulü değildir. Son commitlerin CI sonucu PROGRESS.md'de izlenir.
 Yeni MFA akışlarında geçici Chromium uygulamasında iki temada ek 20 tarama temizdir;
 [yerel kanıt](evidence/mfa-browser-2026-10-30.json) sır veya şirket verisi içermez.

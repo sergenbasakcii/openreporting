@@ -792,7 +792,7 @@
       "status": "P",
       "priority": "P2",
       "evidence": "tests/browser/accessibility-surfaces.cjs",
-      "note": "axe-core 4.14: giriş + 8 rota, koyu/açık 17 taramada bulgu yok; gerçek ekran okuyucu/bağımsız WCAG kabulü açık"
+      "note": "axe-core 4.14: giriş + 8 rota, 5 temada 41 taramada ciddi/kritik bulgu yok; gerçek ekran okuyucu/bağımsız WCAG kabulü açık"
     },
     {
       "id": "I09",
