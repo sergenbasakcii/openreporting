@@ -129,9 +129,56 @@ Son 30 günün olayları SMTP kapalı olsa da **Raporlar** sayfasının üstünd
   *Sunucu* sekmesi yalnız sunucu dosyasından değişen ayarları gösterir.
 - **Kullanıcılar**: ekleme, rol, devre dışı bırakma, parola sıfırlama ve telefonunu kaybeden kullanıcı için
   **İki adımlı girişi sıfırla**.
-- **Profil** (herkes): tema, saat dilimi, ana sayfa, kendi parolanızı değiştirme ve iki adımlı giriş.
+- **Profil** (herkes): tema (Aurora, Porselen, Grafit, Kum, Yüksek kontrast, Sistem), saat dilimi, ana sayfa, kendi parolanızı değiştirme ve iki adımlı giriş.
 
-## 8. Klavye kısayolları
+## 8. Akıllı dashboard (hızlı rapor)
+
+Teknik sorgu bilgisi gerektirmeden rapora hazır sayfalar hazırlamak için **Akıllı dashboard** menüsünü
+kullanın.
+
+1. **Şablon seçin:** Boş sayfa, Yönetici özeti, Host sağlık raporu, Ağ ve erişilebilirlik, Kapasite planlama.
+2. **Öğe ekleyin:** soldaki listeden grafiği sayfaya sürükleyin veya tıklayın. Sayfa öğeleri: metin, logo /
+   görsel, ayırıcı (bölüm başlığı), rapor bilgisi, **akıllı özet** (veriden otomatik cümleler).
+3. **Ne gösterileceğini seçin:** panelin üstündeki **Grup · Host · Anahtar kelime** kutularına tıklayın.
+   Listeden seçebilir veya bir kelime yazıp "… içeren tümü"nü seçebilirsiniz. Anahtar kelime seçilene kadar
+   panel sorgu çalıştırmaz.
+4. **Ayarlayın (sağ panel):** birim, ondalık, gösterilen değer (son / ortalama / en yüksek …), **tek seri**
+   (KPI için ortalama/toplam), renk eşikleri, **en yüksek / en düşük N**, **önceki dönemle karşılaştırma**
+   (▲/▼ yüzde), **panele özel tarih aralığı** (ör. 24 saatlik raporda "son 1 yıl"), grafik altı **açıklama**.
+5. **Rapor ayarları:** başlık, alt başlık, logo (sayfa başında), alt bilgi, kapak, **filigran** (GİZLİ, TASLAK
+   …), kâğıt ve yön, **rapor filtresi** (Grup / Host seçimi tüm grafikleri birlikte değiştirir).
+6. **Çıktı:** *Önizle* gerçek PDF'i açar; *İndir* → PDF, **her host için ayrı sayfalar**, Excel, CSV;
+   *Zamanla* raporu e-postayla düzenli gönderir.
+
+Düzenleme: tutamaçtan sürükleyerek taşıyın, sağ alt köşeden boyutlandırın; ok tuşları kaydırır (Shift ile 4
+hücre), Ctrl+D çoğaltır, Delete siler, Ctrl+Z / Ctrl+Y geri alır / yineler. Sayfa araçları: yukarı / aşağı
+taşı, **otomatik düzenle**, çoğalt, sil. Kaydedilmemiş çalışma tarayıcıda taslak olarak tutulur.
+
+Normal bir dashboard'u **⋮ → Akıllı rapora dönüştür** ile sayfalara yerleştirebilir; Keşfet'te bulduğunuz bir
+grafiği **Akıllı rapora ekle** ile yeni bir rapora gönderebilirsiniz.
+
+## 9. Takımlar ve izinler (yönetici)
+
+- **Yönetim → Takımlar:** kullanıcıları gruplayın (ör. NOC ekibi, Finans).
+- **Klasör menüsü → Klasör izinleri:** klasörü kısıtlayıp takımlara veya kişilere *Görüntüleme* / *Düzenleme*
+  verin.
+- **Dashboard → ⋮ → İzinler:** tek bir dashboard'u yalnız seçilen takım ve kişilere açın; kısıtlı bir klasördeki
+  tek dashboard'u bir ekiple paylaşmak için de kullanılır. Düzenleme için kullanıcının rolü de editör olmalıdır.
+
+## 10. Veri kaynakları
+
+Zabbix, PostgreSQL/TimescaleDB, Prometheus/Mimir/VictoriaMetrics, Loki, HTTP JSON/CSV ve TestData'ya ek olarak:
+**veri gölü (Trino / Presto / Starburst)**, **Databricks SQL**, **ClickHouse**, **Elasticsearch / OpenSearch**,
+**InfluxDB**, **Graphite**. Tüm bağlantılar salt-okunurdur; HTTPS ve sertifika doğrulaması zorunludur.
+Her kaynak için yalnız okuma yetkili bir hesap kullanın.
+
+## 11. Arama ve kısayollar
+
+Her sayfada **Ctrl+K** (veya üstteki *Ara…*) komut paletini açar: dashboard, akıllı dashboard, sayfa ve
+işlemleri yazarak bulun (Türkçe karakter gerekmez: "yonetici ozet" → "Yönetici özeti"). **?** tuşu tüm
+kısayolları gösterir.
+
+## 12. Klavye kısayolları
 
 | Kısayol | İşlem |
 | --- | --- |
@@ -139,3 +186,7 @@ Son 30 günün olayları SMTP kapalı olsa da **Raporlar** sayfasının üstünd
 | Esc | Panel düzenleyiciden / tek panel görünümünden / kiosk modundan çık |
 | Ctrl+Enter | Keşfet’te sorguyu çalıştır |
 | Lejantta tıklama | Yalnız bu seriyi göster (Ctrl+tıklama: seriyi aç/kapa) |
+| Ctrl+K | Komut paleti (her yerde) |
+| ? | Kısayol listesi |
+| Ctrl+Z / Ctrl+Y | Akıllı dashboard'da geri al / yinele |
+| Ctrl+D, Delete, ok tuşları | Akıllı dashboard'da seçili öğeyi çoğalt, sil, kaydır |
