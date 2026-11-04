@@ -35,3 +35,8 @@ Gradyan, ince dilimlerle çizilir (`_gradient`); her PDF görüntüleyicide ayn�
 
 Makine tarafından okunan uzun biçim (bölüm, panel, blok, satır, sütun, değer, birim) ve UTF-8 BOM aynen
 korunur; tasarım değişikliği yapılmadı (entegrasyonları bozmamak için).
+
+## PDF yer imleri (sonradan eklendi)
+
+Her PDF'te görüntüleyicinin kenar çubuğunda bir anahat (outline) bulunur: raporun başı ve her bölüm (ör. host
+bazında raporda her host) için bir giriş. 30 sayfalık host raporunda istenen hosta tek tıkla gidilir.

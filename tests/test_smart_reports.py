@@ -196,3 +196,11 @@ def test_caption_and_watermark_are_printed(env):
     assert stored["smart"]["watermark"] == "GİZLİ"
     text = page_text(export(http), 0)
     assert "Bakım penceresi 02:00-03:00 arası veri içermez." in text and "GİZLİ" in text
+
+
+def test_per_host_pdf_has_one_outline_entry_per_host(env):
+    _, http, _ = env
+    assert http.post("/api/dashboards/db", json={"dashboard": model(), "overwrite": True}).status_code == 200
+    data = export_bytes(http, split_by="host")
+    assert b"/Outlines" in data
+    assert data.count(b"/Title (") + data.count(b"/Title <") >= page_count(data)  # report + every host section

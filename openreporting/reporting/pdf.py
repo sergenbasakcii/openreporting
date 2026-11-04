@@ -490,9 +490,19 @@ def render_pdf(config, collected, title, logo=None, images=None):
     if config.get("cover", True):
         pdf.cover([(t or title, page) for t, page in toc] if config.get("toc", True) else [])
     gap = 3
-    for page in pages:
+    last_section = None
+    for number, page in enumerate(pages):
         pdf.section_title = page["title"] if config.get("split_by") else ""
         pdf.new_page()
+        # PDF outline (viewer side bar): the report, then one entry per section such as each host.
+        if number == 0:
+            pdf.c.bookmarkPage("report-start")
+            pdf.c.addOutlineEntry(title, "report-start", level=0)
+        if page["title"] and page["title"] != last_section:
+            key = f"section-{number}"
+            pdf.c.bookmarkPage(key)
+            pdf.c.addOutlineEntry(page["title"], key, level=1)
+            last_section = page["title"]
         for op in page["ops"]:
             kind = op[0]
             if kind == "section":
