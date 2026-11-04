@@ -103,7 +103,7 @@ function shell(root) {
   const crumbs = h('div', { class: 'breadcrumbs' });
   setCrumbHost(crumbs);
   // The search box opens the command palette (Ctrl+K anywhere): dashboards, pages and actions in one place.
-  const search = h('button', { type: 'button', class: 'search-box palette-trigger', 'aria-label': 'Ara (Ctrl+K)', onClick: () => openPalette(app) },
+  const search = h('button', { type: 'button', class: 'search-box palette-trigger', title: 'Dashboard, sayfa veya işlem ara (Ctrl+K)', onClick: () => openPalette(app) },
     icon('search'), h('span', { text: 'Ara…' }), h('kbd', { text: 'Ctrl K' }));
   const toggleNav = button('', { icon: 'menu', variant: 'ghost', title: 'Menüyü daralt/genişlet', onClick: () => {
     document.body.classList.toggle('nav-collapsed');
