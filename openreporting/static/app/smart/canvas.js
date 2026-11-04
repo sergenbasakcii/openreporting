@@ -36,6 +36,25 @@ export function findSpot(panels, wanted, rows, pages, ignoreId) {
   return { ...wanted, page: pages, x: 0, y: 0 };
 }
 
+// Normal dashboard → pages: keep each panel's column/width, cut the 24-column grid into page-high bands,
+// shrink panels taller than a page, then resolve any overlap by the first free spot. Rows become dividers.
+export function layoutFromGrid(panels, rows) {
+  const placed = [];
+  let pages = 1;
+  const ordered = [...panels].sort((a, b) => (a.gridPos?.y ?? 0) - (b.gridPos?.y ?? 0) || (a.gridPos?.x ?? 0) - (b.gridPos?.x ?? 0));
+  for (const panel of ordered) {
+    const g = panel.gridPos || { x: 0, y: 0, w: 12, h: 8 };
+    const w = Math.max(2, Math.min(COLS, g.w || 12));
+    const hgt = panel.type === 'row' ? 2 : Math.max(2, Math.min(rows, g.h || 8));
+    const page = Math.floor((g.y || 0) / rows);
+    const wanted = { page, x: Math.max(0, Math.min(COLS - w, g.x || 0)), y: Math.min(rows - hgt, (g.y || 0) % rows), w, h: hgt };
+    const pos = findSpot(placed, wanted, rows, Math.max(pages, page + 1));
+    pages = Math.max(pages, pos.page + 1);
+    placed.push({ ...panel, type: panel.type === 'row' ? 'divider' : panel.type, smartPos: pos, ...(panel.type === 'row' ? { options: { style: 'brand' }, transparent: true, panels: undefined } : {}) });
+  }
+  return { panels: placed, pages };
+}
+
 // Close vertical gaps: every element moves up as far as it can on its page, keeping column and order.
 export function compactPage(panels, page, rows) {
   const placed = [];

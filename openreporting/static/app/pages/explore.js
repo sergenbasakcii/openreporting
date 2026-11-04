@@ -125,7 +125,11 @@ export async function explorePage(root, { app }) {
     h('section', { class: 'card', 'aria-labelledby': 'explore-q' }, h('h2', { class: 'section-heading', id: 'explore-q', text: '2 · Sorgu' }), editors),
     h('section', { class: 'card', 'aria-labelledby': 'explore-r' },
       h('div', { class: 'explore-result-head' }, h('h2', { class: 'section-heading', id: 'explore-r', text: '3 · Sonuç' }), h('span', { class: 'spacer' }),
-        viewBar, tp, button('Yenile', { icon: 'refresh', onClick: run }), saveButton),
+        viewBar, tp, button('Yenile', { icon: 'refresh', onClick: run }),
+        button('Akıllı rapora ekle', { icon: 'report', title: 'Bu sonucu yeni bir akıllı dashboard sayfasına koy', onClick: () => {
+          app.pendingSmartPanel = { ...JSON.parse(JSON.stringify(panel)), id: 1, title: VIEWS.find((v) => v.type === panel.type).label, timeRange: { ...state.range } };
+          navigate('/smart/new');
+        } }), saveButton),
       h('div', { class: 'explore-graph' }, graph.el)));
   root.append(page);
   run();

@@ -10,7 +10,7 @@ import { PanelView } from '../dashboard/panelview.js';
 import { PLUGINS } from '../panels/registry.js';
 import { queryEditor } from '../query/editors.js';
 import { preparePreviewWindow } from '../preview.js';
-import { createCanvas, findSpot, compactPage, ROWS, COLS } from '../smart/canvas.js';
+import { createCanvas, findSpot, compactPage, layoutFromGrid, ROWS, COLS } from '../smart/canvas.js';
 import { keywordChips } from '../smart/keywords.js';
 import { createHistory, drafts } from '../smart/history.js';
 import { TEMPLATES, buildTemplate } from '../smart/templates.js';
@@ -79,10 +79,18 @@ export async function smartBuilderPage(root, { app, uid }) {
   const meta = existing ? existing.meta : { folderUid: null, canEdit: true };
   const editable = meta.canEdit !== false && ['admin', 'editor'].includes(app.user.role);
   let model = existing ? existing.dashboard : blankModel('Yeni akıllı dashboard', preferred);
-  if (!model.smart) model.smart = blankModel('', preferred).smart; // a normal dashboard opened here becomes page-based
-  model.tags = [...new Set([...(model.tags || []), SMART_TAG])];
   model.panels ||= [];
-  for (const [i, p] of model.panels.entries()) p.smartPos ||= { page: 0, x: 0, y: (i * 8) % model.smart.rows, w: p.gridPos?.w || 12, h: Math.min(model.smart.rows, p.gridPos?.h || 8) };
+  const converted = !model.smart;
+  if (converted) {
+    // A normal dashboard opened here becomes page-based; its saved version stays in the history.
+    model.smart = { ...blankModel('', preferred).smart, orientation: 'landscape', rows: ROWS.landscape };
+    const flat = model.panels.flatMap((p) => (p.type === 'row' && Array.isArray(p.panels) && p.panels.length ? [p, ...p.panels] : [p]));
+    const laid = layoutFromGrid(flat, model.smart.rows);
+    model.panels = laid.panels;
+    model.smart.pages = laid.pages;
+  }
+  model.tags = [...new Set([...(model.tags || []), SMART_TAG])];
+  for (const p of model.panels) p.smartPos ||= findSpot(model.panels.filter((x) => x.smartPos), { page: 0, x: 0, y: 0, w: 12, h: 8 }, model.smart.rows, model.smart.pages);
 
   if (!uid) {
     const template = TEMPLATES.find((t) => t.id === new URLSearchParams(location.search).get('template'));
@@ -96,6 +104,14 @@ export async function smartBuilderPage(root, { app, uid }) {
     }
   }
 
+  if (!uid && app.pendingSmartPanel) {
+    // Coming from Explore: the explored query becomes the first element on the page.
+    const panel = app.pendingSmartPanel;
+    app.pendingSmartPanel = null;
+    model.title = 'Keşfet’ten akıllı rapor';
+    const [w, hgt] = SIZES[panel.type] || [24, 10];
+    model.panels = [{ ...panel, id: 1, titleLocked: true, smartPos: { page: 0, x: 0, y: 0, w: Math.max(w, 24), h: Math.max(hgt, 10) } }];
+  }
   const draft = drafts.load(model.uid || uid);
   const state = { range: { ...model.time }, resolved: null, now: Date.now(), dirty: false, selected: null, variables: {}, zoom: 'fit', savedAt: existing ? Date.parse(existing.meta.updated) || null : null };
   const history = createHistory(model);
@@ -438,7 +454,8 @@ export async function smartBuilderPage(root, { app, uid }) {
       button('Sil', { size: 'sm', onClick: (e) => { drafts.clear(model.uid || uid); e.currentTarget.closest('.draft-banner').remove(); } })));
   }
   setBreadcrumbs([{ label: 'Akıllı dashboard', href: '/smart' }, { label: model.title }], root);
-  if (!uid && model.panels.length) state.dirty = true;
+  if ((!uid && model.panels.length) || converted) state.dirty = true;
+  if (converted) toast('Dashboard sayfalara yerleştirildi (yatay A4). Kaydedene kadar orijinal düzen değişmez.', 'info', 6000);
   await loadVariables();
   drawFilterBar();
   canvas.render();

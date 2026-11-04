@@ -83,3 +83,12 @@ düşük kötü 30/10; değerler düzenlenebilir), stat renk kullanımı, açık
   kendi yüzeyinden okunur (koyu temada açık kâğıt).
 - **Etiket renkleri:** 12 tonun bazıları beyaz yazıyla 4.5:1 altındaydı; marka uyumlu, hepsi AA geçen yeni palet.
 - **Durum ızgarası:** kaydırılabilir alan klavyeyle odaklanabilir.
+
+## Dönüştürme ve Keşfet'ten gönderme (sonradan eklendi)
+
+- **Normal dashboard → akıllı rapor:** dashboard menüsündeki "Akıllı rapora dönüştür" panelleri yatay A4
+  sayfalara yerleştirir (`layoutFromGrid`): sütun ve genişlik korunur, ızgara sayfa yüksekliğinde bantlara
+  bölünür, sayfadan uzun paneller kısaltılır, çakışmalar ilk boş yere taşınır, satır başlıkları bölüm
+  ayırıcısına dönüşür. Kaydedilene kadar orijinal dashboard değişmez; kaydedilen her sürüm geçmişte kalır.
+- **Keşfet → akıllı rapor:** Keşfet'teki "Akıllı rapora ekle" sorguyu, görünümü ve Keşfet'te seçilen zaman
+  aralığını (panelin kendi dönemi olarak) yeni bir akıllı dashboard'un ilk öğesi yapar.

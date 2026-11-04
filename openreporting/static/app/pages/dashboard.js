@@ -500,6 +500,7 @@ export async function dashboardPage(root, { uid, query, app }) {
       !meta.isNew && { label: 'Paylaş', icon: 'share', onClick: () => shareDialog(location.href, dash.title) },
       !meta.isNew && app.user.role === 'admin' && { label: 'İzinler', icon: 'lock', onClick: () => dashboardPermissionsDialog(dash) },
       !meta.isNew && dash.smart && { label: 'Akıllı düzenleyicide aç', icon: 'report', onClick: () => navigate(`/smart/${dash.uid}`) },
+      !meta.isNew && !dash.smart && canEdit && { label: 'Akıllı rapora dönüştür (PDF sayfaları)', icon: 'report', onClick: () => navigate(`/smart/${dash.uid}`) },
       { label: 'JSON dışa aktar', icon: 'download', onClick: () => downloadBlob(`${dash.title.replace(/[^\w-]+/g, '_')}.json`, JSON.stringify({ ...dash, id: undefined }, null, 2), 'application/json') },
       !meta.isNew && { label: 'PDF olarak indir', icon: 'download', onClick: () => exportAs('pdf') },
       !meta.isNew && { label: 'Excel olarak indir', icon: 'download', onClick: () => exportAs('xlsx') },
