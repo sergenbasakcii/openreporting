@@ -553,14 +553,34 @@ def report_logo(settings, config):
         return None
 
 
+def _image_bytes(settings, logo_id):
+    try:
+        return logos.path(settings, logo_id).read_bytes()
+    except logos.LogoError:
+        return None
+
+
+def panel_images(settings, dashboard):
+    """Uploaded images referenced by image panels, keyed by logo id (missing ones are skipped)."""
+    ids = {p.get("options", {}).get("logo_id") for p in dashboard.get("panels") or [] if p.get("type") == "image"}
+    found = {i: _image_bytes(settings, i) for i in ids if isinstance(i, str)}
+    return {i: data for i, data in found.items() if data}
+
+
+def smart_logo(settings, dashboard):
+    """Header/cover logo chosen in the smart dashboard editor (used when the report sets none)."""
+    logo_id = (dashboard.get("smart") or {}).get("logo_id")
+    return _image_bytes(settings, logo_id) if logo_id else None
+
+
 def build_outputs(settings, config, title, start, end, *, user="report", formats=None, trusted=True, principal=None):
     dashboard = dashboards.get(settings, config["dashboard_uid"], principal)["dashboard"]
     collected = collect(settings, dashboard, config, start, end, user=user, trusted=trusted)
     outputs = {}
-    logo = report_logo(settings, config)
+    logo = report_logo(settings, config) or smart_logo(settings, dashboard)
     for fmt in formats or config["formats"]:
         if fmt == "pdf":
-            outputs["pdf"] = render_pdf(config, collected, title, logo=logo)
+            outputs["pdf"] = render_pdf(config, collected, title, logo=logo, images=panel_images(settings, dashboard))
         elif fmt == "xlsx":
             outputs["xlsx"] = render_xlsx(config, collected, title)
         elif fmt == "csv":

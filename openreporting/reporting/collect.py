@@ -10,7 +10,7 @@ from ..domain import DomainError
 from ..templating import ALL, interpolate
 
 log = logging.getLogger(__name__)
-NO_QUERY_TYPES = {"text", "row"}
+NO_QUERY_TYPES = {"text", "row", "image", "divider", "reportinfo"}
 
 
 @dataclass
@@ -21,6 +21,7 @@ class PanelResult:
     errors: list = field(default_factory=list)
     interval_ms: int = 0
     warnings: list = field(default_factory=list)
+    period: tuple | None = None  # (from_ms, to_ms) when the panel has its own time range
 
 
 @dataclass
@@ -107,6 +108,9 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
                 continue
             local = {**scope, **(panel.get("scopedVars") or {})}
             result = PanelResult(panel=panel, title=interpolate(panel.get("title", ""), local))
+            if panel.get("timeRange"):
+                own = _panel_range(panel, rng, tz)
+                result.period = (int(own["from"]), int(own["to"]))
             if panel.get("type") not in NO_QUERY_TYPES and panel.get("targets"):
                 try:
                     response = query_engine.run(
@@ -114,7 +118,7 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
                         {
                             "targets": copy.deepcopy(panel["targets"]),
                             "datasource": panel.get("datasource"),
-                            "range": _panel_range(panel, rng),
+                            "range": _panel_range(panel, rng, tz),
                             "timezone": tz,
                             "maxDataPoints": max(10, min(int(panel.get("maxDataPoints") or 600), 20000)),
                             "minInterval": panel.get("interval"),
@@ -138,6 +142,9 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
                 except Exception as exc:  # noqa: BLE001 - one failing panel must not abort the report
                     log.exception("Report panel query failed")
                     result.errors.append(f"Sorgu başarısız: {type(exc).__name__}")
+            if panel.get("type") == "reportinfo":
+                # Per-host sections must show that section's selection, not the report-wide "all".
+                result.panel = {**panel, "_variables": variable_summary(scope)}
             if panel.get("type") == "text":
                 content = (panel.get("options") or {}).get("content", "")
                 result.panel = {**panel, "options": {**(panel.get("options") or {}), "content": interpolate(content, local)}}
@@ -146,7 +153,20 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
     return Collected(dashboard=dashboard, variables=variables, sections=sections, start=start, end=end, timezone=tz, warnings=warnings)
 
 
-def _panel_range(panel, rng):
+def _panel_range(panel, rng, tz="UTC"):
+    own = panel.get("timeRange")
+    if own:
+        # Relative periods ("now-1y") are anchored at the report end, so a scheduled report for a past
+        # period shows the year up to that period, not up to the moment it was rendered.
+        from datetime import datetime, timezone
+
+        from ..timerange import resolve_range
+
+        anchor = datetime.fromtimestamp(int(rng["to"]) / 1000, timezone.utc)
+        start, end = resolve_range(own["from"], own["to"], tz, now=anchor)
+        rng = {"from": str(int(start.timestamp() * 1000)), "to": str(int(end.timestamp() * 1000))}
+        if not panel.get("timeShift"):
+            return rng
     if panel.get("timeFrom") or panel.get("timeShift"):
         frm, to = rng["from"], rng["to"]
         if panel.get("timeFrom"):

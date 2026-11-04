@@ -1,6 +1,10 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Akıllı dashboard v2**: şablon galerisi, logo/görsel · ayırıcı · rapor bilgisi öğeleri, marka başlığı ve alt bilgi,
+  rapor geneli grup/host filtresi, host bazında PDF, **panel bazında tarih aralığı** (ör. son 1 yıl), KPI için tek seri,
+  eşik hazır ayarları, geri al/yinele, kısayollar, taslak kurtarma, yakınlaştırma, önizleme ve zamanlama.
+  Düzeltmeler: regex zaman aşımı, export `split_by`, kâğıt üzerinde renk kontrastı, etiket paleti. Belge: `12-smart-dashboard-v2.md`.
 - **Akıllı dashboard**: A4/A3 sayfa tuvali, görselleştirmeyi sürükle-bırak, Grup/Host/Anahtar kelime drill-down
   seçicileri, canlı veri, PDF'te birebir aynı yerleşim. Belge: `10-smart-dashboard.md`.
 - **Yeni PDF/Excel tasarımı**: marka paleti, yeni kapak ve sayfa başı, stilli Excel; PDF stat panelinde taşma düzeltildi.

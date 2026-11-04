@@ -5,11 +5,11 @@ import { ORDER, newPanel } from '../openreporting/static/app/panels/registry.js'
 
 const series = [{ type: 'timeseries', name: 'Test', labels: {}, points: [[1000, 1], [2000, null], [3000, 3]], unit: '' }];
 const panel = (type) => ({ type, options: {}, fieldConfig: { defaults: {} } });
-test('20 new plugins remain in the existing picker, 30 total', () => {
+test('20 extended plugins and 3 layout elements remain in the picker, 33 total', () => {
   assert.equal(Object.keys(EXTRA_NAMES).length, 20);
-  assert.equal(ORDER.length, 30);
-  assert.equal(new Set(ORDER).size, 30);
-  for (const type of Object.keys(EXTRA_NAMES)) assert.equal(newPanel(type, 1, {}).type, type);
+  assert.equal(ORDER.length, 33);
+  assert.equal(new Set(ORDER).size, 33);
+  for (const type of [...Object.keys(EXTRA_NAMES), 'image', 'divider', 'reportinfo']) assert.equal(newPanel(type, 1, {}).type, type);
 });
 test('histogram includes real samples, excludes missing values', () => {
   const option = extendedOption(series, panel('histogram'));

@@ -12,7 +12,11 @@ from .domain import DomainError
 
 MAX_PATTERN = 500
 MAX_SUBJECT = 20_000
-TIMEOUT_S = 0.05
+# Wall-clock budget per match. Concurrent queries share the GIL, so a trivial match can be descheduled
+# for tens of milliseconds; the budget leaves room for that and a timeout is retried once. A
+# catastrophic pattern still fails (twice the budget at most) and never freezes other requests,
+# because matching runs with ``concurrent=True`` (the GIL is released while matching).
+TIMEOUT_S = 0.25
 _FLAGS = {"i": regex.IGNORECASE, "m": regex.MULTILINE, "s": regex.DOTALL, "x": regex.VERBOSE}
 
 
@@ -31,10 +35,13 @@ class SafeRegex:
         return self.pattern.groups
 
     def _run(self, method, *args):
-        try:
-            return method(*args, timeout=TIMEOUT_S)
-        except TimeoutError as exc:
-            raise RegexError("Düzenli ifade çok karmaşık (zaman aşımı); sadeleştirin") from exc
+        for attempt in (1, 2):
+            try:
+                return method(*args, timeout=TIMEOUT_S, concurrent=True)
+            except TimeoutError as exc:
+                if attempt == 2:
+                    raise RegexError("Düzenli ifade çok karmaşık (zaman aşımı); sadeleştirin") from exc
+        return None  # pragma: no cover - loop always returns or raises
 
     def search(self, text):
         return self._run(self.pattern.search, str(text)[:MAX_SUBJECT])

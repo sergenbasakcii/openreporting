@@ -11,7 +11,7 @@ from ..query_engine import local_midnight_ms
 from ..series_functions import bucketize
 from ..timerange import zone
 from ..units import resolve_unit
-from .collect import variable_summary
+from .collect import NO_QUERY_TYPES, variable_summary
 from .fieldcfg import display_name
 
 MAX_SHEETS = 250
@@ -118,7 +118,7 @@ def render_xlsx(config, collected, title):
     for section in collected.sections:
         for result in section.panels:
             kind = result.panel.get("type")
-            if kind in ("row", "text"):
+            if kind in NO_QUERY_TYPES:
                 continue
             status = "; ".join(result.errors) or "; ".join(result.warnings) or "Tamam"
             blocks = panel_tables(result, collected.timezone, anchor)
@@ -192,7 +192,7 @@ def render_csv(config, collected, title):
     anchor = local_midnight_ms(collected.start, tz)
     for section in collected.sections:
         for result in section.panels:
-            if result.panel.get("type") in ("row", "text"):
+            if result.panel.get("type") in NO_QUERY_TYPES:
                 continue
             for block_title, headers, rows, units in panel_tables(result, tz, anchor):
                 for row in rows:

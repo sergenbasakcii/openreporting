@@ -49,6 +49,9 @@ PANEL_TYPES = EXTRA_PANEL_TYPES | {
     "row",
     "heatmap",
     "statetimeline",
+    "image",
+    "divider",
+    "reportinfo",
 }
 TYPE_ALIASES = {
     "graph": "timeseries",
@@ -145,6 +148,23 @@ def _map_datasource(ref, ds_map):
     return None
 
 
+def _panel_time_range(panel):
+    """Optional per-panel period ``timeRange = {from, to}`` (e.g. now-1y → now, or two dates)."""
+    value = panel.get("timeRange")
+    if value in (None, {}, ""):
+        panel.pop("timeRange", None)
+        return
+    if not isinstance(value, dict) or not all(isinstance(value.get(k), str) and 1 <= len(value[k]) <= 64 for k in ("from", "to")):
+        raise DashboardError("Panel tarih aralığı {from, to} metinleri olmalı")
+    from .timerange import TimeRangeError, resolve_range
+
+    try:
+        resolve_range(value["from"], value["to"], "UTC")
+    except TimeRangeError as exc:
+        raise DashboardError(f"Panel tarih aralığı geçersiz: {exc}") from None
+    panel["timeRange"] = {"from": value["from"], "to": value["to"]}
+
+
 def _panel(panel, index, ds_map, ids):
     if not isinstance(panel, dict):
         raise DashboardError("Panel must be an object")
@@ -190,6 +210,7 @@ def _panel(panel, index, ds_map, ids):
     ids.add(pid)
     out["id"] = pid
     out["title"] = str(out.get("title") or "")[:300]
+    _panel_time_range(out)
     out["gridPos"] = _grid(panel.get("gridPos"), index)
     if "datasource" in out:
         out["datasource"] = _map_datasource(out.get("datasource"), ds_map)

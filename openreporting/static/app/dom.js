@@ -316,7 +316,8 @@ export function timeAgo(iso) {
 }
 
 export function tagColor(name) {
-  const palette = ['#3274d9', '#629e51', '#e5ac0e', '#bf1b00', '#8f3bb8', '#1f78c1', '#ba43a9', '#447ebc', '#c15c17', '#0a50a1', '#806eb7', '#d683ce'];
+  // Brand-aligned tones; every one keeps white tag text at WCAG AA (≥ 4.5:1).
+  const palette = ['#0f766e', '#4f46e5', '#92400e', '#be123c', '#6d28d9', '#0369a1', '#a21caf', '#047857', '#9a3412', '#1d4ed8', '#475569', '#be185d'];
   let hash = 0;
   for (const ch of String(name)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return palette[hash % palette.length];

@@ -16,6 +16,7 @@ API'yi, güvenlik kurallarını ve testleri anlatır. Kurulum ve işletim rehber
 | 09 | [Takımlar ve dashboard izinleri](09-teams-and-dashboard-permissions.md) | Kullanıcı grupları, takıma klasör izni, dashboard bazında kullanıcı/takım izni |
 | 10 | [Akıllı dashboard](10-smart-dashboard.md) | Canlı PDF sayfası, sürükle-bırak, anahtar kelime / drill-down, birebir PDF |
 | 11 | [PDF ve Excel çıktı tasarımı](11-export-design.md) | Marka paleti, kapak/başlık/tablo, Excel stilleri |
+| 12 | [Akıllı dashboard v2](12-smart-dashboard-v2.md) | Şablonlar, logo/görsel, rapor filtresi, host bazında PDF, panel bazında tarih aralığı, geri al |
 
 ## İlgili belgeler
 

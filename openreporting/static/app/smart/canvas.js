@@ -47,7 +47,8 @@ function placeBox(box, pos, rows) {
 
 /**
  * Canvas controller.
- * opts: { model, header(pageIndex) -> Node, renderItem(panel) -> {el, bar}, onAdd(type, pos), onChange(), onSelect(panel) }
+ * opts: { model, editable, header(page) -> Node, footer(page) -> Node[], pageTools(page) -> Node|null,
+ *         renderItem(panel) -> {el, bar}, onAdd(type, pos), onMove(panel, pos), onSelect(panel|null) }
  */
 export function createCanvas(opts) {
   const root = h('div', { class: 'smart-pages' });
@@ -86,8 +87,9 @@ export function createCanvas(opts) {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       box.classList.remove('dragging', 'blocked');
-      if (fits(model.panels, next, panel.id, rows())) { panel.smartPos = next; opts.onChange(); } else toast('Bu alan dolu; panel eski yerine döndü', 'warn');
-      render();
+      const moved = JSON.stringify(next) !== JSON.stringify(origin);
+      if (moved && fits(model.panels, next, panel.id, rows())) opts.onMove(panel, next);
+      else { if (moved) toast('Bu alan dolu; öğe eski yerine döndü', 'warn'); render(); }
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -96,12 +98,16 @@ export function createCanvas(opts) {
   function itemBox(panel) {
     const { el, bar } = opts.renderItem(panel);
     const box = h('div', { class: ['smart-item', opts.selectedId?.() === panel.id ? 'selected' : ''].join(' '), dataset: { id: panel.id },
-      onPointerdown: () => opts.onSelect(panel) });
-    const grip = h('button', { type: 'button', class: 'smart-grip', title: 'Taşı (sürükleyin)', 'aria-label': 'Paneli taşı' }, icon('drag'));
-    grip.addEventListener('pointerdown', (e) => { e.preventDefault(); dragItem(panel, box, 'move', e); });
-    const resize = h('div', { class: 'smart-resize', title: 'Boyutlandır' });
-    resize.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); dragItem(panel, box, 'resize', e); });
-    box.append(h('div', { class: 'smart-bar' }, grip, bar), h('div', { class: 'smart-view' }, el), resize);
+      onPointerdown: (e) => { e.stopPropagation(); opts.onSelect(panel); } });
+    if (opts.editable === false) {
+      box.append(h('div', { class: 'smart-bar' }, bar), h('div', { class: 'smart-view' }, el));
+    } else {
+      const grip = h('button', { type: 'button', class: 'smart-grip', title: 'Taşı (sürükleyin) · ok tuşlarıyla kaydırın', 'aria-label': 'Öğeyi taşı' }, icon('drag'));
+      grip.addEventListener('pointerdown', (e) => { e.preventDefault(); dragItem(panel, box, 'move', e); });
+      const resize = h('div', { class: 'smart-resize', title: 'Boyutlandır' });
+      resize.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); dragItem(panel, box, 'resize', e); });
+      box.append(h('div', { class: 'smart-bar' }, grip, bar), h('div', { class: 'smart-view' }, el), resize);
+    }
     placeBox(box, panel.smartPos, rows());
     return box;
   }
@@ -122,8 +128,9 @@ export function createCanvas(opts) {
       bodies.push(body);
       const paper = h('section', { class: 'paper', 'data-theme': 'porcelain', 'data-scheme': 'light', 'aria-label': `Sayfa ${page + 1}`,
         style: { aspectRatio: String(geo.ratio), paddingTop: `${geo.pad.top * 100 / geo.ratio}%`, paddingBottom: `${geo.pad.bottom * 100 / geo.ratio}%`, paddingLeft: `${geo.pad.side * 100}%`, paddingRight: `${geo.pad.side * 100}%` } },
-      opts.header(page), body, h('footer', { class: 'paper-foot' }, h('span', { text: 'OpenReporting raporu' }), h('span', { text: `Sayfa ${page + 1}` })));
-      root.append(paper);
+      opts.header(page), body, h('footer', { class: 'paper-foot' }, ...(opts.footer ? opts.footer(page) : [h('span', { text: `Sayfa ${page + 1}` })])));
+      paper.addEventListener('pointerdown', () => opts.onSelect(null));
+      root.append(h('div', { class: 'page-wrap' }, opts.pageTools ? opts.pageTools(page) : null, paper));
     }
     for (const panel of model.panels) bodies[panel.smartPos.page]?.append(itemBox(panel));
   }
@@ -131,6 +138,7 @@ export function createCanvas(opts) {
   return {
     el: root,
     render,
+    fits: (pos, ignoreId) => fits(model.panels, pos, ignoreId, rows()),
     setModel(next) { model = next; render(); },
   };
 }

@@ -93,6 +93,7 @@ class DashboardExportIn(BaseModel):
     format: str = "pdf"
     layout: str = "grid"
     orientation: str = "landscape"
+    split_by: str | None = Field(default=None, max_length=64)
 
 
 def _fail(exc):
@@ -188,7 +189,11 @@ def preview(body: PreviewIn, request: Request, user=Depends(editor)):
         renderer = {"pdf": render_pdf, "xlsx": render_xlsx, "csv": render_csv}[fmt]
         with _heavy():
             collected = collect(settings, dashboard, config, start, end, user=user["username"], section_limit=body.max_sections)
-            extra = {"logo": service.report_logo(settings, config)} if fmt == "pdf" else {}
+            extra = (
+                {"logo": service.report_logo(settings, config) or service.smart_logo(settings, dashboard), "images": service.panel_images(settings, dashboard)}
+                if fmt == "pdf"
+                else {}
+            )
             payload = renderer(config, collected, f"{config['name']} (önizleme)", **extra)
         dashboards.get(settings, config["dashboard_uid"], user)
     except (DomainError, TimeRangeError) as exc:
@@ -213,6 +218,7 @@ def export_dashboard(body: DashboardExportIn, request: Request, user=Depends(vie
                 "variables": body.variables,
                 "layout": body.layout,
                 "orientation": body.orientation,
+                "split_by": body.split_by,
                 "formats": [body.format],
                 "cover": False,
                 "toc": False,

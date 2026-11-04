@@ -65,7 +65,7 @@ export function renderStat(container, frames, panel) {
       if (showName) box.append(h('div', { class: 'stat-name', text: item.name }));
       if (textMode !== 'name' && textMode !== 'none') {
         const size = fitText(d.text, cellW * 0.9, cellH * (showName ? 0.7 : 0.9), 96);
-        box.append(h('div', { class: 'stat-value', text: d.text, style: { fontSize: `${size}px`, color: colorMode === 'value' ? readableColor(c, cssVar('--bg-panel')) : 'inherit' } }));
+        box.append(h('div', { class: 'stat-value', text: d.text, style: { fontSize: `${size}px`, color: colorMode === 'value' ? readableColor(c, cssVar('--bg-panel', container.isConnected ? container : undefined)) : 'inherit' } }));
       }
       if (graphMode === 'area' && item.points.length > 1 && cellH > 50) {
         const spark = sparkline(item.points, colorMode.startsWith('background') ? 'rgba(255,255,255,.75)' : c);
@@ -101,7 +101,7 @@ export function renderBarGauge(container, frames, panel) {
     const bar = h('div', { class: 'bg-bar' }, fill);
     if (opts.showUnfilled === false) bar.style.background = 'transparent';
     list.append(h('div', { class: 'bargauge-row', title: `${item.name}: ${d.text}` }, h('div', { class: 'bg-name', text: item.name }), bar,
-      h('div', { class: 'bg-value', text: d.text, style: { color: readableColor(c, cssVar('--bg-panel')) } })));
+      h('div', { class: 'bg-value', text: d.text, style: { color: readableColor(c, cssVar('--bg-panel', container.isConnected ? container : undefined)) } })));
   }
   container.replaceChildren(list);
   return nothing;
@@ -173,7 +173,7 @@ export function renderTable(container, frames, panel, ctx) {
         const c2 = (mapped && mapped.color && color(mapped.color)) || thresholdColor(v, cfg.thresholds, cfg.min ?? 0, cfg.max ?? 100);
         const td = h('td', { class: 'num' });
         if ((cell === 'color-background' || cell === 'color-background-solid') && v !== null && c2) { td.style.background = cell === 'color-background' ? alpha(c2, 0.75) : c2; td.style.color = contrastText(c2); td.textContent = text; }
-        else if (cell === 'color-text' && c2) { td.style.color = readableColor(c2, cssVar('--bg-panel')); td.textContent = text; }
+        else if (cell === 'color-text' && c2) { td.style.color = readableColor(c2, cssVar('--bg-panel', container.isConnected ? container : undefined)); td.textContent = text; }
         else if ((cell === 'gauge' || cell === 'lcd-gauge' || cell === 'gradient-gauge') && v !== null) {
           if (!columnMax.has(ci)) columnMax.set(ci, Math.max(maxOf(table.rows.map((x) => x[ci] ?? 0), 0), 1));
           const max = cfg.max ?? (unit === 'percent' ? 100 : columnMax.get(ci));
@@ -209,7 +209,7 @@ export function renderStatusGrid(container, frames, panel) {
   const labelField = opts.labelField || 'host';
   if (opts.sort === 'value') items.sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
   if (opts.sort === 'name') items.sort((a, b) => String(a.labels[labelField] || a.name).localeCompare(String(b.labels[labelField] || b.name), 'tr', { numeric: true }));
-  const grid = h('div', { class: 'statusgrid' });
+  const grid = h('div', { class: 'statusgrid', tabindex: '0', role: 'group', 'aria-label': panel.title || 'Durum ızgarası' });
   grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${Number(opts.minCellWidth) || 130}px, 1fr))`;
   const theme = chartTheme(container);
   for (const item of items) {

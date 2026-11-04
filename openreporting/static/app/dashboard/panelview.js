@@ -3,7 +3,7 @@ import { h, button, menu, toast, downloadBlob } from '../dom.js';
 import { icon } from '../icons.js';
 import { post, ApiError } from '../api.js';
 import { plugin, withDefaults } from '../panels/registry.js';
-import { effectiveZone, isAbsolute, durationMs } from '../time.js';
+import { effectiveZone, isAbsolute, durationMs, rangeLabel } from '../time.js';
 import { interpolate, requestVariables } from '../variables.js';
 import { formatValue } from '../units.js';
 
@@ -15,7 +15,8 @@ function shiftRaw(value, shift) {
 
 export function panelRange(panel, range) {
   let r = { ...range };
-  if (panel.timeFrom) r = { from: `now-${panel.timeFrom}`, to: 'now' };
+  if (panel.timeRange && panel.timeRange.from && panel.timeRange.to) r = { from: panel.timeRange.from, to: panel.timeRange.to };
+  else if (panel.timeFrom) r = { from: `now-${panel.timeFrom}`, to: 'now' };
   if (panel.timeShift) r = { from: shiftRaw(r.from, panel.timeShift), to: shiftRaw(r.to, panel.timeShift) };
   return r;
 }
@@ -78,7 +79,8 @@ export class PanelView {
     if (panel.description) icons.append(h('span', { class: 'panel-status', title: interpolate(panel.description, ctx.variables, ctx.scopedVars) }, icon('info')));
     this.menuBtn = button('', { icon: 'dots', variant: 'ghost', size: 'sm', title: 'Panel menüsü', onClick: (e) => this.openMenu(e.currentTarget) });
     icons.append(this.menuBtn);
-    this.header = h('div', { class: 'panel-header' }, this.titleEl, this.status, icons);
+    this.rangeEl = h('span', { class: 'panel-period', hidden: true });
+    this.header = h('div', { class: 'panel-header' }, this.titleEl, this.rangeEl, this.status, icons);
     this.body = h('div', { class: 'panel-body' });
     this.vizEl = h('div', { class: 'viz' });
     this.body.append(this.vizEl);
@@ -99,6 +101,10 @@ export class PanelView {
     const title = interpolate(this.panel.title || '', this.ctx.variables, this.ctx.scopedVars);
     this.titleEl.textContent = title;
     this.titleEl.title = title;
+    // A panel with its own period says so, otherwise it would look like it follows the dashboard range.
+    const own = this.panel.timeRange;
+    this.rangeEl.hidden = !own;
+    if (own) { this.rangeEl.textContent = rangeLabel(own, this.ctx.timezone); this.rangeEl.title = 'Bu panelin kendi tarih aralığı'; }
     // An untitled panel keeps its header (menu, status) but must not expose an empty heading.
     if (title) this.titleEl.removeAttribute('aria-hidden');
     else this.titleEl.setAttribute('aria-hidden', 'true');
@@ -166,7 +172,7 @@ export class PanelView {
     }
     const range = this.response && this.response.request ? { from: this.response.request.from, to: this.response.request.to } : this.ctx.resolvedRange;
     try {
-      this.viz = p.render(this.vizEl, this.frames, panel, { ...this.vizState, timeRange: range, timezone: this.ctx.timezone, group: this.ctx.group,
+      this.viz = p.render(this.vizEl, this.frames, panel, { ...this.vizState, timeRange: range, timezone: this.ctx.timezone, group: this.ctx.group, variables: this.ctx.variables, range: this.ctx.range,
         onZoom: p.zoom && this.ctx.onZoom ? this.ctx.onZoom : null, interpolate: (s, escape) => interpolate(s, this.ctx.variables, this.ctx.scopedVars, escape),
         hiddenSeries: this.vizState.hiddenSeries || (this.vizState.hiddenSeries = new Set()), tableSort: this.vizState.tableSort || (this.vizState.tableSort = { col: null, desc: false }) });
     } catch (err) {

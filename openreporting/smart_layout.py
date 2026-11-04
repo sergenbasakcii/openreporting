@@ -10,7 +10,10 @@ A smart dashboard is an ordinary dashboard with a ``smart`` block and a ``smartP
 normal dashboard view, in reports and in schedules without special cases.
 """
 
+import re
+
 COLUMNS = 24
+_LOGO = re.compile(r"^[0-9a-f]{64}$")
 ROWS = {"portrait": 32, "landscape": 20}
 MAX_PAGES = 50
 PAPERS = ("A4", "A3", "Letter")
@@ -43,6 +46,10 @@ def normalize(model):
         "pages": _int(smart.get("pages"), used_pages, MAX_PAGES, used_pages),
         "cover": bool(smart.get("cover", False)),
         "subtitle": str(smart.get("subtitle") or "")[:200],
+        "logo_id": smart.get("logo_id") if isinstance(smart.get("logo_id"), str) and _LOGO.match(smart["logo_id"]) else None,
+        "logo_on_pages": bool(smart.get("logo_on_pages", True)),
+        "footer": str(smart.get("footer") or "")[:160],
+        "filters": bool(smart.get("filters", False)),
     }
     for panel, pos in zip(panels, positions):
         w = _int(pos.get("w"), 2, COLUMNS, 12)
@@ -63,7 +70,11 @@ def is_smart(dashboard):
 def report_overrides(dashboard):
     """Report/export settings implied by a smart dashboard (paper, orientation, cover, grid layout)."""
     smart = dashboard["smart"]
-    return {"paper": smart["paper"], "orientation": smart["orientation"], "layout": "grid", "cover": smart["cover"], "toc": False}
+    overrides = {"paper": smart["paper"], "orientation": smart["orientation"], "layout": "grid", "cover": smart["cover"], "toc": False}
+    overrides["logo_on_pages"] = smart.get("logo_on_pages", True)
+    if smart.get("footer"):
+        overrides["footer_text"] = smart["footer"]
+    return overrides
 
 
 def plan(panels, rows, col_w, page_h):

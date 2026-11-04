@@ -8,6 +8,7 @@ tables, and adds a cover page with variables, time range and table of contents.
 import io
 import math
 from .. import smart_layout
+from .layout_pdf import draw as draw_layout
 from datetime import datetime, timezone
 
 from reportlab.lib.colors import Color
@@ -102,7 +103,7 @@ def _fit(width, height, box_w, box_h):
 
 
 class Pdf:
-    def __init__(self, config, collected, title, *, generated_at=None, logo=None):
+    def __init__(self, config, collected, title, *, generated_at=None, logo=None, images=None):
         _fonts()
         size = PAPERS.get(config.get("paper", "A4"), A4)
         self.page_w, self.page_h = landscape(size) if config.get("orientation", "landscape") == "landscape" else portrait(size)
@@ -125,6 +126,7 @@ class Pdf:
         self.top = self.page_h - MARGIN - HEADER_H
         self.bottom = MARGIN + FOOTER_H
         self.toc = []
+        self.images = images or {}
 
     # -- primitives -------------------------------------------------------
     def _fmt_time(self, dt, pattern="%d.%m.%Y %H:%M"):
@@ -294,7 +296,13 @@ class Pdf:
         if title:
             c.setFillColor(_rgb(BRAND))
             c.roundRect(x + 7, y + h - 12.5, 2.4, 8, 1.2, stroke=0, fill=1)
-            self.text(x + 13, y + h - 12, title, 8.5, INK, bold=True, max_width=w - 32)
+            period = getattr(result, "period", None)
+            label = ""
+            if period:
+                fmt = "%d.%m.%Y" if period[1] - period[0] >= 2 * 86400000 else "%d.%m.%Y %H:%M"
+                label = f"{self._fmt_time(datetime.fromtimestamp(period[0] / 1000, timezone.utc), fmt)} – {self._fmt_time(datetime.fromtimestamp(period[1] / 1000, timezone.utc), fmt)}"
+                self.text(x + w - 8, y + h - 12, label, 6.5, MUTED, align="right", max_width=w * 0.45)
+            self.text(x + 13, y + h - 12, title, 8.5, INK, bold=True, max_width=w - 32 - (self.width(label, 6.5) + 8 if label else 0))
         if result.errors or result.warnings:
             mark = "!" if result.errors else "i"
             fill = "#d10e5c" if result.errors else "#f5b73d"
@@ -305,6 +313,8 @@ class Pdf:
 
     def draw_panel(self, result, x, y, w, h):
         kind = result.panel.get("type", "timeseries")
+        if draw_layout(self, result, x, y, w, h):
+            return
         if kind == "row":
             self.text(x + 2, y + h - 11, result.title or "Satır", 10.5, INK, bold=True, max_width=w)
             self.c.setStrokeColor(_rgb(BRAND))
@@ -1052,15 +1062,17 @@ def paginate(pdf, config, sections):
         state["cursor"] = 0
 
     for section in sections:
-        header_h = 18 if section.title else 0
+        # Smart dashboards: every section (e.g. one per host) starts on fresh pages; its name goes in the page header.
+        smart = smart_layout.is_smart(pdf.collected.dashboard)
+        header_h = 18 if section.title and not smart else 0
         if config.get("layout", "grid") == "grid":
             placements, page_count = plan_grid(pdf, section)
             first_h = max((top + ph for pi, _, _, top, _, ph in placements if pi == 0), default=20)
-            if state["cursor"] is None or config.get("section_page_break") or page_count > 1 or state["cursor"] + header_h + first_h > usable:
+            if state["cursor"] is None or smart or config.get("section_page_break") or page_count > 1 or state["cursor"] + header_h + first_h > usable:
                 if not (state["cursor"] == 0 and pages and not pages[-1]["ops"]):
                     new_page(section.title)
             toc.append((section.title, first_page + len(pages) - 1))
-            if section.title:
+            if section.title and not smart:
                 pages[-1]["ops"].append(("section", section.title, state["cursor"]))
                 state["cursor"] += header_h
             base = state["cursor"]
@@ -1121,10 +1133,10 @@ def paginate(pdf, config, sections):
     return pages, toc
 
 
-def render_pdf(config, collected, title, logo=None):
+def render_pdf(config, collected, title, logo=None, images=None):
     if smart_layout.is_smart(collected.dashboard):
         config = {**config, **smart_layout.report_overrides(collected.dashboard)}
-    pdf = Pdf(config, collected, title, logo=logo)
+    pdf = Pdf(config, collected, title, logo=logo, images=images)
     pages, toc = paginate(pdf, config, collected.sections)
     if config.get("cover", True):
         pdf.cover([(t or title, page) for t, page in toc] if config.get("toc", True) else [])
