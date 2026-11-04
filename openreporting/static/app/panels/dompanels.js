@@ -90,7 +90,7 @@ export function renderBarGauge(container, frames, panel) {
   const opts = panel.options || {};
   const mode = opts.displayMode || 'gradient';
   if (opts.sort === 'desc') items.sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
-  const list = h('div', { class: 'bargauge-list' });
+  const list = h('div', { class: 'bargauge-list', tabindex: '0', role: 'group', 'aria-label': panel.title || 'Çubuk gösterge' });
   const autoMax = Math.max(maxOf(items.map((i) => i.value ?? 0), 0), 1);
   for (const item of items) {
     const min = item.cfg.min ?? 0;

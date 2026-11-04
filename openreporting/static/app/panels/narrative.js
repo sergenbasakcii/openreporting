@@ -63,6 +63,6 @@ export function narrativeSentences(panel, frames, tz) {
 export function renderNarrative(container, frames, panel, ctx) {
   const lines = narrativeSentences(panel, frames, ctx.timezone);
   if (!lines.length) { noData(container, 'Özet için veri yok'); return nothing; }
-  container.replaceChildren(h('div', { class: 'narrative' }, h('ul', lines.map((t) => h('li', { text: t })))));
+  container.replaceChildren(h('div', { class: 'narrative', tabindex: '0', role: 'group', 'aria-label': panel.title || 'Akıllı özet' }, h('ul', lines.map((t) => h('li', { text: t })))));
   return nothing;
 }

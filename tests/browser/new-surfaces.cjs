@@ -17,7 +17,7 @@ const base = process.env.OPENREPORTING_UI_URL || 'http://127.0.0.1:8811';
     assert.equal(login.status(), 200);
     const page = await context.newPage();
     page.on('pageerror', (e) => errors.push(e.message));
-    const routes = ['/smart', '/admin/teams', '/explore', '/admin/api', '/admin/api-keys', '/datasources/new'];
+    const routes = ['/', '/smart', '/admin/teams', '/explore', '/admin/api', '/admin/api-keys', '/datasources/new'];
     if (process.env.OPENREPORTING_UI_SMART) routes.push(`/smart/${process.env.OPENREPORTING_UI_SMART}`);
     for (const route of routes) {
       await page.goto(base + route);

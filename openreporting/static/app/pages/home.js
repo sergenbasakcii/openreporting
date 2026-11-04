@@ -14,12 +14,13 @@ export async function homePage(root, { app }) {
   page.replaceChildren();
   const canEdit = ['admin', 'editor'].includes(app.user.role);
   page.append(h('div', { class: 'page-header' }, h('div', h('h1', { text: `Hoş geldiniz, ${app.user.display_name || app.user.username}` }),
-    h('p', { class: 'sub', text: 'Zabbix ve SQL kaynaklarından dashboard’lar oluşturun, host gruplarına göre raporlar üretin ve zamanlayın.' }))));
+    h('p', { class: 'sub', text: 'Zabbix, veri gölü, SQL, log ve metrik kaynaklarından dashboard ve rapor hazırlayın. Her yerden aramak için Ctrl+K.' }))));
   const hasReal = sources.some((s) => s.type !== 'testdata');
   const steps = h('div', { class: 'card-grid' },
     tile('database', hasReal ? 'Veri kaynakları bağlı' : '1. Zabbix’i bağlayın', hasReal ? `${sources.length} veri kaynağı tanımlı` : 'Zabbix API URL ve salt-okunur token ile veri kaynağı ekleyin.', app.user.role === 'admin' ? '/datasources' : null),
-    tile('apps', '2. Dashboard oluşturun', 'Grup / host / item sorguları, değişkenler, 10 görselleştirme türü.', canEdit ? '/dashboards/new' : '/dashboards'),
-    tile('report', '3. Rapor üretin', 'Dashboard’ları PDF / Excel / CSV rapora çevirin; host başına bölümler, e-posta zamanlaması.', '/reports'),
+    tile('report', '2. Akıllı dashboard ile hızlı rapor', 'Şablon seçin, sayfaya sürükleyin, host ve anahtar kelimeyi seçin; logolu PDF hazır.', canEdit ? '/smart' : '/smart'),
+    tile('apps', 'Dashboard oluşturun', 'Grup / host / item sorguları, değişkenler, 30’dan fazla görselleştirme.', canEdit ? '/dashboards/new' : '/dashboards'),
+    tile('calendar', '3. Raporları zamanlayın', 'PDF / Excel / CSV; host başına bölümler, önceki dönemle karşılaştırma, e-posta teslimi.', '/reports'),
     canEdit ? tile('compass', 'Keşfet', 'Bir dashboard oluşturmadan metrikleri hızlıca sorgulayın.', '/explore') : null);
   page.append(steps);
   if (canEdit && !dashboards.length) {
@@ -49,6 +50,6 @@ function tile(iconName, title, text, href) {
 
 function list(items, emptyText) {
   if (!items.length) return h('p', { class: 'muted', text: emptyText });
-  return h('div', items.map((d) => h('a', { class: 'list-row', href: d.url, 'data-link': '' }, icon('apps'), h('div', { class: 'grow' }, h('b', { text: d.title }),
+  return h('div', items.map((d) => h('a', { class: 'list-row', href: (d.tags || []).includes('akıllı') ? `/smart/${d.uid}` : d.url, 'data-link': '' }, icon((d.tags || []).includes('akıllı') ? 'report' : 'apps'), h('div', { class: 'grow' }, h('b', { text: d.title }),
     h('div', { class: 'faint', text: `${d.folderTitle} · ${timeAgo(d.updated)}` })), h('div', d.tags.slice(0, 3).map(tagEl)))));
 }

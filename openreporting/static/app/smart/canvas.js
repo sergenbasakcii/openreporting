@@ -36,6 +36,22 @@ export function findSpot(panels, wanted, rows, pages, ignoreId) {
   return { ...wanted, page: pages, x: 0, y: 0 };
 }
 
+// Close vertical gaps: every element moves up as far as it can on its page, keeping column and order.
+export function compactPage(panels, page, rows) {
+  const placed = [];
+  const order = panels.filter((p) => p.smartPos.page === page).sort((a, b) => a.smartPos.y - b.smartPos.y || a.smartPos.x - b.smartPos.x);
+  const moved = new Map();
+  for (const panel of order) {
+    let y = 0;
+    const pos = { ...panel.smartPos };
+    while (y < pos.y && !fits(placed, { ...pos, y }, null, rows)) y += 1;
+    const next = { ...pos, y: Math.min(y, pos.y) };
+    placed.push({ id: panel.id, smartPos: next });
+    moved.set(panel.id, next);
+  }
+  return moved;
+}
+
 function cellAt(body, clientX, clientY, rows) {
   const r = body.getBoundingClientRect();
   return { x: Math.floor(((clientX - r.left) / r.width) * COLS), y: Math.floor(((clientY - r.top) / r.height) * rows) };

@@ -45,3 +45,14 @@ sonradan metin eklendiği için metin ikonun üstüne taşıyordu. Metinli düğ
 24×24 ikon tanımlar (ısı haritası, histogram, XY dağılım, balon, kutu, mum, radar, huni, ağaç haritası,
 hiyerarşi halkası, Sankey, bağlantı grafiği, takvim ısı haritası, şelale, kutupsal çubuk, paralel koordinatlar,
 halka, gül, yığılmış alan, basamak). İkonlar `currentColor` kullanır, temaya uyar.
+
+## Komut paleti ve kısayollar (sonradan eklendi)
+
+- **Ctrl+K / ⌘K** veya üst çubuktaki "Ara…" kutusu komut paletini açar: dashboard'lar, akıllı dashboard'lar,
+  sayfalar ve işlemler (yeni dashboard, şablondan akıllı dashboard, rapor zamanla …) tek listede.
+  Sonuçlar `/api/search`'ten gelir; izinler sunucuda uygulanır. Arama bulanıktır ve Türkçe karakter/aksan
+  duyarsızdır ("yonetici ozet" → "Yönetici özeti"; `fuzzy.js`, `tests/test_fuzzy.mjs`). ↑/↓, Enter, Esc.
+- **?** tuşu tüm kısayolların listesini açar.
+- Ana sayfa yeni akışı anlatır: akıllı dashboard ile hızlı rapor, dashboard, zamanlanmış rapor.
+- Akıllı dashboard sayfa araçlarına **Otomatik düzenle** eklendi: sayfadaki boşluklar kapanır, öğeler sütun
+  ve sıra korunarak yukarı toplanır (`compactPage`).

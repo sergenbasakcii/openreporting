@@ -5,6 +5,7 @@ import { get, post, setCsrf, onUnauthorized, refreshCsrf } from './api.js';
 import { route, startRouter, navigate, setCrumbHost, render, teardown } from './router.js';
 import { enrollmentPage } from './mfa.js';
 import { loadPlugins } from './plugins.js';
+import { openPalette, installPalette } from './palette.js';
 import { applyThemeToDocument, resolveTheme, oppositeTheme, normalisePreference, SYSTEM } from './themes.js';
 
 const app = { user: null, prefs: null, settings: null, pendingDashboard: null };
@@ -101,7 +102,9 @@ function shell(root) {
   const sidenav = h('aside', { class: 'sidenav' }, h('div', { class: 'brand' }, h('div', { class: 'brand-logo', text: 'O' }), h('div', { class: 'label' }, 'OpenReporting', h('small', { text: `v${app.settings.version}` }))), nav, userBtn);
   const crumbs = h('div', { class: 'breadcrumbs' });
   setCrumbHost(crumbs);
-  const search = input({ placeholder: 'Dashboard ara…', class: 'search-box', onKeydown: (e) => { if (e.key === 'Enter') navigate(`/dashboards?query=${encodeURIComponent(e.target.value)}`); } });
+  // The search box opens the command palette (Ctrl+K anywhere): dashboards, pages and actions in one place.
+  const search = h('button', { type: 'button', class: 'search-box palette-trigger', 'aria-label': 'Ara (Ctrl+K)', onClick: () => openPalette(app) },
+    icon('search'), h('span', { text: 'Ara…' }), h('kbd', { text: 'Ctrl K' }));
   const toggleNav = button('', { icon: 'menu', variant: 'ghost', title: 'Menüyü daralt/genişlet', onClick: () => {
     document.body.classList.toggle('nav-collapsed');
     try { localStorage.setItem(NAV_KEY, document.body.classList.contains('nav-collapsed') ? '1' : ''); } catch { /* ignore */ }
@@ -193,7 +196,7 @@ async function boot() {
   app.settings = settings;
   if (me.preferences && me.preferences.theme) applyTheme(me.preferences.theme);
   const content = shell(root);
-  if (!app.routesRegistered) { registerRoutes(); app.routesRegistered = true; startRouter(content, app); }
+  if (!app.routesRegistered) { registerRoutes(); installPalette(app); app.routesRegistered = true; startRouter(content, app); }
   else { startRouter(content, app); }
 }
 

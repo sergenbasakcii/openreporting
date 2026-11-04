@@ -10,7 +10,7 @@ import { PanelView } from '../dashboard/panelview.js';
 import { PLUGINS } from '../panels/registry.js';
 import { queryEditor } from '../query/editors.js';
 import { preparePreviewWindow } from '../preview.js';
-import { createCanvas, findSpot, ROWS, COLS } from '../smart/canvas.js';
+import { createCanvas, findSpot, compactPage, ROWS, COLS } from '../smart/canvas.js';
 import { keywordChips } from '../smart/keywords.js';
 import { createHistory, drafts } from '../smart/history.js';
 import { TEMPLATES, buildTemplate } from '../smart/templates.js';
@@ -194,6 +194,7 @@ export async function smartBuilderPage(root, { app, uid }) {
     pageTools: editable ? (page) => h('div', { class: 'page-tools' }, h('span', { text: `Sayfa ${page + 1}` }),
       button('', { size: 'sm', variant: 'ghost', icon: 'arrow-up', title: 'Sayfayı yukarı taşı', disabled: page === 0, onClick: () => movePage(page, -1) }),
       button('', { size: 'sm', variant: 'ghost', icon: 'arrow-down', title: 'Sayfayı aşağı taşı', disabled: page === model.smart.pages - 1, onClick: () => movePage(page, 1) }),
+      button('', { size: 'sm', variant: 'ghost', icon: 'list', title: 'Otomatik düzenle: boşlukları kapat', 'aria-label': 'Sayfayı otomatik düzenle', class: 'compact-btn', onClick: () => compact(page) }),
       button('', { size: 'sm', variant: 'ghost', icon: 'copy', title: 'Sayfayı çoğalt', onClick: () => duplicatePage(page) }),
       button('', { size: 'sm', variant: 'ghost', icon: 'trash', title: 'Sayfayı sil', disabled: model.smart.pages === 1, onClick: () => deletePage(page) })) : null,
     renderItem: (panel) => ({ bar: itemBar(panel), el: h('div', { class: 'smart-view-inner' }, view(panel).el,
@@ -240,6 +241,12 @@ export async function smartBuilderPage(root, { app, uid }) {
     views.get(panel.id)?.destroy(); views.delete(panel.id);
     change((m) => { m.panels = m.panels.filter((p) => p.id !== panel.id); });
     if (state.selected === panel.id) select(null);
+  }
+
+  function compact(page) {
+    const moved = compactPage(model.panels, page, model.smart.rows);
+    change((m) => { for (const p of m.panels) if (moved.has(p.id)) p.smartPos = moved.get(p.id); });
+    toast('Sayfa düzenlendi', 'ok');
   }
 
   function movePage(page, delta) {
