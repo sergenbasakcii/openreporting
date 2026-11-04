@@ -11,8 +11,6 @@ import json
 import logging
 import smtplib
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
-from email.utils import formatdate, make_msgid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .. import dashboards, folder_access
@@ -20,7 +18,6 @@ from ..db import audit, connect, transaction, utcnow
 from . import notifications
 from ..domain import DomainError, canonical, identity, parse_utc, sha, validate_emails
 from ..postgres_store import assert_worker_ownership
-from ..mail_transport import connection as smtp_connection
 from ..timerange import TimeRangeError, resolve_range
 from ..worker import _atomic_write, completed_period, schedule_next
 from . import logos
@@ -29,23 +26,12 @@ from .excel import render_csv, render_xlsx
 from .pdf import render_pdf
 
 log = logging.getLogger(__name__)
+from .assets import panel_images, report_logo, smart_logo  # noqa: F401 - public API
+from .delivery import MAX_ATTACHMENT_BYTES, MIME, send_mail  # noqa: F401 - public API
+from .errors import MailSetupError, ReportError  # noqa: F401 - public API
+
 FORMATS = ("pdf", "xlsx", "csv")
 CADENCES = ("hourly", "daily", "weekly", "monthly", "yearly")
-MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
-MIME = {
-    "pdf": ("application", "pdf"),
-    "xlsx": ("application", "vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-    "csv": ("text", "csv"),
-    "manifest": ("application", "json"),
-}
-
-
-class ReportError(DomainError):
-    pass
-
-
-class MailSetupError(Exception):
-    """Connection failed before any message delivery command was attempted."""
 
 
 def _actor_authorized(db, settings, actor_id, *, admin=False):
@@ -541,38 +527,6 @@ def mark_interrupted(settings, force=False):
             audit(db, "worker", "report_run.interrupted", "dash_report_run", row["id"])
 
 
-def report_logo(settings, config):
-    """PNG bytes of the report's customer logo, or None."""
-    if not config.get("logo_id"):
-        return None
-    try:
-        return logos.path(settings, config["logo_id"]).read_bytes()
-    except logos.LogoError:
-        # A missing logo is cosmetic: the report is still complete and may be delivered.
-        log.warning("Report %s: logo %s unavailable, rendering without it", config.get("name"), config["logo_id"])
-        return None
-
-
-def _image_bytes(settings, logo_id):
-    try:
-        return logos.path(settings, logo_id).read_bytes()
-    except logos.LogoError:
-        return None
-
-
-def panel_images(settings, dashboard):
-    """Uploaded images referenced by image panels, keyed by logo id (missing ones are skipped)."""
-    ids = {p.get("options", {}).get("logo_id") for p in dashboard.get("panels") or [] if p.get("type") == "image"}
-    found = {i: _image_bytes(settings, i) for i in ids if isinstance(i, str)}
-    return {i: data for i, data in found.items() if data}
-
-
-def smart_logo(settings, dashboard):
-    """Header/cover logo chosen in the smart dashboard editor (used when the report sets none)."""
-    logo_id = (dashboard.get("smart") or {}).get("logo_id")
-    return _image_bytes(settings, logo_id) if logo_id else None
-
-
 def build_outputs(settings, config, title, start, end, *, user="report", formats=None, trusted=True, principal=None):
     dashboard = dashboards.get(settings, config["dashboard_uid"], principal)["dashboard"]
     collected = collect(settings, dashboard, config, start, end, user=user, trusted=trusted)
@@ -729,50 +683,6 @@ def execute(settings, run_id):
         audit(db, "worker", f"report_delivery.{status}", "dash_report_run", run_id)
         if status in ("failed", "unknown"):
             notifications.notify(db, f"delivery_{status}", run["report_id"], schedule_id=run["schedule_id"], run_id=run_id)
-
-
-def send_mail(settings, config, run, files, recipients, partial):
-    if not settings.mail_enabled:
-        return "disabled"
-    recipients = validate_emails(recipients, settings.recipient_domains)
-    tz = ZoneInfo(config["timezone"]) if config["timezone"] not in ("UTC", "utc") else timezone.utc
-    start = parse_utc(run["period_start"]).astimezone(tz).strftime("%d.%m.%Y %H:%M")
-    end = parse_utc(run["period_end"]).astimezone(tz).strftime("%d.%m.%Y %H:%M")
-    subject = (config.get("email_subject") or "{report} | {from} – {to}").replace("{report}", config["name"]).replace("{from}", start).replace("{to}", end)
-    message = EmailMessage()
-    message["From"] = settings.smtp_from
-    message["To"] = ", ".join(recipients)
-    message["Date"] = formatdate(localtime=False)
-    message["Message-ID"] = make_msgid(idstring=run["id"], domain=settings.smtp_from.rsplit("@", 1)[-1])
-    message["Subject"] = subject.replace("\r", " ").replace("\n", " ")[:250]
-    body = config.get("email_message") or "Rapor ektedir."
-    if partial:
-        body += "\n\nUYARI: Bu raporda bazı paneller hata veya eksik veri içeriyor (kısmi rapor)."
-    if settings.public_url:
-        body += f"\n\nArşiv: {settings.public_url}/reports/{run['report_id']}"
-    message.set_content(body)
-    total = 0
-    for fmt in config["formats"]:
-        filename = files.get(fmt)
-        if not filename:
-            continue
-        payload = (settings.archive_dir / filename).read_bytes()
-        total += len(payload)
-        if total > MAX_ATTACHMENT_BYTES:
-            raise ReportError("Ekler 20 MB sınırını aşıyor")
-        maintype, subtype = MIME[fmt]
-        message.add_attachment(payload, maintype=maintype, subtype=subtype, filename=filename)
-    ready = False
-    try:
-        with smtp_connection(settings) as smtp:
-            ready = True
-            assert_worker_ownership()
-            refused = smtp.send_message(message, from_addr=settings.smtp_from, to_addrs=recipients)
-    except Exception:
-        if not ready:
-            raise MailSetupError("SMTP connection or authentication failed before delivery") from None
-        raise
-    return "partial_rejected" if refused else "sent"
 
 
 def verified_file(settings, run_id, kind, user=None):
