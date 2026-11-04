@@ -90,9 +90,14 @@ class ElasticsearchDataSource(_Auth):
         return url, clean
 
     def _index(self, target):
-        index = str(target.get("index") or self.options.get("index") or "").strip()
-        if not index or not _INDEX.match(index) or ".." in index:
-            raise DataSourceError("İndeks deseni gerekli (ör. logs-*)")
+        configured = str(self.options.get("index") or "").strip()
+        wanted = str(target.get("index") or "").strip()
+        # An index configured by the admin is the boundary: queries may not widen it.
+        if configured and wanted and wanted != configured:
+            raise DataSourceError(f"Bu veri kaynağı yalnızca '{configured}' indeks desenini sorgulayabilir")
+        index = wanted or configured
+        if not index or not _INDEX.match(index) or ".." in index or any(part.startswith((".", "-", "+")) or part in ("*", "_all") for part in index.split(",")):
+            raise DataSourceError("Geçerli bir indeks deseni gerekli (ör. logs-*); sistem indeksleri ve tümü (*) sorgulanamaz")
         return quote(index, safe=",*")
 
     def _filter(self, target, ctx):

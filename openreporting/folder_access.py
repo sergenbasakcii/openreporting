@@ -13,6 +13,8 @@ from fastapi import HTTPException
 
 from .db import audit, connect, transaction, utcnow
 
+NOT_FOUND = "İçerik bulunamadı veya erişim izniniz yok"
+
 
 def principal(db, user):
     if not user:
@@ -86,10 +88,8 @@ def require_folder(db, user, folder_id, *, edit=False):
 
 def require_dashboard(db, user, uid, *, edit=False):
     row = db.execute("SELECT * FROM dashboards WHERE uid=?", (uid,)).fetchone()
-    if not row:
-        raise HTTPException(404, "Dashboard bulunamadı")
-    if not dashboard_allowed(db, user, uid, edit=edit):
-        raise HTTPException(404, "İçerik bulunamadı veya erişim izniniz yok")
+    if not row or not dashboard_allowed(db, user, uid, edit=edit):
+        raise HTTPException(404, NOT_FOUND)
     return row
 
 

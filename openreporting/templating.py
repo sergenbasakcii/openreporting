@@ -68,12 +68,13 @@ def format_values(values, fmt, *, multi=False, name=""):
         return ",".join(_sql_quote_escaped(v) for v in values) if values else "NULL"
     if fmt == "influxregex":
         # Inside an InfluxQL /regex/ literal: escape regex syntax and the delimiter.
-        escaped = [re.escape(v).replace("/", r"\/") for v in values]
+        # Also safe inside an InfluxQL '...' string literal: quotes are escaped (re.escape doubles backslashes).
+        escaped = [re.escape(v).replace("/", r"\/").replace("'", r"\'") for v in values]
         return escaped[0] if len(escaped) == 1 else "(" + "|".join(escaped) + ")"
     if fmt == "doublequote":
-        return ",".join('"' + v.replace('"', '\\"') + '"' for v in values)
+        return ",".join('"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"' for v in values)
     if fmt == "singlequote":
-        return ",".join("'" + v.replace("'", "\\'") + "'" for v in values)
+        return ",".join("'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'" for v in values)
     if fmt == "glob":
         return values[0] if len(values) == 1 else "{" + ",".join(values) + "}"
     if fmt in ("text", "text_value"):
@@ -83,7 +84,8 @@ def format_values(values, fmt, *, multi=False, name=""):
     if fmt == "percentencode":
         return quote(values[0] if len(values) == 1 else "{" + ",".join(values) + "}", safe="")
     if fmt in ("lucene",):
-        return "(" + " OR ".join('"' + v.replace('"', '\\"') + '"' for v in values) + ")"
+        # Backslash first: otherwise a trailing backslash would escape the closing quote.
+        return "(" + " OR ".join('"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"' for v in values) + ")"
     return ",".join(values)
 
 

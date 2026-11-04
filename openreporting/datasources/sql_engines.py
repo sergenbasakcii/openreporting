@@ -17,6 +17,43 @@ from .http_sources import HTTPSource, clean_header, validate_http_url
 from .postgres import expand_macros, guard_sql, rows_to_frames
 
 _NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.@-]{0,127}$")
+# Statement shapes that change data or metadata, checked outside string literals anywhere in the query
+# (Spark SQL accepts "WITH ... INSERT", which a first-keyword check alone would let through). Shapes, not
+# bare words, so columns and functions such as `update_time`, `load` or replace(...) keep working.
+_WRITES = re.compile(
+    r"\binsert\s+(into|overwrite)\b|\bupdate\s+[\w.`\"]+\s+set\b|\bdelete\s+from\b|\bmerge\s+into\b|\bcopy\s+into\b|"
+    r"\b(create|drop|alter|truncate|undrop|replace)\s+(or\s+replace\s+)?(temporary\s+|temp\s+|external\s+|materialized\s+)?"
+    r"(table|view|schema|database|catalog|function|index|dictionary|user|role|policy|connection|volume|share)\b|"
+    r"\b(grant|revoke)\s+\w|\boptimize\s+(table\s+)?[\w.`]+|\b(attach|detach|rename|exchange)\s+(table|database|dictionary|tables)\b|"
+    r"\bsystem\s+(drop|reload|stop|start|flush|sync|restart|kill|suspend|unfreeze)\b|\bkill\s+(query|mutation)\b|\bvacuum\s+\w|"
+    r"\bmsck\s+repair\b|\bload\s+data\b|\b(cache|uncache)\s+(lazy\s+)?table\b|\bcall\s+[\w.]+\s*\(|"
+    r"^\s*(set|reset|use)\b",
+    re.I,
+)
+# ClickHouse: per-query SETTINGS would override the server caps; table functions reach files / URLs / hosts.
+_CLICKHOUSE_DENY = re.compile(
+    r"\bsettings\b|\b(url|file|s3|s3cluster|gcs|azureblobstorage|remote|remotesecure|cluster|clusterallreplicas|mysql|postgresql|"
+    r"mongodb|redis|jdbc|odbc|hdfs|executable|input|sqlite|deltalake|iceberg|hudi)\s*\(",
+    re.I,
+)
+_LITERAL_BS = re.compile(r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.)*\"|`[^`]*`")
+_LITERAL_STD = re.compile(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"")
+
+
+def guard_engine_sql(sql, dialect):
+    """guard_sql plus dialect rules. Backslash-escaping dialects are re-scanned with their own literal rules."""
+    body = guard_sql(sql)
+    literal = _LITERAL_BS if dialect in ("clickhouse", "databricks") else _LITERAL_STD
+    bare = literal.sub("''", body)
+    if ";" in bare:
+        raise DataSourceError("Tek bir SQL ifadesine izin verilir")
+    if _WRITES.search(bare):
+        raise DataSourceError("Yalnızca okuma sorgularına izin verilir (veri veya şema değiştiren komut bulundu)")
+    if dialect == "clickhouse" and _CLICKHOUSE_DENY.search(bare):
+        raise DataSourceError("ClickHouse sorgusunda SETTINGS ve tablo fonksiyonları (url, file, s3, remote …) kullanılamaz")
+    return body
+
+
 _WAREHOUSE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 _TIMESTAMP = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?))?\s*(Z|UTC|[+-]\d{2}:?\d{2})?$")
 _NUMERIC_TYPES = ("int", "bigint", "smallint", "tinyint", "integer", "double", "real", "float", "decimal", "long", "short", "byte", "uint", "number")
@@ -117,7 +154,7 @@ class SQLEngine(HTTPSource):
             raise DataSourceError(f"Satır sınırı ({self.row_limit}) aşıldı; sorguyu daraltın veya toplulaştırın")
 
     def query(self, target, ctx):
-        body = guard_sql(target.get("rawSql") or "")
+        body = guard_engine_sql(target.get("rawSql") or "", self.dialect)
         expanded = expand_macros(body, ctx.start, ctx.end, ctx.interval_s, self.dialect)
         columns, rows = self.run(expanded)
         frames = rows_to_frames([c["name"] for c in columns], convert_rows(columns, rows), target.get("format", "time_series"), target.get("refId", "A"))
@@ -125,7 +162,7 @@ class SQLEngine(HTTPSource):
 
     def metric_find(self, query, ctx=None):
         text = query.get("rawSql") if isinstance(query, dict) else str(query or "")
-        body = guard_sql(text)
+        body = guard_engine_sql(text, self.dialect)
         if ctx is not None:
             body = expand_macros(body, ctx.start, ctx.end, ctx.interval_s, self.dialect)
         columns, rows = self.run(body)
@@ -200,15 +237,21 @@ class TrinoDataSource(SQLEngine):
             if time.monotonic() > deadline:
                 self._cancel(next_uri, headers)
                 raise DataSourceError("Sorgu zaman aşımına uğradı; zaman aralığını daraltın")
-            payload = self._json(self.fetch(raw_path=self.same_origin_path(next_uri), headers=headers))
+            payload = self._json(self.fetch(raw_path=self._statement_path(next_uri), headers=headers))
         columns = [{"name": c.get("name", f"c{i}"), "type": c.get("type", "varchar")} for i, c in enumerate(columns or [])]
         return columns, rows
+
+    def _statement_path(self, next_uri):
+        path = self.same_origin_path(next_uri)
+        if not path.startswith("/v1/statement/") or ".." in path or "//" in path:
+            raise DataSourceError("Trino beklenmeyen bir takip adresi döndürdü; izlenmedi")
+        return path
 
     def _cancel(self, next_uri, headers):
         if not next_uri:
             return
         try:
-            self.fetch(raw_path=self.same_origin_path(next_uri), method="DELETE", headers=headers, ok=(200, 204))
+            self.fetch(raw_path=self._statement_path(next_uri), method="DELETE", headers=headers, ok=(200, 204))
         except DataSourceError:
             pass  # best effort: the coordinator also abandons queries whose client went away
 
@@ -275,7 +318,7 @@ class DatabricksDataSource(SQLEngine):
         while result.get("next_chunk_internal_link"):
             self.check_rows(rows)
             link = str(result["next_chunk_internal_link"])
-            if not link.startswith(f"{self._PATH}/{statement_id}/result/chunks/"):
+            if not re.fullmatch(rf"{re.escape(self._PATH)}/{re.escape(statement_id)}/result/chunks/\d+(\?[A-Za-z0-9_=&-]*)?", link):
                 raise DataSourceError("Databricks beklenmeyen sonuç bağlantısı döndürdü")
             result = self._json(self.fetch(raw_path=link))
             rows.extend(result.get("data_array") or [])

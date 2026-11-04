@@ -489,7 +489,7 @@ def get(settings, uid, user=None):
             (uid,),
         ).fetchone()
         if not row:
-            raise DashboardError("Dashboard bulunamadı")
+            raise DashboardError(folder_access.NOT_FOUND)  # same text as a hidden one: uids cannot be probed
         folder_access.require_dashboard(db, user, uid)
         can_edit = folder_access.dashboard_allowed(db, user, uid, edit=True)
         starred = bool(user and db.execute("SELECT 1 FROM dashboard_stars WHERE user_id=? AND dashboard_id=?", (user["id"], row["id"])).fetchone())
@@ -635,13 +635,16 @@ def search(settings, user, query="", tag="", folder_uid=None, starred=False, lim
 def folders(settings, user=None):
     with connect(settings) as db:
         visible, values = folder_access.visible_sql(db, user, "f.id")
+        counted, count_values = folder_access.visible_dashboards_sql(db, user, "d")
         rows = db.execute(
             """SELECT f.id,f.uid,f.title,f.updated_at,
-                (SELECT COUNT(*) FROM dashboards d WHERE d.folder_id=f.id) AS dashboard_count
+                (SELECT COUNT(*) FROM dashboards d WHERE d.folder_id=f.id AND """
+            + counted
+            + """) AS dashboard_count
                 FROM folders f WHERE """
             + visible
             + " ORDER BY LOWER(f.title),f.uid",
-            values,
+            [*count_values, *values],
         ).fetchall()
         return [
             {**{k: r[k] for k in ("uid", "title", "updated_at", "dashboard_count")}, "canEdit": folder_access.allowed(db, user, r["id"], edit=True)}

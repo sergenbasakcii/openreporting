@@ -312,3 +312,75 @@ def test_variable_formats_keep_values_inert_in_each_engine():
     assert format_values(['say "hi"'], "lucene") == '("say \\"hi\\"")'
     assert ClickHouseDataSource.default_format == DatabricksDataSource.default_format == "sqlstring_escaped"
     assert TrinoDataSource.default_format == "sqlstring" and InfluxDBDataSource.default_format == "influxregex"
+
+
+# ---- security review regressions ------------------------------------------------------------
+
+
+def test_quote_formats_escape_backslashes_before_quotes():
+    from openreporting.templating import format_values
+
+    bs = chr(92)
+    lucene = format_values([f'{bs}") OR tenant:B OR (host:{bs}"'], "lucene")
+    # Every quote inside the value stays escaped: the phrase cannot be closed early.
+    inner = lucene[2:-2]
+    assert all(inner[i - 1] == bs for i, c in enumerate(inner) if c == '"')
+    assert format_values([f"x{bs}"], "doublequote") == f'"x{bs}{bs}"'
+    assert format_values(["o'k"], "influxregex") == f"o{bs}'k"
+
+
+@pytest.mark.parametrize(
+    "sql,dialect",
+    [
+        ("WITH c AS (SELECT 1) INSERT INTO t SELECT * FROM c", "databricks"),
+        ("WITH c AS (SELECT 1) MERGE INTO t USING c ON 1=1 WHEN MATCHED THEN DELETE", "databricks"),
+        ("SELECT 1 SETTINGS max_result_rows=0", "clickhouse"),
+        ("SELECT * FROM url('http://169.254.169.254/latest', CSV)", "clickhouse"),
+        ("SELECT * FROM file('/etc/passwd')", "clickhouse"),
+        ("SELECT * FROM remote('other:9000', db.t)", "clickhouse"),
+        ("SELECT 'a" + chr(92) + "'' ; DROP TABLE t", "clickhouse"),
+        ("SELECT 1; DELETE FROM t", "trino"),
+    ],
+)
+def test_engine_guard_blocks_writes_settings_and_table_functions(sql, dialect):
+    from openreporting.datasources.sql_engines import guard_engine_sql
+
+    with pytest.raises(DataSourceError):
+        guard_engine_sql(sql, dialect)
+
+
+def test_engine_guard_keeps_words_inside_literals_and_normal_reads():
+    from openreporting.datasources.sql_engines import guard_engine_sql
+
+    assert guard_engine_sql("SELECT 'update me' AS label, count() AS value FROM logs WHERE msg LIKE '%delete%'", "clickhouse")
+    assert guard_engine_sql("WITH s AS (SELECT host FROM hive.web.t) SELECT * FROM s", "trino")
+    assert guard_engine_sql("SELECT replace(host, 'a', 'b') AS h, load, update_time, system FROM metrics", "clickhouse")
+    assert guard_engine_sql("SELECT set_name, cache_hits FROM t", "databricks")
+
+
+def test_follow_up_links_must_stay_on_the_expected_api_paths(settings, monkeypatch):
+    Recorder(monkeypatch, {"nextUri": "https://lake.example.com/v1/info"})
+    with pytest.raises(DataSourceError, match="takip"):
+        make(TrinoDataSource, settings).query({"rawSql": "SELECT 1"}, ctx())
+    Recorder(monkeypatch, {"nextUri": "https://lake.example.com/v1/statement/../../ui/api"})
+    with pytest.raises(DataSourceError):
+        make(TrinoDataSource, settings).query({"rawSql": "SELECT 1"}, ctx())
+    Recorder(
+        monkeypatch,
+        {
+            "statement_id": "s1",
+            "status": {"state": "SUCCEEDED"},
+            "manifest": {},
+            "result": {"data_array": [], "next_chunk_internal_link": "/api/2.0/sql/statements/s1/result/chunks/../../../../2.0/secrets"},
+        },
+    )
+    with pytest.raises(DataSourceError):
+        make(DatabricksDataSource, settings, options={"warehouse_id": "w"}).query({"rawSql": "SELECT 1"}, ctx())
+
+
+@pytest.mark.parametrize("index", ["logs-*,.security-7", "*", "_all", "audit-*"])
+def test_elasticsearch_target_cannot_widen_the_configured_index(settings, monkeypatch, index):
+    recorder = Recorder(monkeypatch)
+    with pytest.raises(DataSourceError):
+        make(ElasticsearchDataSource, settings, options={"index": "logs-*"}).query({"index": index}, ctx())
+    assert recorder.calls == []

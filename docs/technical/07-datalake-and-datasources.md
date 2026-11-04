@@ -71,3 +71,23 @@ JSON metni. Shard hatası varsa eksik sonuç gösterilmez.
 | Graphite | Yok, Basic, Bearer |
 
 Gizli alanlar (`password`, `token`) Fernet ile şifrelenir, tarayıcıya yalnız "yapılandırıldı" bilgisi döner.
+
+## Güvenlik incelemesi sonrası sertleştirmeler
+
+Bağımsız inceleme (kritik/yüksek bulgu yok) sonrası:
+
+- **Motor SQL koruması** (`guard_engine_sql`): `guard_sql`'e ek olarak, motorun kendi literal kurallarıyla
+  (ClickHouse/Databricks ters eğik çizgiyi kaçış sayar) yeniden taranır; sorgunun herhangi bir yerinde veri/şema
+  değiştiren komut biçimleri (`WITH … INSERT`, `MERGE INTO`, `CREATE TABLE`, `GRANT`, `SYSTEM …` …) reddedilir.
+  Sütun ve fonksiyon adları (`update_time`, `replace(...)`) etkilenmez.
+- **ClickHouse:** sorgu içi `SETTINGS` (sunucu sınırlarını ezebilirdi) ve dosya/URL/uzak host'a erişen tablo
+  fonksiyonları (`url`, `file`, `s3`, `remote`, `mysql`, `jdbc` …) reddedilir. Profili `readonly=1` olan bir
+  kullanıcı yine önerilir.
+- **Takip adresleri:** Trino `nextUri` yalnız `/v1/statement/…` altında, Databricks parça bağlantısı yalnız
+  `/api/2.0/sql/statements/<id>/result/chunks/<n>` biçiminde kabul edilir; `..` reddedilir.
+- **Elasticsearch:** yöneticinin tanımladığı indeks deseni sınırdır; sorgu başka desen isteyemez. Sistem indeksleri
+  (`.` ile başlayan), `*` ve `_all` sorgulanamaz.
+- **Değişken biçimleri:** `lucene`, `doublequote`, `singlequote` önce ters eğik çizgiyi kaçırır (değer sondaki `\`
+  ile tırnağı kapatamaz); `influxregex` tek tırnağı da kaçırır, InfluxQL string literali içinde de güvenlidir.
+- **Dashboard varlığı:** gizli bir dashboard ile olmayan bir dashboard aynı yanıtı verir; klasör sayaçları yalnız
+  görünür dashboard'ları sayar.
