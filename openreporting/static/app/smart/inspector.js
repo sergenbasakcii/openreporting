@@ -128,6 +128,11 @@ export function createInspector(ctx) {
     if (REDUCING.includes(panel.type)) {
       items.push(field('Gösterilen değer', select(CALCS, path(panel, ['options', 'reduceOptions', 'calcs', 0], 'lastNotNull'), (v) => setOption({ reduceOptions: { ...(panel.options?.reduceOptions || {}), calcs: [v] } }))));
     }
+    if (['bargauge', 'piechart', 'donut', 'statusgrid', 'stat', 'gauge'].includes(panel.type)) {
+      const current = panel.options?.topN ? `${panel.options.topOrder === 'asc' ? 'asc' : 'desc'}:${panel.options.topN}` : '';
+      items.push(field('Gösterilecek', select([{ value: '', label: 'Tümü' }, ...[5, 10, 20].map((n) => ({ value: `desc:${n}`, label: `En yüksek ${n}` })), ...[5, 10].map((n) => ({ value: `asc:${n}`, label: `En düşük ${n}` }))],
+        current, (v) => { const [order, n] = v ? v.split(':') : [undefined, undefined]; setOption({ topN: n ? Number(n) : undefined, topOrder: order }); }), 'Örn. en yoğun 10 host; sıralama değere göre yapılır.'));
+    }
     const preset = thresholdPreset(panel);
     items.push(field('Renk eşikleri', select([{ value: 'none', label: 'Yok (seri renkleri)' }, { value: 'high-bad', label: 'Yüksek kötü: 70 sarı · 90 kırmızı' }, { value: 'low-bad', label: 'Düşük kötü: 30 altı sarı · 10 altı kırmızı' }, ...(preset === 'custom' ? [{ value: 'custom', label: 'Özel (gelişmiş)' }] : [])],
       preset, (v) => { if (v === 'custom') return; setDefaults({ thresholds: THRESHOLDS[v] || undefined, color: v === 'none' ? undefined : { mode: 'thresholds' } }); })));

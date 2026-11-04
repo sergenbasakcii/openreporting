@@ -45,3 +45,10 @@ uygulanır, böylece ekranda okunan cümle raporda da aynıdır. Konu metni `opt
 
 Boş bırakılmış görsel öğesi teslim edilen raporda yer tutucu basmaz (rapor logosu varsa onu basar); yalnızca
 seçilmiş ama artık bulunamayan bir görsel için küçük bir uyarı yazılır.
+
+## En yüksek / en düşük N
+
+`options.topN` (ve `options.topOrder = "desc" | "asc"`) indirgeyen panellerde (çubuk gösterge, pasta, halka,
+durum ızgarası, stat, gösterge) değeri en yüksek veya en düşük N öğeyi sıralı olarak bırakır; boş değerler
+sıralamaya girmez. Tarayıcıda `topN()` (`panels/common.js`), PDF'te `fieldcfg.top_n` aynı kuralla çalışır.
+Yönetici özeti şablonu "En yüksek bellek kullanımı · ilk 10" kullanır.

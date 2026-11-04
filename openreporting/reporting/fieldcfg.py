@@ -280,7 +280,21 @@ def reduced_items(panel, frames):
                     )
                     index += 1
     limit = int(options(panel, "reduceOptions.limit", 0) or 0)
-    return items[:limit] if limit > 0 else items
+    items = items[:limit] if limit > 0 else items
+    return top_n(panel, items)
+
+
+def top_n(panel, items):
+    """Keep the N highest (or lowest) items by value, sorted that way; ``options.topN`` = 0 keeps all."""
+    try:
+        n = int(options(panel, "topN", 0) or 0)
+    except (TypeError, ValueError):
+        n = 0
+    if n <= 0:
+        return items
+    lowest = options(panel, "topOrder", "desc") == "asc"
+    ranked = sorted(items, key=lambda i: (i["value"] is None, (i["value"] or 0) if lowest else -(i["value"] or 0)))
+    return ranked[: min(n, 500)]
 
 
 def hex_rgb(value):

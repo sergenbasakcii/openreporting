@@ -17,7 +17,7 @@ export const TEMPLATES = [
       { type: 'stat', pos: [18, 7, 6, 5], title: 'ICMP kayıp (ort.)', item: 'ICMP loss', unit: 'percent', calc: 'mean', thresholds: 'high-bad', agg: 'averageSeries' },
       { type: 'narrative', pos: [0, 12, 24, 5], title: 'CPU · özet', item: 'CPU utilization', unit: 'percent', thresholds: 'high-bad', compare: true },
       { type: 'timeseries', pos: [0, 17, 24, 6], title: 'CPU kullanımı', item: 'CPU utilization', unit: 'percent', compare: true, agg: 'averageSeries' },
-      { type: 'bargauge', pos: [0, 23, 24, 9], title: 'Bellek kullanımı (host bazında)', item: 'Memory utilization', unit: 'percent', calc: 'lastNotNull', thresholds: 'high-bad' },
+      { type: 'bargauge', pos: [0, 23, 24, 9], title: 'En yüksek bellek kullanımı · ilk 10', item: 'Memory utilization', unit: 'percent', calc: 'lastNotNull', thresholds: 'high-bad', top: 10 },
     ],
   },
   {
@@ -89,6 +89,7 @@ export function buildTemplate(template, { nextId, datasource, makeTarget, rows }
       }
       if (spec.calc) panel.options.reduceOptions = { calcs: [spec.calc] };
       if (spec.compare) panel.options.compare = 'previous';
+      if (spec.top) panel.options.topN = spec.top;
       if (spec.compare && spec.type === 'stat') panel.options.compareGood = 'down';
     }
     return panel;

@@ -112,3 +112,12 @@ def test_narrative_states_only_facts_from_the_data():
     assert "1 seri son değerde 90% eşiğinin üzerinde: web-1." == text[3]
     assert text[4].startswith("Önceki döneme göre ortalama %")
     assert sentences(panel, [ts("x", [[0, None]])], "UTC") == []
+
+
+def test_top_n_keeps_the_highest_or_lowest_items_sorted():
+    frames = [ts(f"h{i}", [[1, None if v is None else float(v)]]) for i, v in enumerate([5, 90, 40, None, 70])]
+    top = reduced_items({"type": "bargauge", "options": {"topN": 2}, "fieldConfig": {"defaults": {}}}, frames)
+    assert [i["name"] for i in top] == ["h1", "h4"]
+    low = reduced_items({"type": "bargauge", "options": {"topN": 2, "topOrder": "asc"}, "fieldConfig": {"defaults": {}}}, frames)
+    assert [i["name"] for i in low] == ["h0", "h2"]  # missing values never rank
+    assert len(reduced_items({"type": "bargauge", "options": {"topN": "x"}, "fieldConfig": {"defaults": {}}}, frames)) == 5

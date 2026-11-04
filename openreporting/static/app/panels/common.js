@@ -121,7 +121,16 @@ export function reducedValues(frames, panel) {
     });
   }
   const limit = Number(opts.limit) || 0;
-  return limit > 0 ? out.slice(0, limit) : out;
+  return topN(panel, limit > 0 ? out.slice(0, limit) : out);
+}
+
+// Highest / lowest N by the reduced value (options.topN, options.topOrder 'desc' | 'asc'); 0 keeps all.
+export function topN(panel, items) {
+  const n = Math.min(500, Number(panel.options?.topN) || 0);
+  if (n <= 0) return items;
+  const lowest = panel.options?.topOrder === 'asc';
+  const key = (i) => (i.value === null || i.value === undefined ? (lowest ? Infinity : -Infinity) : i.value);
+  return [...items].sort((a, b) => (lowest ? key(a) - key(b) : key(b) - key(a))).slice(0, n);
 }
 
 export function colorFor(cfg, index, value) {
