@@ -30,7 +30,7 @@ def draw(pdf, result, x, y, w, h):
 
 
 def _image(pdf, options, x, y, w, h):
-    from .pdf import FAINT
+    from .pdf_base import FAINT
 
     data = (pdf.images or {}).get(options.get("logo_id"))
     if not data and not options.get("logo_id") and pdf.logo is not None:
@@ -52,7 +52,7 @@ def _image(pdf, options, x, y, w, h):
 
 
 def _divider(pdf, options, title, x, y, w, h):
-    from .pdf import BRAND, GRID, INK, _gradient, _rgb
+    from .pdf_base import BRAND, GRID, INK, _gradient, _rgb
 
     mid = y + h / 2
     if title:
@@ -67,7 +67,7 @@ def _divider(pdf, options, title, x, y, w, h):
 
 
 def _report_info(pdf, options, x, y, w, h):
-    from .pdf import BRAND, INK, MUTED, TINT, _rgb
+    from .pdf_base import BRAND, INK, MUTED, TINT, _rgb
     from .collect import variable_summary
 
     collected = pdf.collected
