@@ -487,3 +487,7 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .shortcut-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 4px 12px; align-items: center; }
 .shortcut-list dd { margin: 0; color: var(--text); } .shortcut-list kbd { font: 12px var(--font-mono); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg-panel); color: var(--text-strong); white-space: nowrap; }
 .shortcuts-dialog .palette-list { padding: 8px 14px; } .shortcuts-dialog .palette-search b { color: var(--text-strong); }
+.smart-view-inner.has-caption .panel { bottom: 2.6em; }
+.smart-caption { position: absolute; left: 6px; right: 6px; bottom: 0; height: 2.4em; margin: 0; font-size: 11px; line-height: 1.2em; color: var(--text-muted); overflow: hidden; }
+.paper-watermark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 0; font-weight: 800; font-size: clamp(40px, 9vw, 110px); color: rgba(148, 163, 184, .16); transform: rotate(-35deg); white-space: nowrap; overflow: hidden; }
+.paper-body { z-index: 1; }

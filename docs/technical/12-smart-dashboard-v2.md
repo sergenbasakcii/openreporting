@@ -92,3 +92,10 @@ düşük kötü 30/10; değerler düzenlenebilir), stat renk kullanımı, açık
   ayırıcısına dönüşür. Kaydedilene kadar orijinal dashboard değişmez; kaydedilen her sürüm geçmişte kalır.
 - **Keşfet → akıllı rapor:** Keşfet'teki "Akıllı rapora ekle" sorguyu, görünümü ve Keşfet'te seçilen zaman
   aralığını (panelin kendi dönemi olarak) yeni bir akıllı dashboard'un ilk öğesi yapar.
+
+## Grafik açıklaması ve filigran (sonradan eklendi)
+
+- **Açıklama:** her grafiğin `options.caption` metni (≤300 karakter) tuvalde ve PDF'te grafiğin altına en çok
+  iki satır olarak yazılır; grafik alanı buna göre küçülür (ör. bakım penceresi notu).
+- **Filigran:** rapor ayarlarında Yok / GİZLİ / TASLAK / KURUM İÇİ / ÖRNEKTİR. PDF'te her sayfanın (kapak dahil)
+  içerik **üstüne** çapraz ve soluk basılır; panel zeminleri onu örtemez. Tuvalde de aynı şekilde görünür.

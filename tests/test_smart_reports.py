@@ -184,3 +184,15 @@ def test_smart_pdf_structure_without_a_pdf_reader(env):
     single = export_bytes(http)
     assert single.startswith(b"%PDF") and page_count(single) == 1
     assert page_count(export_bytes(http, split_by="host")) > 3
+
+
+def test_caption_and_watermark_are_printed(env):
+    _, http, _ = env
+    dash = model(filters=False)
+    dash["smart"]["watermark"] = "GİZLİ"
+    dash["panels"][3]["options"] = {"caption": "Bakım penceresi 02:00-03:00 arası veri içermez."}
+    assert http.post("/api/dashboards/db", json={"dashboard": dash, "overwrite": True}).status_code == 200
+    stored = http.get("/api/dashboards/uid/smart-report").json()["dashboard"]
+    assert stored["smart"]["watermark"] == "GİZLİ"
+    text = page_text(export(http), 0)
+    assert "Bakım penceresi 02:00-03:00 arası veri içermez." in text and "GİZLİ" in text

@@ -50,6 +50,7 @@ def normalize(model):
         "logo_on_pages": bool(smart.get("logo_on_pages", True)),
         "footer": str(smart.get("footer") or "")[:160],
         "filters": bool(smart.get("filters", False)),
+        "watermark": str(smart.get("watermark") or "")[:40],
     }
     for panel, pos in zip(panels, positions):
         w = _int(pos.get("w"), 2, COLUMNS, 12)
@@ -74,6 +75,8 @@ def report_overrides(dashboard):
     overrides["logo_on_pages"] = smart.get("logo_on_pages", True)
     if smart.get("footer"):
         overrides["footer_text"] = smart["footer"]
+    if smart.get("watermark"):
+        overrides["watermark"] = smart["watermark"]
     return overrides
 
 

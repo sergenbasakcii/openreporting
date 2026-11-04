@@ -80,6 +80,8 @@ export function createInspector(ctx) {
       field(null, toggle('Logoyu her sayfada göster', s.logo_on_pages !== false, (v) => change((m) => { m.smart.logo_on_pages = v; }))),
       field('Alt bilgi metni', input({ value: s.footer || '', placeholder: 'ör. Şirket adı · Gizli', onChange: (e) => change((m) => { m.smart.footer = e.target.value; }) })),
       field(null, toggle('Kapak sayfası ekle', !!s.cover, (v) => change((m) => { m.smart.cover = v; }))),
+      field('Filigran', select([{ value: '', label: 'Yok' }, ...['GİZLİ', 'TASLAK', 'KURUM İÇİ', 'ÖRNEKTİR'].map((v) => ({ value: v, label: v }))], s.watermark || '',
+        (v) => change((m) => { m.smart.watermark = v; })), 'Her PDF sayfasına çapraz, soluk yazılır.'),
       h('h3', { class: 'section-heading', text: 'Rapor filtresi' }),
       field(null, toggle('Grup / host seçimi rapor genelinde olsun', !!s.filters, (v) => ctx.toggleFilters(v))),
       h('p', { class: 'hint', text: 'Açıkken sayfanın üstünde Grup ve Host seçicileri çıkar; panellerde “Rapor filtresini kullan” seçeneği tüm grafikleri tek seçimle değiştirir. PDF’i her host için ayrı sayfalarla da alabilirsiniz.' }),
@@ -154,6 +156,8 @@ export function createInspector(ctx) {
       items.push(field('Açıklama (legend)', select([{ value: 'list', label: 'Liste' }, { value: 'table', label: 'Tablo (ort./maks./son)' }, { value: 'hidden', label: 'Gizli' }], path(panel, ['options', 'legend', 'displayMode'], 'list'),
         (v) => setOption({ legend: { ...(panel.options?.legend || {}), displayMode: v, showLegend: v !== 'hidden', placement: 'bottom', calcs: v === 'table' ? ['mean', 'max', 'lastNotNull'] : [] } }))));
     }
+    items.push(field('Açıklama (grafiğin altında)', h('textarea', { class: 'input', rows: 2, value: panel.options?.caption || '', maxlength: 300, 'aria-label': 'Grafik açıklaması',
+      placeholder: 'ör. Pazartesi bakım çalışması nedeniyle 02:00-03:00 arası veri yok.', onChange: (e) => setOption({ caption: e.target.value.trim() || undefined }) }), 'Raporda grafiğin altına en çok iki satır yazılır.'));
     items.push(h('h3', { class: 'section-heading', text: 'Tarih aralığı' }), periodEditor(panel, change, ctx.getModel().timezone));
     items.push(button('Gelişmiş sorgu', { icon: 'code', size: 'sm', onClick: () => ctx.editQuery(panel) }));
     return items;

@@ -163,6 +163,7 @@ export function createCanvas(opts) {
       bodies.push(body);
       const paper = h('section', { class: 'paper', 'data-theme': 'porcelain', 'data-scheme': 'light', 'aria-label': `Sayfa ${page + 1}`,
         style: { aspectRatio: String(geo.ratio), paddingTop: `${geo.pad.top * 100 / geo.ratio}%`, paddingBottom: `${geo.pad.bottom * 100 / geo.ratio}%`, paddingLeft: `${geo.pad.side * 100}%`, paddingRight: `${geo.pad.side * 100}%` } },
+      opts.watermark && opts.watermark() ? h('div', { class: 'paper-watermark', 'aria-hidden': 'true', text: opts.watermark() }) : null,
       opts.header(page), body, h('footer', { class: 'paper-foot' }, ...(opts.footer ? opts.footer(page) : [h('span', { text: `Sayfa ${page + 1}` })])));
       paper.addEventListener('pointerdown', () => opts.onSelect(null));
       root.append(h('div', { class: 'page-wrap' }, opts.pageTools ? opts.pageTools(page) : null, paper));

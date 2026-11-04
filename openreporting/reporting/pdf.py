@@ -165,8 +165,23 @@ class Pdf:
             lines.append(line)
         return lines
 
+    def watermark(self):
+        text = str(self.config.get("watermark") or "").strip()[:40]
+        if not text:
+            return
+        c = self.c
+        c.saveState()
+        c.translate(self.page_w / 2, self.page_h / 2)
+        c.rotate(35)
+        size = min(96, self.page_w * 1.1 / max(4, len(text)))
+        c.setFont(BOLD, size)
+        c.setFillColor(_rgb("#94a3b8", 0.16))
+        c.drawCentredString(0, -size / 3, text)
+        c.restoreState()
+
     def new_page(self):
         if self.page:
+            self.watermark()  # on top of the finished page, so panel backgrounds cannot hide it
             self.c.showPage()
         self.page += 1
         c = self.c
@@ -311,6 +326,14 @@ class Pdf:
             c.setFillColor(_rgb(fill))
             c.circle(x + w - 10, y + h - 9, 4, stroke=0, fill=1)
             self.text(x + w - 10, y + h - 11.5, mark, 6, "#ffffff", bold=True, align="center")
+        caption = str((result.panel.get("options") or {}).get("caption") or "").strip()
+        if caption and h > 60:
+            # Caption under the chart: up to two wrapped lines, the chart area shrinks accordingly.
+            lines = self.wrap(caption, 7.5, w - 16)[:2]
+            for i, line in enumerate(lines):
+                self.text(x + 8, y + 6 + (len(lines) - 1 - i) * 9.5, line, 7.5, MUTED, max_width=w - 16)
+            pad = 6 + len(lines) * 9.5
+            return x + 6, y + pad + 2, w - 12, h - (20 if title else 8) - pad
         return x + 6, y + 5, w - 12, h - (20 if title else 8)
 
     def draw_panel(self, result, x, y, w, h):
@@ -1208,5 +1231,6 @@ def render_pdf(config, collected, title, logo=None, images=None):
                 frame_result = type(result)(panel=result.panel, title=ptitle, errors=result.errors, warnings=result.warnings)
                 bx, by, bw, bh = pdf.panel_frame(MARGIN, pdf.top - top - need, pdf.content_w, need, frame_result)
                 pdf.draw_table(result.panel, None, bx, by, bw, bh, rows_override=model, start_row=start)
+    pdf.watermark()
     pdf.c.save()
     return pdf.buffer.getvalue()
