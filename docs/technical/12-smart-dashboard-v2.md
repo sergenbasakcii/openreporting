@@ -99,3 +99,10 @@ düşük kötü 30/10; değerler düzenlenebilir), stat renk kullanımı, açık
   iki satır olarak yazılır; grafik alanı buna göre küçülür (ör. bakım penceresi notu).
 - **Filigran:** rapor ayarlarında Yok / GİZLİ / TASLAK / KURUM İÇİ / ÖRNEKTİR. PDF'te her sayfanın (kapak dahil)
   içerik **üstüne** çapraz ve soluk basılır; panel zeminleri onu örtemez. Tuvalde de aynı şekilde görünür.
+
+## Çoklu seçim ve hizalama (sonradan eklendi)
+
+Shift+tıklama aynı sayfadaki öğeleri çoklu seçer (ilk seçilen referanstır). Sağ panel: sola hizala, üste hizala,
+aynı genişlik, aynı yükseklik, yan yana eşit dağıt ve seçilenleri sil (Delete). Sonuç öğeleri üst üste
+bindirecekse işlem yapılmaz ve uyarı verilir. Yerleşim işlevleri (`arrange`, `compactPage`, `layoutFromGrid`,
+`findSpot`) `tests/test_smart_canvas.mjs` ile test edilir.

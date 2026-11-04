@@ -55,6 +55,24 @@ export function layoutFromGrid(panels, rows) {
   return { panels: placed, pages };
 }
 
+// Multi-selection layout operations; each returns new positions keyed by panel id (pages are not mixed).
+export function arrange(panels, op, rows) {
+  const out = new Map();
+  if (panels.length < 2) return out;
+  const ref = panels[0].smartPos;
+  const set = (p, patch) => out.set(p.id, { ...p.smartPos, ...patch });
+  if (op === 'left') panels.forEach((p) => set(p, { x: ref.x }));
+  if (op === 'top') panels.forEach((p) => set(p, { y: Math.min(ref.y, rows - p.smartPos.h) }));
+  if (op === 'width') panels.forEach((p) => set(p, { w: ref.w, x: Math.min(p.smartPos.x, COLS - ref.w) }));
+  if (op === 'height') panels.forEach((p) => set(p, { h: ref.h, y: Math.min(p.smartPos.y, rows - ref.h) }));
+  if (op === 'distribute') {
+    // Equal widths side by side across the full page width, on the first element's row.
+    const w = Math.max(2, Math.floor(COLS / panels.length));
+    panels.forEach((p, i) => set(p, { x: Math.min(COLS - w, i * w), w, y: Math.min(ref.y, rows - p.smartPos.h) }));
+  }
+  return out;
+}
+
 // Close vertical gaps: every element moves up as far as it can on its page, keeping column and order.
 export function compactPage(panels, page, rows) {
   const placed = [];
@@ -132,8 +150,8 @@ export function createCanvas(opts) {
 
   function itemBox(panel) {
     const { el, bar } = opts.renderItem(panel);
-    const box = h('div', { class: ['smart-item', opts.selectedId?.() === panel.id ? 'selected' : ''].join(' '), dataset: { id: panel.id },
-      onPointerdown: (e) => { e.stopPropagation(); opts.onSelect(panel); } });
+    const box = h('div', { class: ['smart-item', opts.selectedId?.() === panel.id ? 'selected' : '', opts.isMulti?.(panel.id) ? 'multi' : ''].join(' '), dataset: { id: panel.id },
+      onPointerdown: (e) => { e.stopPropagation(); opts.onSelect(panel, e); } });
     if (opts.editable === false) {
       box.append(h('div', { class: 'smart-bar' }, bar), h('div', { class: 'smart-view' }, el));
     } else {

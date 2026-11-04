@@ -66,6 +66,17 @@ export function createInspector(ctx) {
   const el = h('aside', { class: 'smart-side', 'aria-label': 'Ayarlar' });
   const { change } = ctx;
 
+  function multiSettings(count) {
+    const act = (label, op, iconName) => button(label, { size: 'sm', icon: iconName, onClick: () => ctx.multiAction(op) });
+    return [
+      h('h2', { class: 'section-heading', text: `${count} öğe seçili` }),
+      h('p', { class: 'hint', text: 'Hizalamada ilk seçtiğiniz öğe referans alınır. Shift+tıklama ile ekleyip çıkarın, Esc ile bırakın.' }),
+      h('div', { class: 'quick-layout' }, act('Sola hizala', 'left', 'arrow-up'), act('Üste hizala', 'top', 'arrow-up'),
+        act('Aynı genişlik', 'width', 'expand'), act('Aynı yükseklik', 'height', 'expand'), act('Yan yana eşit dağıt', 'distribute', 'apps')),
+      h('div', { class: 'toolbar', style: { marginTop: '12px' } }, button('Seçilenleri sil', { icon: 'trash', size: 'sm', variant: 'danger', onClick: () => ctx.multiAction('delete') })),
+    ];
+  }
+
   function pageSettings(model) {
     const s = model.smart;
     return [
@@ -202,6 +213,8 @@ export function createInspector(ctx) {
     el,
     render() {
       const model = ctx.getModel();
+      const multi = ctx.getMulti ? ctx.getMulti() : new Set();
+      if (multi.size > 1) { clear(el).append(...multiSettings(multi.size)); return; }
       const panel = model.panels.find((p) => p.id === ctx.getSelected());
       clear(el).append(...(panel ? panelSettings(model, panel) : pageSettings(model)).filter(Boolean));
     },

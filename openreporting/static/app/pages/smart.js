@@ -10,7 +10,7 @@ import { PanelView } from '../dashboard/panelview.js';
 import { PLUGINS } from '../panels/registry.js';
 import { queryEditor } from '../query/editors.js';
 import { preparePreviewWindow } from '../preview.js';
-import { createCanvas, findSpot, compactPage, layoutFromGrid, ROWS, COLS } from '../smart/canvas.js';
+import { createCanvas, findSpot, compactPage, layoutFromGrid, arrange, ROWS, COLS } from '../smart/canvas.js';
 import { keywordChips } from '../smart/keywords.js';
 import { createHistory, drafts } from '../smart/history.js';
 import { TEMPLATES, buildTemplate } from '../smart/templates.js';
@@ -113,7 +113,7 @@ export async function smartBuilderPage(root, { app, uid }) {
     model.panels = [{ ...panel, id: 1, titleLocked: true, smartPos: { page: 0, x: 0, y: 0, w: Math.max(w, 24), h: Math.max(hgt, 10) } }];
   }
   const draft = drafts.load(model.uid || uid);
-  const state = { range: { ...model.time }, resolved: null, now: Date.now(), dirty: false, selected: null, variables: {}, zoom: 'fit', savedAt: existing ? Date.parse(existing.meta.updated) || null : null };
+  const state = { range: { ...model.time }, resolved: null, now: Date.now(), dirty: false, selected: null, multi: new Set(), variables: {}, zoom: 'fit', savedAt: existing ? Date.parse(existing.meta.updated) || null : null };
   const history = createHistory(model);
   const views = new Map();
   const dsOf = (panel) => sources.find((s) => s.uid === (panel.datasource?.uid || model.smartSource?.uid)) || preferred;
@@ -219,14 +219,48 @@ export async function smartBuilderPage(root, { app, uid }) {
       panel.smartDraft && !panel.targets.length ? h('div', { class: 'smart-hint' }, icon('search'), h('span', { text: 'Üstteki “Anahtar kelime” kutusundan gösterilecek metriği seçin' })) : null) }),
     onAdd: (type, cell) => addPanel(type, cell),
     onMove: (panel, pos) => change(() => { panel.smartPos = pos; }),
-    onSelect: (panel) => select(panel ? panel.id : null),
+    isMulti: (id) => state.multi.has(id),
+    onSelect: (panel, event) => (panel && event?.shiftKey ? toggleMulti(panel) : select(panel ? panel.id : null)),
   });
 
+  function paintSelection() {
+    for (const el of canvas.el.querySelectorAll('.smart-item')) {
+      const id = Number(el.dataset.id);
+      el.classList.toggle('selected', id === state.selected);
+      el.classList.toggle('multi', state.multi.has(id));
+    }
+  }
   function select(id) {
-    if (state.selected === id) return;
+    if (state.selected === id && !state.multi.size) return;
     state.selected = id;
-    for (const el of canvas.el.querySelectorAll('.smart-item')) el.classList.toggle('selected', Number(el.dataset.id) === id);
-    inspector.render();
+    state.multi = new Set();
+    paintSelection(); inspector.render();
+  }
+  // Shift+click: build a multi-selection on one page; the first element is the alignment reference.
+  function toggleMulti(panel) {
+    const first = model.panels.find((p) => p.id === (state.multi.size ? [...state.multi][0] : state.selected));
+    if (first && first.smartPos.page !== panel.smartPos.page) { toast('Çoklu seçim aynı sayfadaki öğelerle yapılır', 'warn'); return; }
+    const next = new Set(state.multi.size ? state.multi : (state.selected ? [state.selected] : []));
+    if (next.has(panel.id)) next.delete(panel.id); else next.add(panel.id);
+    state.multi = next.size > 1 ? next : new Set();
+    state.selected = next.size === 1 ? [...next][0] : next.size ? [...next][0] : null;
+    paintSelection(); inspector.render();
+  }
+  function multiAction(op) {
+    const chosen = [...state.multi].map((id) => model.panels.find((p) => p.id === id)).filter(Boolean);
+    if (op === 'delete') {
+      for (const p of chosen) { views.get(p.id)?.destroy(); views.delete(p.id); }
+      change((m) => { m.panels = m.panels.filter((p) => !state.multi.has(p.id)); });
+      state.multi = new Set(); state.selected = null; inspector.render();
+      return;
+    }
+    const moved = arrange(chosen, op, model.smart.rows);
+    const others = model.panels.filter((p) => !moved.has(p.id));
+    const trial = [...others, ...chosen.map((p) => ({ ...p, smartPos: moved.get(p.id) || p.smartPos }))];
+    const clash = trial.some((a, i) => trial.slice(i + 1).some((b) => a.smartPos.page === b.smartPos.page && a.smartPos.x < b.smartPos.x + b.smartPos.w && b.smartPos.x < a.smartPos.x + a.smartPos.w && a.smartPos.y < b.smartPos.y + b.smartPos.h && b.smartPos.y < a.smartPos.y + a.smartPos.h));
+    if (clash) { toast('Bu düzen öğeleri üst üste bindirir; önce yer açın veya Otomatik düzenle kullanın', 'warn'); return; }
+    change((m) => { for (const p of m.panels) if (moved.has(p.id)) p.smartPos = moved.get(p.id); });
+    paintSelection();
   }
 
   function addPanel(type, cell = null) {
@@ -336,7 +370,7 @@ export async function smartBuilderPage(root, { app, uid }) {
       footer: [button('Vazgeç', { onClick: () => dlg.close() }), button('Uygula', { variant: 'primary', onClick: () => { dlg.close(); change(() => { panel.targets = [target]; delete panel.smartDraft; }, { refresh: panel }); } })] });
   }
 
-  const inspector = createInspector({ getModel: () => model, getSelected: () => state.selected, sources, preferred, dsOf, change, select, setOrientation, toggleFilters, removePanel, duplicate, editQuery, changeSource, changeType });
+  const inspector = createInspector({ getModel: () => model, getSelected: () => state.selected, getMulti: () => state.multi, multiAction, sources, preferred, dsOf, change, select, setOrientation, toggleFilters, removePanel, duplicate, editQuery, changeSource, changeType });
 
   // ---- report filter (variables) ----
   const filterHost = h('div', { class: 'smart-filters' });
@@ -433,6 +467,7 @@ export async function smartBuilderPage(root, { app, uid }) {
     if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
     if (!panel) return;
     if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicate(panel); return; }
+    if (state.multi.size > 1 && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); multiAction('delete'); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removePanel(panel); return; }
     if (e.key === 'Escape') { select(null); return; }
     const step = e.shiftKey ? 4 : 1;

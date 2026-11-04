@@ -198,7 +198,7 @@ jobs:
       - name: JS syntax
         run: node tests/check_app_syntax.cjs
       - name: Visualization models
-        run: node --test tests/test_extended_panels.mjs tests/test_accessible_colors.mjs tests/test_markdown.mjs tests/test_themes.mjs tests/test_fuzzy.mjs
+        run: node --test tests/test_extended_panels.mjs tests/test_accessible_colors.mjs tests/test_markdown.mjs tests/test_themes.mjs tests/test_fuzzy.mjs tests/test_smart_canvas.mjs
 
   mfa-browser:
     name: MFA browser acceptance

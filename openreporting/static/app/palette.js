@@ -78,7 +78,7 @@ const SHORTCUTS = [
   ['Genel', [['Ctrl + K', 'Komut paleti: dashboard, sayfa veya işlem ara'], ['?', 'Bu kısayol listesi'], ['Esc', 'Açık pencereyi kapat']]],
   ['Dashboard', [['Ctrl + Enter', 'Keşfet’te sorguyu çalıştır'], ['Ctrl + S', 'Kaydet']]],
   ['Akıllı dashboard', [['Ctrl + Z / Ctrl + Y', 'Geri al / yinele'], ['Ctrl + D', 'Seçili öğeyi çoğalt'], ['Delete', 'Seçili öğeyi sil'],
-    ['← ↑ → ↓', 'Seçili öğeyi 1 hücre kaydır (Shift ile 4)'], ['Esc', 'Seçimi kaldır'], ['Ctrl + S', 'Kaydet']]],
+    ['← ↑ → ↓', 'Seçili öğeyi 1 hücre kaydır (Shift ile 4)'], ['Shift + tıklama', 'Çoklu seçim (hizala, eşit boyut, dağıt)'], ['Esc', 'Seçimi kaldır'], ['Ctrl + S', 'Kaydet']]],
 ];
 
 function shortcutsDialog() {
