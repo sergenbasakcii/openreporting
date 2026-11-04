@@ -8,6 +8,8 @@ tables, and adds a cover page with variables, time range and table of contents.
 import io
 import math
 from .. import smart_layout
+from .compare import comparison_deltas, delta_text
+from .narrative import sentences as narrative_sentences
 from .layout_pdf import draw as draw_layout
 from datetime import datetime, timezone
 
@@ -332,6 +334,9 @@ class Pdf:
         if kind == "text":
             self.draw_text(result.panel, bx, by, bw, bh)
             return
+        if kind == "narrative":
+            self.draw_narrative(result.panel, frames, bx, by, bw, bh)
+            return
         if not frames or all((f["type"] == "timeseries" and not f["points"]) or (f["type"] == "table" and not f["rows"]) for f in frames):
             self.text(bx + bw / 2, by + bh / 2 - 3, "Veri yok", 10, FAINT, align="center")
             return
@@ -423,8 +428,11 @@ class Pdf:
                     "width": custom.get("lineWidth", 1),
                     "span": custom.get("spanNulls", False),
                     "step": custom.get("lineInterpolation") == "stepAfter",
+                    "previous": bool((frame.get("meta") or {}).get("previous")),
                 }
             )
+            if entries[-1]["previous"]:
+                entries[-1]["fill"] = 0
         if not entries:
             self.text(x + w / 2, y + h / 2, "Veri yok", 10, FAINT, align="center")
             return
@@ -547,7 +555,10 @@ class Pdf:
                 path.moveTo(*seg[0])
                 for point in seg[1:]:
                     path.lineTo(*point)
+                if e.get("previous"):
+                    c.setDash(3, 2)
                 c.drawPath(path, stroke=1, fill=0)
+                c.setDash()
         c.setStrokeColor(_rgb("#c9ced8"))
         c.setLineWidth(0.6)
         c.line(px, plot_bottom, px + pw, plot_bottom)
@@ -626,6 +637,7 @@ class Pdf:
         if not items:
             self.text(x + w / 2, y + h / 2, "Veri yok", 10, FAINT, align="center")
             return
+        deltas = comparison_deltas(panel, frames, items)
         color_mode = options(panel, "colorMode", "value")
         graph = options(panel, "graphMode", "area")
         text_mode = options(panel, "textMode", "auto")
@@ -659,6 +671,20 @@ class Pdf:
                 )
             if text_mode != "name":
                 self.text(cx + cw / 2, center_y, value_text, size, text_color, bold=True, align="center", max_width=cw - 4)
+            delta = deltas.get(index)
+            if delta is not None and ch > 34:
+                label, tone = delta_text(delta, options(panel, "compareGood", "neutral"))
+                dcolor = {"good": "#15803d", "bad": "#be123c"}.get(tone, MUTED)
+                self.text(
+                    cx + cw / 2,
+                    max(cy + 4, center_y - size * 0.55 - 2),
+                    label,
+                    7,
+                    dcolor if not color_mode.startswith("background") else text_color,
+                    bold=True,
+                    align="center",
+                    max_width=cw - 4,
+                )
         if hidden:
             index = len(items)
             col, row = index % cols, index // cols
@@ -872,6 +898,24 @@ class Pdf:
                 )
                 self.c.setFillColor(_rgb(colr or "#5794F2"))
                 self.c.rect(x0, yy + row_h * 0.15, max(0.3, x1 - x0), row_h * 0.7, stroke=0, fill=1)
+
+    def draw_narrative(self, panel, frames, x, y, w, h):
+        lines = narrative_sentences(panel, frames or [], self.collected.timezone)
+        if not lines:
+            self.text(x + w / 2, y + h / 2, "Özet için veri yok", 9, FAINT, align="center")
+            return
+        line_y = y + h - 10
+        for sentence in lines:
+            wrapped = self.wrap(sentence, 8.5, w - 14)
+            for i, line in enumerate(wrapped):
+                if line_y < y + 4:
+                    return
+                if i == 0:
+                    self.c.setFillColor(_rgb(BRAND))
+                    self.c.circle(x + 4, line_y + 2.6, 1.6, stroke=0, fill=1)
+                self.text(x + 11, line_y, line, 8.5, INK)
+                line_y -= 11
+            line_y -= 3
 
     def draw_text(self, panel, x, y, w, h):
         content = (panel.get("options") or {}).get("content", "")

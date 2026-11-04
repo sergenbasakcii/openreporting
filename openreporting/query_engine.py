@@ -136,6 +136,38 @@ def _public_error(exc, trusted):
     return "Sorgu çalıştırılamadı; ayrıntılar için yöneticinize başvurun"
 
 
+PREVIOUS_SUFFIX = "__prev"
+PREVIOUS_LABEL = " (önceki dönem)"
+
+
+def with_previous_period(targets, ctx, panel_ds, compare):
+    """For ``compare == "previous"``: add a copy of each visible query shifted by the range length."""
+    if compare != "previous":
+        return targets
+    span_s = max(1, int((ctx.end - ctx.start).total_seconds()))
+    extra = []
+    for target in targets:
+        if target.get("hide") or is_expression(target, panel_ds) or str(target.get("refId", "")).endswith(PREVIOUS_SUFFIX):
+            continue
+        functions = [f for f in (target.get("functions") or []) if (f.get("name") or (f.get("def") or {}).get("name")) != "timeShift"]
+        extra.append(
+            {
+                **target,
+                "refId": f"{target.get('refId', 'A')}{PREVIOUS_SUFFIX}",
+                "functions": [*functions, {"name": "timeShift", "params": [f"{span_s}s"]}],
+                "_previous": True,
+            }
+        )
+    if len(targets) + len(extra) > MAX_TARGETS:
+        raise QueryError("Karşılaştırma ile sorgu sayısı sınırı aşıldı; sorgu sayısını azaltın")
+    return [*targets, *extra]
+
+
+def mark_previous(frame):
+    meta = {**(frame.get("meta") or {}), "previous": True}
+    return {**frame, "name": f"{frame.get('name', '')}{PREVIOUS_LABEL}", "meta": meta}
+
+
 def run(settings, request, *, user="", transport=None, trusted=True):
     targets = [t for t in (request.get("targets") or []) if isinstance(t, dict)]
     if not targets:
@@ -144,6 +176,7 @@ def run(settings, request, *, user="", transport=None, trusted=True):
         raise QueryError(f"A panel may contain at most {MAX_TARGETS} queries")
     ctx = build_context(settings, request, user=user)
     panel_ds = request.get("datasource")
+    targets = with_previous_period(targets, ctx, panel_ds, request.get("compare"))
     ref_ids = [t.get("refId") or chr(65 + i) for i, t in enumerate(targets)]
     if len(set(ref_ids)) != len(ref_ids):
         raise QueryError("Query refIds must be unique")
@@ -194,6 +227,9 @@ def run(settings, request, *, user="", transport=None, trusted=True):
             log.exception("Expression %s failed", ref_id)
             outputs[ref_id] = []
             results[ref_id] = {"error": f"İfade hesaplanamadı: {type(exc).__name__}", "warnings": [], "meta": {}}
+    for target in targets:
+        if target.get("_previous"):
+            outputs[target["refId"]] = [mark_previous(f) for f in outputs.get(target["refId"], [])]
     visible = [f for t in targets if not t.get("hide") for f in outputs.get(t["refId"], [])]
     if total_points(visible) > settings.max_series_points:
         raise QueryError("Sonuç nokta bütçesini aşıyor; aralığı daraltın veya groupBy/aggregateBy kullanın")

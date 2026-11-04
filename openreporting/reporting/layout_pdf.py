@@ -30,7 +30,7 @@ def draw(pdf, result, x, y, w, h):
 
 
 def _image(pdf, options, x, y, w, h):
-    from .pdf import FAINT, GRID, _rgb
+    from .pdf import FAINT
 
     data = (pdf.images or {}).get(options.get("logo_id"))
     if not data and not options.get("logo_id") and pdf.logo is not None:
@@ -39,11 +39,10 @@ def _image(pdf, options, x, y, w, h):
         pdf.c.drawImage(pdf.logo, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih, mask="auto")
         return
     if not data:
-        pdf.c.setStrokeColor(_rgb(GRID))
-        pdf.c.setDash(3, 3)
-        pdf.c.roundRect(x, y, w, h, 6, stroke=1, fill=0)
-        pdf.c.setDash()
-        pdf.text(x + w / 2, y + h / 2 - 3, "Görsel bulunamadı", 8, FAINT, align="center")
+        # The editor shows a placeholder; a delivered report never prints one. A logo that was chosen
+        # but has since disappeared is flagged discreetly so the author can fix the dashboard.
+        if options.get("logo_id"):
+            pdf.text(x + w / 2, y + h / 2 - 3, "Görsel bulunamadı", 7, FAINT, align="center")
         return
     image = ImageReader(io.BytesIO(data))
     iw, ih = _fit(*image.getSize(), w - 4, h - 4)

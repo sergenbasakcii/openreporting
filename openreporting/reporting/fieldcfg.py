@@ -231,6 +231,8 @@ def reduced_items(panel, frames):
     items = []
     index = 0
     for frame in frames:
+        if (frame.get("meta") or {}).get("previous"):
+            continue  # previous-period frames only feed comparisons
         if frame["type"] == "timeseries":
             name = display_name(frame)
             cfg = field_config(panel, frame, name)

@@ -125,6 +125,7 @@ def collect(settings, dashboard, config, start, end, *, user="report", max_secti
                             "variables": local,
                             "transformations": panel.get("transformations") or [],
                             "dashboardTitle": dashboard.get("title", ""),
+                            "compare": (panel.get("options") or {}).get("compare"),
                         },
                         user=user,
                         trusted=trusted,

@@ -1,5 +1,6 @@
 import { EXTRA_NAMES, renderExtended } from './extended.js';
 import { LAYOUT_PLUGINS } from './layout.js';
+import { renderNarrative } from './narrative.js';
 // Visualization plugins: renderers, defaults and option schemas used by the panel editor.
 import { render as renderTimeseries } from './timeseries.js';
 import { renderBarchart, renderPiechart, renderGauge, renderStateTimeline } from './charts.js';
@@ -126,9 +127,11 @@ export const PLUGINS = {
 };
 
 Object.assign(PLUGINS, LAYOUT_PLUGINS);
+PLUGINS.narrative = { name: 'Akıllı özet', icon: 'text', render: renderNarrative, thresholds: true, defaults: { options: {} },
+  sections: [{ title: 'Özet', items: [{ path: 'options.subject', label: 'Konu (ör. CPU kullanımı)', type: 'text', default: '' }] }] };
 for (const [type, name] of Object.entries(EXTRA_NAMES)) PLUGINS[type] = { name, icon: `viz-${type}`, render: renderExtended, defaults: { options: { reduceOptions: { calcs: ['lastNotNull'] }, bins: 10 }, fieldConfig: { defaults: { unit: 'auto' }, overrides: [] } }, sections: type === 'histogram' ? [{ title: 'Histogram', items: [{ path: 'options.bins', label: 'Aralık sayısı', type: 'number', min: 1, max: 50, default: 10 }] }] : [] };
 
-export const ORDER = ['timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'statusgrid', 'statetimeline', 'text', ...Object.keys(EXTRA_NAMES), ...Object.keys(LAYOUT_PLUGINS)];
+export const ORDER = ['timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'statusgrid', 'statetimeline', 'text', ...Object.keys(EXTRA_NAMES), ...Object.keys(LAYOUT_PLUGINS), 'narrative'];
 export const CALC_OPTIONS = calcOptions;
 
 // A plugin panel whose plugin is not loaded shows an explicit notice instead of a wrong chart.

@@ -52,6 +52,7 @@ PANEL_TYPES = EXTRA_PANEL_TYPES | {
     "image",
     "divider",
     "reportinfo",
+    "narrative",
 }
 TYPE_ALIASES = {
     "graph": "timeseries",

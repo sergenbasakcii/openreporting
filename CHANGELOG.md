@@ -1,6 +1,8 @@
 # Değişiklik günlüğü
 
 ## Yayınlanmamış
+- **Önceki dönemle karşılaştırma** (KPI'da ▲/▼ yüzde, grafikte kesikli önceki dönem) ve **Akıllı özet** paneli
+  (veriden otomatik cümleler: ortalama, uçlar, eğilim, eşik aşımları). Belge: `13-compare-and-narrative.md`.
 - **Akıllı dashboard v2**: şablon galerisi, logo/görsel · ayırıcı · rapor bilgisi öğeleri, marka başlığı ve alt bilgi,
   rapor geneli grup/host filtresi, host bazında PDF, **panel bazında tarih aralığı** (ör. son 1 yıl), KPI için tek seri,
   eşik hazır ayarları, geri al/yinele, kısayollar, taslak kurtarma, yakınlaştırma, önizleme ve zamanlama.

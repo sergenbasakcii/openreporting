@@ -142,7 +142,7 @@ def test_layout_elements_logo_footer_and_panel_period_reach_the_pdf(env):
     assert "ACME · gizli" in text  # smart footer replaces the default footer
     assert "Rapor dönemi" in text and "Trafik · son 1 yıl" in text
     year = datetime.now(timezone.utc).year
-    assert f"{year - 1}" in text and "Görsel bulunamadı" not in text  # own period printed; empty image used the logo
+    assert f"{year - 1}" in text and "Görsel bulunamadı" not in text  # empty image prints nothing / the logo  # own period printed; empty image used the logo
     assert pdf[0].get_size()[0] < pdf[0].get_size()[1]  # portrait
 
 

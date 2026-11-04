@@ -464,3 +464,7 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .period-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; } .period-chips .kw-chip { padding: 0 8px; }
 .period-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .period-chip svg { width: 12px; height: 12px; }
+.stat-delta { font-size: 11px; font-weight: 600; color: var(--text-muted); text-align: center; z-index: 1; }
+.stat-delta.tone-good { color: var(--success-text); } .stat-delta.tone-bad { color: var(--error-text); }
+.narrative { position: absolute; inset: 0; overflow: auto; padding: 4px 10px; font-size: 13px; line-height: 1.5; }
+.narrative ul { margin: 0; padding-left: 16px; } .narrative li { margin-bottom: 4px; } .narrative li::marker { color: var(--accent); }

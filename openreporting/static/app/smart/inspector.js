@@ -6,7 +6,7 @@ import { PLUGINS } from '../panels/registry.js';
 import { THRESHOLDS } from './templates.js';
 import { timePicker, resolveRange, rangeLabel } from '../time.js';
 
-export const CHART_TYPES = ['timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'donut', 'statusgrid', 'heatmap', 'statetimeline'];
+export const CHART_TYPES = ['narrative', 'timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'donut', 'statusgrid', 'heatmap', 'statetimeline'];
 export const LAYOUT_TYPES = ['text', 'image', 'divider', 'reportinfo'];
 const REDUCING = ['stat', 'gauge', 'bargauge', 'piechart', 'donut', 'statusgrid'];
 const UNITS = [{ value: '', label: 'Otomatik' }, { value: 'percent', label: 'Yüzde (%)' }, { value: 'bytes', label: 'Bayt' }, { value: 'bps', label: 'bit/sn' },
@@ -111,6 +111,7 @@ export function createInspector(ctx) {
     const setOption = (patch) => change(() => { panel.options = { ...(panel.options || {}), ...patch }; }, { refresh: panel });
     const ds = ctx.dsOf(panel);
     const items = [
+      panel.type === 'narrative' ? field('Konu', input({ value: panel.options?.subject || '', placeholder: panel.title || 'ör. CPU kullanımı', onChange: (e) => setOption({ subject: e.target.value }) }), 'Cümleler bu adla başlar; boşsa panel başlığı kullanılır. Eşik ve karşılaştırma seçenekleri de cümlelere yansır.') : null,
       field('Veri kaynağı', select(ctx.sources.map((s) => ({ value: s.uid, label: s.name })), ds?.uid, (v) => ctx.changeSource(panel, v))),
       h('div', { class: 'form-grid' },
         field('Birim', select(UNITS, d.unit || '', (v) => setDefaults({ unit: v || undefined }))),
@@ -134,6 +135,14 @@ export function createInspector(ctx) {
       const steps = d.thresholds?.steps || [];
       items.push(h('div', { class: 'form-grid' }, steps.slice(1).map((step, i) => field(`${i === 0 ? 'Uyarı' : 'Kritik'} eşiği`, input({ type: 'number', value: step.value,
         onChange: (e) => setDefaults({ thresholds: { ...d.thresholds, steps: steps.map((s, j) => (j === i + 1 ? { ...s, value: Number(e.target.value) } : s)) } }) })))));
+    }
+    if (['stat', 'timeseries', 'barchart', 'narrative'].includes(panel.type)) {
+      items.push(field('Karşılaştırma', select([{ value: '', label: 'Yok' }, { value: 'previous', label: 'Önceki dönemle karşılaştır' }], panel.options?.compare || '',
+        (v) => setOption({ compare: v || undefined })), panel.type === 'stat' ? 'Değerin altında ▲/▼ yüzde değişim yazar.' : 'Önceki dönem kesikli çizgiyle gösterilir.'));
+      if (panel.options?.compare && panel.type === 'stat') {
+        items.push(field('Artış', select([{ value: 'neutral', label: 'Nötr (renksiz)' }, { value: 'down', label: 'Azalış iyi (CPU, hata, gecikme)' }, { value: 'up', label: 'Artış iyi (satış, erişilebilirlik)' }],
+          panel.options?.compareGood || 'neutral', (v) => setOption({ compareGood: v }))));
+      }
     }
     if (panel.type === 'stat') items.push(field('Renk kullanımı', select([{ value: 'value', label: 'Değer rengi' }, { value: 'background', label: 'Arka plan' }, { value: 'none', label: 'Renksiz' }], panel.options?.colorMode || 'value', (v) => setOption({ colorMode: v }))));
     if (['timeseries', 'barchart'].includes(panel.type)) {

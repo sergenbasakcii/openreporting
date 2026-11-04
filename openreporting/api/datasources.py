@@ -45,6 +45,7 @@ class QueryIn(BaseModel):
     now: int | None = None
     dashboardUid: str | None = Field(default=None, max_length=40)
     panelId: int | None = None
+    compare: str | None = Field(default=None, pattern="^previous$")
 
 
 EDIT_ROLES = ("admin", "editor")
@@ -69,6 +70,7 @@ def viewer_payload(settings, body, user):
         minInterval=panel.get("interval"),
         variables=dashboards.viewer_variables(model, body.variables),
         dashboardTitle=model.get("title", ""),
+        compare=(panel.get("options") or {}).get("compare"),
     )
     return payload
 

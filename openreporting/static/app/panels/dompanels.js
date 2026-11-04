@@ -2,7 +2,7 @@
 import { h } from '../dom.js';
 import { formatValue, resolveUnit } from '../units.js';
 import { fieldConfigFor, color, alpha, contrastText, thresholdColor, applyMappings, readableColor, cssVar } from '../colors.js';
-import { reducedValues, display, noData, timeSeries, tables, reduce, REDUCERS, fitText, chartTheme, minOf, maxOf } from './common.js';
+import { comparisonDeltas, deltaLabel, reducedValues, display, noData, timeSeries, tables, reduce, REDUCERS, fitText, chartTheme, minOf, maxOf } from './common.js';
 import { escapeMarkdown, renderMarkdown } from '../markdown.js';
 import { fmtDateTime } from '../dom.js';
 
@@ -43,6 +43,7 @@ export function renderStat(container, frames, panel) {
   const items = reducedValues(frames, panel);
   if (!items.length) { noData(container); return nothing; }
   const opts = panel.options || {};
+  const deltas = comparisonDeltas(frames, panel, items);
   const colorMode = opts.colorMode || 'value';
   const graphMode = opts.graphMode || 'area';
   const textMode = opts.textMode || 'auto';
@@ -66,6 +67,10 @@ export function renderStat(container, frames, panel) {
       if (textMode !== 'name' && textMode !== 'none') {
         const size = fitText(d.text, cellW * 0.9, cellH * (showName ? 0.7 : 0.9), 96);
         box.append(h('div', { class: 'stat-value', text: d.text, style: { fontSize: `${size}px`, color: colorMode === 'value' ? readableColor(c, cssVar('--bg-panel', container.isConnected ? container : undefined)) : 'inherit' } }));
+      }
+      if (deltas.has(items.indexOf(item)) && cellH > 44) {
+        const d2 = deltaLabel(deltas.get(items.indexOf(item)), opts.compareGood || 'neutral');
+        box.append(h('div', { class: `stat-delta tone-${d2.tone}`, text: d2.text }));
       }
       if (graphMode === 'area' && item.points.length > 1 && cellH > 50) {
         const spark = sparkline(item.points, colorMode.startsWith('background') ? 'rgba(255,255,255,.75)' : c);

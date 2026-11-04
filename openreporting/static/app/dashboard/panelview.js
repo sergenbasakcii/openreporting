@@ -37,6 +37,7 @@ export function buildRequest(panel, ctx, width = 800) {
     transformations: panel.transformations || [],
     dashboardTitle: ctx.dashboardTitle || '',
     now: ctx.now,
+    compare: panel.options && panel.options.compare === 'previous' ? 'previous' : undefined,
   };
 }
 

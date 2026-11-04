@@ -17,7 +17,7 @@ import { TEMPLATES, buildTemplate } from '../smart/templates.js';
 import { createInspector, CHART_TYPES, LAYOUT_TYPES } from '../smart/inspector.js';
 
 export const SMART_TAG = 'akıllı';
-const SIZES = { timeseries: [12, 9], barchart: [12, 9], stat: [6, 5], gauge: [6, 6], bargauge: [12, 7], table: [24, 10], piechart: [8, 8], donut: [8, 8],
+const SIZES = { narrative: [24, 5], timeseries: [12, 9], barchart: [12, 9], stat: [6, 5], gauge: [6, 6], bargauge: [12, 7], table: [24, 10], piechart: [8, 8], donut: [8, 8],
   statusgrid: [12, 7], heatmap: [12, 8], statetimeline: [24, 6], text: [12, 4], image: [6, 3], divider: [24, 2], reportinfo: [24, 4] };
 const KEYWORD_SOURCES = ['zabbix', 'testdata'];
 const ZOOMS = [{ value: 'fit', label: 'Sığdır' }, { value: '0.75', label: '%75' }, { value: '1', label: '%100' }, { value: '1.25', label: '%125' }, { value: '1.5', label: '%150' }];

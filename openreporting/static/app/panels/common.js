@@ -62,12 +62,35 @@ export const timeSeries = (frames) => frames.filter((f) => f.type === 'timeserie
 export const tables = (frames) => frames.filter((f) => f.type === 'table');
 
 // One display value per series (or per numeric table cell when reduceOptions.values).
+// Previous-period comparison: fractional change per reduced item (matched by name, then by order).
+export function comparisonDeltas(frames, panel, items) {
+  if (!panel.options || panel.options.compare !== 'previous') return new Map();
+  const calc = (panel.options.reduceOptions && panel.options.reduceOptions.calcs && panel.options.reduceOptions.calcs[0]) || 'lastNotNull';
+  const prev = timeSeries(frames).filter((f) => f.meta && f.meta.previous);
+  const byName = new Map(prev.map((f) => [displayName(f).replace(/ \(önceki dönem\)$/, ''), reduce(f.points.map((p) => p[1]), calc)]));
+  const ordered = prev.map((f) => reduce(f.points.map((p) => p[1]), calc));
+  const out = new Map();
+  items.forEach((item, i) => {
+    const before = byName.has(item.name) ? byName.get(item.name) : (ordered.length === items.length ? ordered[i] : null);
+    if (before === null || before === undefined || before === 0 || item.value === null || item.value === undefined) return;
+    out.set(i, (item.value - before) / Math.abs(before));
+  });
+  return out;
+}
+
+export function deltaLabel(delta, good = 'neutral') {
+  const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '■';
+  const tone = good !== 'neutral' && delta ? ((delta > 0) === (good === 'up') ? 'good' : 'bad') : 'neutral';
+  return { text: `${arrow} %${Math.abs(delta * 100).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} önceki döneme göre`, tone };
+}
+
 export function reducedValues(frames, panel) {
   const opts = (panel.options && panel.options.reduceOptions) || {};
   const calc = (opts.calcs && opts.calcs[0]) || 'lastNotNull';
   const out = [];
   let index = 0;
   for (const frame of timeSeries(frames)) {
+    if (frame.meta && frame.meta.previous) continue; // previous-period twins only feed comparisons
     const name = displayName(frame);
     const cfg = fieldConfigFor(panel, frame, name);
     const values = frame.points.map((p) => p[1]);
