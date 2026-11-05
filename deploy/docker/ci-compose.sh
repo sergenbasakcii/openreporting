@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # CI acceptance for docker-compose.yml on a disposable runner: build, TLS proxy, proxy trust,
-# secure cookie, MFA over HTTPS, worker heartbeat, restart persistence, backup + verification.
+# secure cookie, MFA over HTTPS, worker heartbeat, restart persistence, backup + verification, and
+# operation with no outbound network at all (deploy/docker/compose.no-egress.yml).
 set -euo pipefail
 [ "${OPENREPORTING_DOCKER_CI:-}" = 1 ] || { echo 'Disposable CI runner required' >&2; exit 1; }
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
@@ -58,5 +59,34 @@ docker compose --profile backup run --rm --entrypoint openreporting backup \
   verify-backup "/backups/$DIR" --key-file /run/openreporting-key/secret.key | tee "$EVIDENCE/verify.json"
 grep -q '"ok": *true' "$EVIDENCE/verify.json"
 docker image inspect "openreporting:local" --format '{{.Size}}' > "$EVIDENCE/image-size-bytes.txt"
+
+# Offline operation after installation: web, worker and backup lose every route out of the host.
+# The product must still sign in, query, render a PDF, run the worker and back up.
+NOEGRESS=(docker compose -f docker-compose.yml -f deploy/docker/compose.no-egress.yml)
+"${NOEGRESS[@]}" up -d --wait
+docker compose exec -T web python - <<'PY'
+import socket
+for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53), ("pypi.org", 443), ("github.com", 443)):
+    try:
+        socket.create_connection((host, port), timeout=4).close()
+    except OSError:
+        continue
+    raise SystemExit(f"egress is open: {host}:{port}")
+print("no egress from web")
+PY
+CSRF="$(login)"
+JSON=(-b "$EVIDENCE/jar" -H 'Content-Type: application/json' -H "Origin: $BASE" -H "X-CSRF-Token: $CSRF")
+"${CURL[@]}" "${JSON[@]}" -d '{"targets":[{"refId":"A","scenario":"sine","datasource":{"uid":"testdata"}}],"range":{"from":"now-1h","to":"now"},"compare":"previous"}' \
+  "$BASE/api/ds/query" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["frames"] and "A__prev" in d["results"], d'
+"${CURL[@]}" "${JSON[@]}" -d '{"dashboard":{"uid":"offline","title":"Offline","smart":{"orientation":"portrait","watermark":"GİZLİ"},"panels":[{"id":1,"type":"narrative","title":"Özet","datasource":{"uid":"testdata"},"targets":[{"refId":"A","scenario":"sine","datasource":{"uid":"testdata"}}],"smartPos":{"page":0,"x":0,"y":0,"w":24,"h":6}}]},"overwrite":true}' \
+  "$BASE/api/dashboards/db" > /dev/null
+"${CURL[@]}" "${JSON[@]}" -d '{"dashboard_uid":"offline","time_range":{"from":"now-1h","to":"now"},"timezone":"UTC","variables":{},"format":"pdf"}' \
+  -o "$EVIDENCE/offline.pdf" "$BASE/api/dashboards/export"
+head -c 4 "$EVIDENCE/offline.pdf" | grep -q '%PDF'
+for _ in $(seq 1 30); do [ "$(worker_state)" = up ] && break; sleep 2; done
+[ "$(worker_state)" = up ]
+"${NOEGRESS[@]}" --profile backup run --rm backup > "$EVIDENCE/backup-offline.txt"
+"${NOEGRESS[@]}" down
+echo 'Offline (no egress) operation passed'
 docker compose down
 echo 'Docker compose acceptance passed'

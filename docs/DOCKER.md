@@ -90,6 +90,42 @@ sınırlar sonradan **Yönetim → Sistem ayarları** sayfasından yapılabilir;
 Kullanıcılar sunucuya birden fazla adla (örn. IP ile) giriyorsa bu adları
 `OPENREPORTING_ALLOWED_HOSTS` içine yazın; bilinmeyen adlar güvenlik için reddedilir.
 
+### İnternetsiz çalışma (kurulumdan sonra)
+
+Kurulum sırasında internet gerekir (imaj tabanları ve kilitli Python paketleri indirilir). **Kurulumdan sonra
+OpenReporting internete hiç bağlanmaz**; her şey sunucunun içinde çalışır:
+
+| Konu | Durum |
+| --- | --- |
+| Arayüz | Tüm JavaScript, CSS, ikonlar ve grafik kütüphanesi (ECharts) imajın içindedir; tarayıcı yalnızca bu sunucuya bağlanır (CSP `'self'`). CDN, Google Fonts, harita döşemesi yoktur. |
+| PDF / Excel | Yazı tipleri (DejaVu) ve şablonlar imajdadır; dışarıdan bir şey indirilmez. |
+| Güncelleme kontrolü, telemetri, lisans | Yoktur. Metrikler (`/metrics`) ve loglar yalnız yereldir. |
+| Yeniden başlatma | `restart: unless-stopped`; imajlar yerelde olduğu için çekme (pull) yapılmaz. |
+
+Kurulumdan sonra sunucunun erişmesi gereken yerler yalnızca **kendi ağınızdadır**:
+
+- Veri kaynakları (Zabbix API, veritabanları, Elasticsearch …): sunucudan bu adreslere erişim açık olmalı.
+- SMTP (e-posta ile rapor teslimi) ve LDAP/AD (kullanıyorsanız).
+- **Saat senkronizasyonu (iç NTP):** iki adımlı giriş (TOTP) ve rapor zamanlamaları doğru saate ihtiyaç duyar.
+- İç DNS (veri kaynaklarının adlarını çözmek için).
+
+Bunun kanıtı her değişiklikte CI'da çalışır: `deploy/docker/compose.no-egress.yml` katmanıyla web ve worker'ın
+dışarı hiçbir yolu kalmaz (internet de iç ağ da). Bu durumda giriş, sorgu, önceki dönem karşılaştırması,
+akıllı dashboard PDF'i, worker ve yedek çalıştırılıp doğrulanır. Tüm veri kaynaklarınız aynı Docker sunucusu
+içindeyse bu katmanı üretimde de kullanabilirsiniz:
+
+```bash
+docker compose -f docker-compose.yml -f deploy/docker/compose.no-egress.yml up -d --wait
+```
+
+Veri kaynaklarınız kurum ağındaysa varsayılan ağı kullanın ve dış trafiği sunucu güvenlik duvarında yalnız bu
+adreslere izin verecek şekilde kısıtlayın (önerilen). Not: Docker Desktop (Windows/macOS) kapalı (`internal`)
+ağlarda servis adlarını çözemediği için bu katman yalnız Linux Docker Engine'de çalışır.
+
+İnternet yalnız şu durumlarda tekrar gerekir: **sürüm yükseltme** (yeni imaj derlemek için; alternatif olarak
+imaj başka bir makinede derlenip `docker save` / `docker load` ile taşınabilir), Python eklentisi kurmak ve
+sertifika yenilemek (sertifikayı kurumunuz sağlıyorsa gerekmez; uygulama otomatik sertifika almaz).
+
 ## 3. Günlük işletim
 
 ```bash
