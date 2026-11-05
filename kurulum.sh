@@ -72,7 +72,6 @@ ayarlar() {
   sed -i -e "s#^OPENREPORTING_PUBLIC_URL=.*#OPENREPORTING_PUBLIC_URL=$url#" \
          -e "s#^OPENREPORTING_ALLOWED_HOSTS=.*#OPENREPORTING_ALLOWED_HOSTS=$extra#" \
          -e "s#^TZ=.*#TZ=${tz:-Europe/Istanbul}#" "$ENV_FILE"
-  chmod 600 "$ENV_FILE"
   if [ "$OR_HTTPS_PORT" != 443 ] && ! grep -q '^OPENREPORTING_HTTPS_PORT=' .env 2>/dev/null; then
     echo "OPENREPORTING_HTTPS_PORT=$OR_HTTPS_PORT" >> .env
   fi
@@ -97,6 +96,8 @@ sertifika() {
     uyari "Kurum sertifikasını sonra $CERT ve $KEY olarak koyup: sudo ./kurulum.sh"
   fi
   chown root:101 "$KEY" && chmod 0640 "$KEY" && chmod 0644 "$CERT"
+  # Settings: readable by the app user (uid 10001, also the backup job), not by other host users.
+  chown root:10001 "$ENV_FILE" && chmod 0640 "$ENV_FILE"
   install -d -o 10001 -g 10001 -m 0700 backups
 }
 

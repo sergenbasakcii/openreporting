@@ -56,7 +56,7 @@ kendisi yapar:
 | Betiğin yaptığı | Ayrıntı |
 | --- | --- |
 | Docker kontrolü | Yoksa (Ubuntu/Debian) kurmayı önerir; sürüm 24+ olmalı |
-| Ayar dosyası | `deploy/docker/openreporting.env` adres, saat dilimi ve sunucu IP'siyle oluşturulur (0600) |
+| Ayar dosyası | `deploy/docker/openreporting.env` adres, saat dilimi ve sunucu IP'siyle oluşturulur (root:10001, 0640) |
 | Sertifika | Kurum sertifikası verilmediyse kendinden imzalı üretir, izinleri ayarlar |
 | Başlatma | İmajı derler, proxy/web/worker sağlıklı olana kadar bekler |
 | İlk yönetici | Hiç kullanıcı yoksa oluşturur; ilk girişte telefonla iki adımlı giriş kurulur |
@@ -90,7 +90,7 @@ git clone https://github.com/sergenbasakcii/openreporting.git ~/openreporting &&
 
 # 1) Ayar dosyası
 cp deploy/docker/openreporting.env.example deploy/docker/openreporting.env
-chmod 600 deploy/docker/openreporting.env
+sudo chown root:10001 deploy/docker/openreporting.env && sudo chmod 0640 deploy/docker/openreporting.env   # yedek konteyneri (uid 10001) okuyabilmeli
 nano deploy/docker/openreporting.env      # OPENREPORTING_PUBLIC_URL=https://openreporting.example.com
 
 # 2) TLS sertifikası: kurum sertifikasını koyun …
@@ -265,6 +265,7 @@ yükleyin. Eski kod yeni şemayı açmayı reddeder.
 | Tarayıcıda 400 “Invalid host header” | `PUBLIC_URL` adresi tarayıcıdakiyle aynı değil; ek adları `ALLOWED_HOSTS` içine yazın |
 | MFA kurulumu “yalnız HTTPS” diyor | Uygulamaya proxy dışında erişiliyor veya `PROXY_IP` uyuşmuyor |
 | Yedek: `not writable by uid 10001` | `sudo chown 10001:10001 backups && sudo chmod 0700 backups` |
+| Yedek: `cp: cannot open '/run/openreporting.env'` | Ayar dosyası yalnız root'a açık: `sudo chown root:10001 deploy/docker/openreporting.env && sudo chmod 0640 deploy/docker/openreporting.env` (veya `sudo ./kurulum.sh`) |
 | Raporlar kuyrukta | `docker compose logs worker`; Sunucu durumu sayfasındaki worker sinyali |
 | Zabbix'e ulaşılamıyor | `docker compose exec web python -c "import urllib.request; print(urllib.request.urlopen('https://zabbix…', timeout=5).status)"`; DNS/güvenlik duvarı |
 | Bellek | `docker stats`; kılavuz Bölüm 11. İsteğe bağlı sınır: servislere `mem_limit: 3g` |
