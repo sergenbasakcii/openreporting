@@ -189,9 +189,9 @@ jobs:
         with:
           persist-credentials: false
       - name: shellcheck
-        run: shellcheck -x -s bash deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/kubernetes/ci-kind.sh && shellcheck -s sh deploy/docker/backup.sh
+        run: shellcheck -x -s bash deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/docker/ci-kurulum.sh kurulum.sh deploy/kubernetes/ci-kind.sh && shellcheck -s sh deploy/docker/backup.sh
       - name: bash -n
-        run: for f in deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/kubernetes/ci-kind.sh; do bash -n "$f"; done && sh -n deploy/docker/backup.sh
+        run: for f in deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/docker/ci-kurulum.sh kurulum.sh deploy/kubernetes/ci-kind.sh; do bash -n "$f"; done && sh -n deploy/docker/backup.sh
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
@@ -301,6 +301,23 @@ jobs:
           path: |
             build/docker
             !build/docker/jar
+          retention-days: 14
+
+  docker-installer:
+    name: One-command installer (kurulum.sh)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Unattended install, idempotent re-run, status and backup
+        run: OPENREPORTING_DOCKER_CI=1 bash deploy/docker/ci-kurulum.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: installer-evidence
+          path: build/kurulum*
           retention-days: 14
 
   kubernetes:
