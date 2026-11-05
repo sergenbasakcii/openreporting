@@ -232,6 +232,16 @@ export function renderStatusGrid(container, frames, panel) {
 
 export function renderText(container, frames, panel, ctx) {
   const content = (panel.options && panel.options.content) || '';
-  container.replaceChildren(renderMarkdown(content, ctx.interpolate ? (s) => ctx.interpolate(s, escapeMarkdown) : (s) => s));
-  return nothing;
+  const body = renderMarkdown(content, ctx.interpolate ? (s) => ctx.interpolate(s, escapeMarkdown) : (s) => s);
+  container.replaceChildren(body);
+  // Overflowing text must be scrollable from the keyboard too; short text adds no extra tab stop.
+  const focusIfScrolls = () => {
+    const target = container.querySelector('.markdown') || container.firstElementChild;
+    if (!target) return;
+    const scrolls = target.scrollHeight > target.clientHeight + 1 || container.scrollHeight > container.clientHeight + 1;
+    const el = target.scrollHeight > target.clientHeight + 1 ? target : container;
+    if (scrolls) { el.setAttribute('tabindex', '0'); el.setAttribute('role', 'region'); el.setAttribute('aria-label', panel.title || 'Metin'); }
+  };
+  requestAnimationFrame(focusIfScrolls);
+  return { resize: focusIfScrolls, destroy() {} };
 }
