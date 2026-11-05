@@ -12,9 +12,10 @@ trap 'sudo systemctl stop openreporting-cikis-kilidi.service 2>/dev/null || true
 mkdir -p build
 sudo -E ./kurulum.sh | tee build/kurulum-1.txt
 grep -q 'Kurulum tamam' build/kurulum-1.txt
-curl -fsk https://localhost:8443/readyz > /dev/null
-curl -fsk -o /dev/null -w '%{http_code}\n' -H 'Content-Type: application/json' -H 'Origin: https://localhost:8443' \
-  -d "{\"username\":\"ciadmin\",\"password\":\"$PASSWORD\"}" https://localhost:8443/api/login | grep -q '^200$'
+code() { curl -sk -o build/kurulum-last-body.txt -w '%{http_code}' "$@"; }
+health="$(code https://localhost:8443/api/health)"; echo "health: $health"; [ "$health" = 200 ]
+login="$(code -H 'Content-Type: application/json' -H 'Origin: https://localhost:8443'   -d "{\"username\":\"ciadmin\",\"password\":\"$PASSWORD\"}" https://localhost:8443/api/login)"
+echo "login: $login"; [ "$login" = 200 ] || { cat build/kurulum-last-body.txt; exit 1; }
 sudo test -s /root/openreporting-anahtar/secret.key
 grep -q 'docker compose --profile backup run' /etc/cron.d/openreporting-yedek
 systemctl is-active --quiet openreporting-cikis-kilidi.service
