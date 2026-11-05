@@ -84,7 +84,7 @@ sertifika() {
   if [ -s "$CERT" ] && [ -s "$KEY" ]; then
     tamam "Var olan sertifika korunuyor"
   elif [ -n "${OR_SERTIFIKA:-}" ]; then
-    [ -s "$OR_SERTIFIKA" ] && [ -s "${OR_ANAHTAR:-}" ] || hata "OR_SERTIFIKA ve OR_ANAHTAR okunabilir PEM dosyaları olmalı"
+    if [ ! -s "$OR_SERTIFIKA" ] || [ ! -s "${OR_ANAHTAR:-}" ]; then hata "OR_SERTIFIKA ve OR_ANAHTAR okunabilir PEM dosyaları olmalı"; fi
     install -m 0644 "$OR_SERTIFIKA" "$CERT" && install -m 0640 "$OR_ANAHTAR" "$KEY"
     tamam "Kurum sertifikası yerleştirildi"
   else
@@ -131,6 +131,9 @@ anahtar() {
   adim "Şifreleme anahtarının kopyası"
   install -d -m 0700 "$KEY_VAULT"
   if compgen -G "$KEY_VAULT/secret.key*" >/dev/null; then tamam "Kopya zaten var: $KEY_VAULT"; return; fi
+  # The key is otherwise created lazily with the first stored credential; create it now so it can be vaulted.
+  compose exec -T web python -c 'from openreporting.config import Settings; from openreporting.secrets_store import ensure_key
+ensure_key(Settings.from_env())'
   compose cp web:/run/openreporting-key/secret.key "$KEY_VAULT/secret.key"
   chmod 0600 "$KEY_VAULT/secret.key"
   tamam "Kopyalandı: $KEY_VAULT/secret.key"

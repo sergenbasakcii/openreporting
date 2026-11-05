@@ -75,3 +75,14 @@ def test_read_only_inspection_handles_special_characters_in_path(settings):
         settings = replace(settings, data_dir=settings.data_dir.with_name("space # unicode ç"))
     init_db(settings)
     assert not has_encrypted_secrets(settings)
+
+
+def test_ensure_key_creates_key_once_for_the_installer(settings):
+    from openreporting.secrets_store import ensure_key
+
+    init_db(settings)
+    path = ensure_key(settings)
+    first = path.read_bytes()
+    reset_cache()
+    assert ensure_key(settings) == path and path.read_bytes() == first
+    assert decrypt(settings, encrypt(settings, {"token": "test-value"})) == {"token": "test-value"}

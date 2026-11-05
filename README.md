@@ -24,7 +24,18 @@ izole Oracle kullanıcı alanı testleri vardır; tam Oracle host kabulünün s�
 | İşletim | Ubuntu ve Oracle Linux kurulum yolları, sertleştirilmiş systemd servisleri, nginx TLS, günlük yedekleme zamanlayıcısı, yükseltme + geri dönüş, `openreporting doctor`, Docker alternatifi |
 
 
-## Hızlı başlangıç — Ubuntu sunucu (üretim)
+## Hızlı başlangıç — Docker (önerilen, tek komut)
+
+```bash
+git clone https://github.com/sergenbasakcii/openreporting.git ~/openreporting && cd ~/openreporting
+sudo ./kurulum.sh
+```
+
+Betik yalnız sunucu adresini ve ilk yöneticiyi sorar; Docker kontrolü, ayar dosyası, sertifika, başlatma,
+anahtar kopyası, gece yedeği ve isteğe bağlı internet çıkış kilidini kendisi yapar. Sonrası:
+`sudo ./kurulum.sh durum | yedek | guncelle`. Ayrıntılar: **[docs/DOCKER.md](docs/DOCKER.md)**.
+
+## Doğrudan Linux kurulumu (Docker'sız alternatif)
 
 ```bash
 # Paketi sunucuya kopyalayın (git clone veya zip) ve:
@@ -47,16 +58,6 @@ LDAP/Active Directory, SMTP TLS/kurum CA'sı, servis hesapları ve canlıya alma
 3. **Raporlar → Yeni rapor**: dashboard’u seçin, `$host` ile bölümleyin, PDF/Excel önizleyin, zamanlayın.
 
 Kullanım kılavuzu: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
-
-## Docker Compose
-
-```bash
-cp deploy/docker/openreporting.env.example deploy/docker/openreporting.env   # OPENREPORTING_PUBLIC_URL
-docker compose up -d --build --wait                                         # nginx TLS + web + worker
-docker compose exec web openreporting create-user yonetici --role admin
-```
-
-Sertifika, yedekleme, yükseltme ve sorun giderme: **[docs/DOCKER.md](docs/DOCKER.md)**.
 
 ## Kubernetes (yatay ölçekleme)
 

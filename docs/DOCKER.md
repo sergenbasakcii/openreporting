@@ -39,7 +39,51 @@ sudo usermod -aG docker "$USER"   # oturumu kapatıp açın
 | Rootless Docker / Podman | 80/443 için ayrıcalıksız port ayarı gerekir (`OPENREPORTING_HTTPS_PORT=8443`); Podman Compose ayrıca doğrulanmalı |
 | Kubernetes | [KUBERNETES.md](KUBERNETES.md) (PostgreSQL ile yatay ölçekleme) |
 
-## 2. İlk kurulum
+## 2. Kurulum (tek komut)
+
+Sunucuda internet varken üç adım:
+
+```bash
+git clone https://github.com/sergenbasakcii/openreporting.git ~/openreporting
+cd ~/openreporting
+sudo ./kurulum.sh
+```
+
+Betik yalnızca şunları sorar: **sunucunun adresi** (DNS adı veya IP; varsayılanı önerir), **yönetici
+kullanıcı adı ve parolası** ve isteğe bağlı olarak uygulamanın erişeceği **iç ağlar**. Kalan her şeyi
+kendisi yapar:
+
+| Betiğin yaptığı | Ayrıntı |
+| --- | --- |
+| Docker kontrolü | Yoksa (Ubuntu/Debian) kurmayı önerir; sürüm 24+ olmalı |
+| Ayar dosyası | `deploy/docker/openreporting.env` adres, saat dilimi ve sunucu IP'siyle oluşturulur (0600) |
+| Sertifika | Kurum sertifikası verilmediyse kendinden imzalı üretir, izinleri ayarlar |
+| Başlatma | İmajı derler, proxy/web/worker sağlıklı olana kadar bekler |
+| İlk yönetici | Hiç kullanıcı yoksa oluşturur; ilk girişte telefonla iki adımlı giriş kurulur |
+| Anahtar kopyası | Şifreleme anahtarını `/root/openreporting-anahtar/` içine kopyalar — **sunucu dışına taşıyın** |
+| Gece yedeği | `/etc/cron.d/openreporting-yedek` — her gece 02:30, 14 gün saklanır |
+| Çıkış kilidi | İç ağlar yazıldıysa internete çıkışı kapatır, yeniden başlatmada korunur |
+| Son kontrol | Saat senkronu ve `doctor` kontrolü |
+
+Kurulum bitince tarayıcıda gösterilen adresi açın. E-posta (SMTP), LDAP ve veri kaynakları arayüzden
+ayarlanır: **Yönetim → Sistem ayarları** ve **Yönetim → Veri kaynakları**.
+
+Sonraki işler de aynı betikle yapılır:
+
+```bash
+sudo ./kurulum.sh durum       # servisler, worker, son yedek, çıkış kilidi
+sudo ./kurulum.sh yedek       # hemen yedek al
+sudo ./kurulum.sh guncelle    # yedek → yeni sürüm → yeniden derle → kontrol
+```
+
+Betik tekrar çalıştırılabilir; var olan ayar, sertifika, kullanıcı ve veriye dokunmaz. Kurum
+sertifikası sonradan geldiğinde `deploy/docker/certs/cert.pem` ve `key.pem` olarak koyup
+`sudo ./kurulum.sh` çalıştırmanız yeterlidir. Soru sormadan kurulum (otomasyon) için betiğin başındaki
+`OR_*` değişkenlerine bakın.
+
+### Elle kurulum (isteğe bağlı)
+
+Betiğin yaptığı adımları kendiniz yapmak isterseniz:
 
 ```bash
 git clone https://github.com/sergenbasakcii/openreporting.git ~/openreporting && cd ~/openreporting
@@ -165,6 +209,8 @@ root cron'u (`sudo crontab -e`); `-T` cron altında terminal ayırmaz, günlük 
 bir kez güvenli yere alın:
 
 ```bash
+# anahtar ilk parola kaydında üretilir; henüz yoksa şimdi üretin:
+docker compose exec -T web python -c "from openreporting.config import Settings; from openreporting.secrets_store import ensure_key; ensure_key(Settings.from_env())"
 docker compose cp web:/run/openreporting-key/secret.key ./secret.key.KASAYA-KOYUN && chmod 600 ./secret.key.KASAYA-KOYUN
 ```
 
@@ -191,6 +237,12 @@ Volume adı Compose proje adıyla başlar (klasör adı `openreporting` ise `ope
 `openreporting_openreporting-key` volume'üne `secret.key` olarak geri koyun.
 
 ## 5. Yükseltme
+
+```bash
+sudo ./kurulum.sh guncelle      # çıkış kilidini geçici kaldırır, yedek alır, yeni sürümü derler, kilidi geri koyar
+```
+
+Elle yapmak isterseniz:
 
 ```bash
 docker compose --profile backup run --rm backup     # önce yedek

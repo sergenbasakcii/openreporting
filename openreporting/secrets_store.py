@@ -69,6 +69,12 @@ def read_keys(path: Path) -> list[bytes]:
         raise SecretError("Secret key file unreadable or invalid") from None
 
 
+def ensure_key(settings):
+    """Create the key file now if this installation has none yet (installer: copy it to the vault at once)."""
+    _fernet(settings)
+    return key_path(settings)
+
+
 def _fernet(settings) -> Fernet | MultiFernet:
     path = key_path(settings)
     cache_key = str(path)

@@ -18,6 +18,7 @@ API'yi, güvenlik kurallarını ve testleri anlatır. Kurulum ve işletim rehber
 | 11 | [PDF ve Excel çıktı tasarımı](11-export-design.md) | Marka paleti, kapak/başlık/tablo, Excel stilleri |
 | 12 | [Akıllı dashboard v2](12-smart-dashboard-v2.md) | Şablonlar, logo/görsel, rapor filtresi, host bazında PDF, panel bazında tarih aralığı, geri al |
 | 13 | [Önceki dönemle karşılaştırma ve akıllı özet](13-compare-and-narrative.md) | KPI ▲/▼ değişim, kesikli önceki dönem, veriden cümle üreten özet paneli |
+| 14 | [Tek komutla Docker kurulumu](14-one-command-installer.md) | `kurulum.sh`: kur, güncelle, durum, yedek; CI ile doğrulanır |
 
 ## İlgili belgeler
 
