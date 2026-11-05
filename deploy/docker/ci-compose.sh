@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI acceptance for docker-compose.yml on a disposable runner: build, TLS proxy, proxy trust,
 # secure cookie, MFA over HTTPS, worker heartbeat, restart persistence, backup + verification, and
-# operation with no outbound network at all (deploy/docker/compose.no-egress.yml).
+# operation with no outbound network at all (deploy/docker/egress-lock.sh).
 set -euo pipefail
 [ "${OPENREPORTING_DOCKER_CI:-}" = 1 ] || { echo 'Disposable CI runner required' >&2; exit 1; }
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
@@ -60,13 +60,14 @@ docker compose --profile backup run --rm --entrypoint openreporting backup \
 grep -q '"ok": *true' "$EVIDENCE/verify.json"
 docker image inspect "openreporting:local" --format '{{.Size}}' > "$EVIDENCE/image-size-bytes.txt"
 
-# Offline operation after installation: web, worker and backup lose every route out of the host.
-# The product must still sign in, query, render a PDF, run the worker and back up.
-NOEGRESS=(docker compose -f docker-compose.yml -f deploy/docker/compose.no-egress.yml)
-"${NOEGRESS[@]}" up -d --wait
+# Offline operation after installation: the host firewall rejects every new connection the containers
+# open towards anything outside their own subnet (deploy/docker/egress-lock.sh). The product must still
+# sign in, query, render a PDF, run the worker and back up.
+sudo bash deploy/docker/egress-lock.sh apply
+trap 'sudo bash deploy/docker/egress-lock.sh remove || true; docker compose logs --no-color > "$EVIDENCE/compose.log" 2>&1 || true' EXIT
 docker compose exec -T web python - <<'PY'
 import socket
-for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53), ("pypi.org", 443), ("github.com", 443)):
+for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53), ("140.82.112.3", 443)):
     try:
         socket.create_connection((host, port), timeout=4).close()
     except OSError:
@@ -74,6 +75,8 @@ for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53), ("pypi.org", 443), ("githu
     raise SystemExit(f"egress is open: {host}:{port}")
 print("no egress from web")
 PY
+docker compose restart web worker
+docker compose up -d --wait
 CSRF="$(login)"
 JSON=(-b "$EVIDENCE/jar" -H 'Content-Type: application/json' -H "Origin: $BASE" -H "X-CSRF-Token: $CSRF")
 "${CURL[@]}" "${JSON[@]}" -d '{"targets":[{"refId":"A","scenario":"sine","datasource":{"uid":"testdata"}}],"range":{"from":"now-1h","to":"now"},"compare":"previous"}' \
@@ -85,8 +88,8 @@ JSON=(-b "$EVIDENCE/jar" -H 'Content-Type: application/json' -H "Origin: $BASE" 
 head -c 4 "$EVIDENCE/offline.pdf" | grep -q '%PDF'
 for _ in $(seq 1 30); do [ "$(worker_state)" = up ] && break; sleep 2; done
 [ "$(worker_state)" = up ]
-"${NOEGRESS[@]}" --profile backup run --rm backup > "$EVIDENCE/backup-offline.txt"
-"${NOEGRESS[@]}" down
+docker compose --profile backup run --rm backup > "$EVIDENCE/backup-offline.txt"
+sudo bash deploy/docker/egress-lock.sh remove
 echo 'Offline (no egress) operation passed'
 docker compose down
 echo 'Docker compose acceptance passed'

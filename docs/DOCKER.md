@@ -109,18 +109,23 @@ Kurulumdan sonra sunucunun erişmesi gereken yerler yalnızca **kendi ağınızd
 - **Saat senkronizasyonu (iç NTP):** iki adımlı giriş (TOTP) ve rapor zamanlamaları doğru saate ihtiyaç duyar.
 - İç DNS (veri kaynaklarının adlarını çözmek için).
 
-Bunun kanıtı her değişiklikte CI'da çalışır: `deploy/docker/compose.no-egress.yml` katmanıyla web ve worker'ın
-dışarı hiçbir yolu kalmaz (internet de iç ağ da). Bu durumda giriş, sorgu, önceki dönem karşılaştırması,
-akıllı dashboard PDF'i, worker ve yedek çalıştırılıp doğrulanır. Tüm veri kaynaklarınız aynı Docker sunucusu
-içindeyse bu katmanı üretimde de kullanabilirsiniz:
+**Önerilen sertleştirme — çıkış kilidi:** konteynerlerin internete çıkmasını sunucu güvenlik duvarında
+tamamen kapatın, yalnız iç ağınızdaki gerekli adreslere izin verin (Docker'ın `DOCKER-USER` zinciri):
 
 ```bash
-docker compose -f docker-compose.yml -f deploy/docker/compose.no-egress.yml up -d --wait
+# Örnek: Zabbix ve veritabanlarının bulunduğu 10.20.0.0/16, SMTP/LDAP sunucusu 192.168.5.10
+sudo deploy/docker/egress-lock.sh apply 10.20.0.0/16 192.168.5.10/32
+sudo deploy/docker/egress-lock.sh status     # kuralları ve sayaçları gösterir
+sudo deploy/docker/egress-lock.sh remove     # kilidi kaldırır (ör. sürüm yükseltmeden önce)
 ```
 
-Veri kaynaklarınız kurum ağındaysa varsayılan ağı kullanın ve dış trafiği sunucu güvenlik duvarında yalnız bu
-adreslere izin verecek şekilde kısıtlayın (önerilen). Not: Docker Desktop (Windows/macOS) kapalı (`internal`)
-ağlarda servis adlarını çözemediği için bu katman yalnız Linux Docker Engine'de çalışır.
+Kullanıcıların 80/443 üzerinden gelen bağlantıları ve konteynerlerin birbirleriyle konuşması etkilenmez.
+Kurallar yeniden başlatmada kendiliğinden korunmaz: dağıtımınızın aracıyla kalıcı yapın veya `apply`
+komutunu `docker.service` sonrasında çalışan bir systemd birimine koyun.
+
+Bunun kanıtı her değişiklikte CI'da çalışır: kilit uygulanınca web konteynerinin internete bağlanamadığı
+doğrulanır, ardından web ve worker yeniden başlatılır ve giriş, sorgu (önceki dönem karşılaştırmasıyla),
+akıllı dashboard PDF'i, worker ve yedek çalıştırılır.
 
 İnternet yalnız şu durumlarda tekrar gerekir: **sürüm yükseltme** (yeni imaj derlemek için; alternatif olarak
 imaj başka bir makinede derlenip `docker save` / `docker load` ile taşınabilir), Python eklentisi kurmak ve
