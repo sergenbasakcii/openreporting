@@ -189,9 +189,9 @@ jobs:
         with:
           persist-credentials: false
       - name: shellcheck
-        run: shellcheck -x -s bash deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/docker/ci-kurulum.sh kurulum.sh deploy/kubernetes/ci-kind.sh && shellcheck -s sh deploy/docker/backup.sh
+        run: shellcheck -x -s bash deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/docker/ci-kurulum.sh deploy/docker/ci-distro-docker.sh kurulum.sh deploy/kubernetes/ci-kind.sh && shellcheck -s sh deploy/docker/backup.sh
       - name: bash -n
-        run: for f in deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/docker/ci-kurulum.sh kurulum.sh deploy/kubernetes/ci-kind.sh; do bash -n "$f"; done && sh -n deploy/docker/backup.sh
+        run: for f in deploy/*.sh deploy/docker/ci-compose.sh deploy/docker/egress-lock.sh deploy/docker/ci-kurulum.sh deploy/docker/ci-distro-docker.sh kurulum.sh deploy/kubernetes/ci-kind.sh; do bash -n "$f"; done && sh -n deploy/docker/backup.sh
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
@@ -302,6 +302,37 @@ jobs:
             build/docker
             !build/docker/jar
           retention-days: 14
+
+  docker-distros:
+    name: Docker install on ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: Ubuntu 24.04, image: "ubuntu:24.04"}
+          - {name: Ubuntu 22.04, image: "ubuntu:22.04"}
+          - {name: Debian 12, image: "debian:12"}
+          - {name: Debian 13, image: "debian:13"}
+          - {name: Kali rolling, image: "kalilinux/kali-rolling"}
+          - {name: Oracle Linux 8, image: "oraclelinux:8"}
+          - {name: Oracle Linux 9, image: "oraclelinux:9"}
+          - {name: Oracle Linux 9 with Podman, image: "oraclelinux:9", env: "WITH_PODMAN=1"}
+          - {name: Oracle Linux 10, image: "oraclelinux:10"}
+          - {name: Rocky Linux 9, image: "rockylinux:9"}
+          - {name: AlmaLinux 9, image: "almalinux:9"}
+          - {name: RHEL 9 (UBI), image: "registry.access.redhat.com/ubi9/ubi"}
+          - {name: Fedora 42, image: "fedora:42"}
+          - {name: openSUSE Leap 15.6, image: "opensuse/leap:15.6"}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Docker the way kurulum.sh does
+        run: |
+          docker run --rm ${{ matrix.env && format('-e {0}', matrix.env) || '' }}             -v "$PWD/kurulum.sh:/repo/kurulum.sh:ro" -v "$PWD/deploy/docker/ci-distro-docker.sh:/t.sh:ro"             "${{ matrix.image }}" bash /t.sh | tee distro.log
+          grep -q RESULT_OK distro.log
 
   docker-installer:
     name: One-command installer (kurulum.sh)

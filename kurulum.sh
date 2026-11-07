@@ -35,21 +35,83 @@ sor() { # sor DEĞİŞKEN "soru" "varsayılan"
 compose() { docker compose "$@"; }
 is_ip() { [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; }
 
+# Distribution family from /etc/os-release: apt (Ubuntu/Debian/Kali/Mint…), dnf (RHEL/Oracle/Rocky/Alma/CentOS/Fedora), zypper (SUSE).
+# osr KEY → value of KEY in /etc/os-release (quotes removed), empty when absent.
+osr() { sed -n "s/^$1=//p" /etc/os-release 2>/dev/null | tr -d '"' | head -n 1; }
+
+os_family() {
+  case " $(osr ID) $(osr ID_LIKE) " in
+    *" ubuntu "*|*" debian "*) echo apt ;;
+    *" rhel "*|*" fedora "*|*" centos "*|*" ol "*|*" rocky "*|*" almalinux "*) echo dnf ;;
+    *" suse "*|*" sles "*|*" opensuse "*) echo zypper ;;
+    *) echo unknown ;;
+  esac
+}
+
+# Docker Engine + Compose v2 from Docker's official repository (distribution packages are often too old).
+install_docker_packages() {
+  local id codename repo
+  id="$(osr ID)"
+  case "$(os_family)" in
+    apt)
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -q
+      apt-get install -y -q ca-certificates curl gnupg git openssl cron
+      # Ubuntu (and derivatives such as Mint) use the Ubuntu repository; Debian, Kali and others the Debian one.
+      if [ "$id" = ubuntu ] || [ -n "$(osr UBUNTU_CODENAME)" ]; then
+        repo=ubuntu; codename="$(osr UBUNTU_CODENAME)"; codename="${codename:-$(osr VERSION_CODENAME)}"
+      else
+        repo=debian; codename="$(osr VERSION_CODENAME)"
+        # Kali rolling and Debian testing have no Docker channel of their own: use the current stable one.
+        case "$codename" in kali-rolling|""|sid|forky) codename=bookworm ;; esac
+      fi
+      install -d -m 0755 /etc/apt/keyrings
+      curl -fsSL "https://download.docker.com/linux/$repo/gpg" -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$repo $codename stable" \
+        > /etc/apt/sources.list.d/docker.list
+      apt-get update -q
+      apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      ;;
+    dnf)
+      # Podman/Buildah ship by default on RHEL-like systems and conflict with Docker's runc/containerd.
+      if rpm -q podman buildah runc >/dev/null 2>&1 || rpm -q podman >/dev/null 2>&1; then
+        evet "Podman/Buildah kurulu; Docker ile çakışır. Kaldırılsın mı (konteyner imajları Podman'da kalır)?" || hata "Podman kaldırılmadan Docker kurulamaz."
+        dnf -y remove podman buildah runc containers-common >/dev/null 2>&1 || dnf -y remove podman buildah runc
+      fi
+      dnf -y install git openssl cronie curl tar
+      case "$id" in rhel) repo=rhel ;; fedora) repo=fedora ;; *) repo=centos ;; esac
+      # Writing the .repo file works with dnf 4 and dnf 5 alike (their config-manager syntaxes differ).
+      curl -fsSL "https://download.docker.com/linux/$repo/docker-ce.repo" -o /etc/yum.repos.d/docker-ce.repo
+      dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      ;;
+    zypper)
+      # SLES: the Containers module must be enabled first (SUSEConnect -p sle-module-containers/15.x/x86_64).
+      zypper --non-interactive install docker docker-compose git openssl cron
+      ;;
+    *) hata "Bu dağıtım tanınmadı. Docker Engine 24+ ve Docker Compose v2 kurun, sonra betiği tekrar çalıştırın." ;;
+  esac
+}
+
 on_kosullar() {
   [ "$(id -u)" = 0 ] || hata "Root yetkisi gerekir: sudo ./kurulum.sh"
   [ "$(uname -s)" = Linux ] || hata "Bu betik Linux sunucu içindir (Windows/macOS'ta Docker Desktop ile docs/DOCKER.md)."
   adim "Docker kontrol ediliyor"
   if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
-    command -v apt-get >/dev/null || hata "Docker Engine 24+ ve Docker Compose v2 kurun, sonra betiği tekrar çalıştırın."
-    evet "Docker kurulu değil. Şimdi kurulsun mu (docker.io + docker-compose-v2)?" || hata "Docker olmadan devam edilemez."
-    apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 openssl
+    evet "Docker Engine veya Compose v2 yok. Docker'ın resmi deposundan şimdi kurulsun mu?" || hata "Docker olmadan devam edilemez."
+    install_docker_packages
     systemctl enable --now docker
   fi
-  command -v openssl >/dev/null || { command -v apt-get >/dev/null && apt-get install -y -q openssl; }
+  command -v openssl >/dev/null || hata "openssl gerekli: paket yöneticinizle kurun (apt/dnf/zypper install openssl)"
   local version
   version="$(docker version --format '{{.Server.Version}}' 2>/dev/null)" || hata "Docker servisi çalışmıyor: systemctl start docker"
   [ "${version%%.*}" -ge 24 ] 2>/dev/null || hata "Docker $version eski; en az 24 gerekir."
   tamam "Docker $version, $(docker compose version --short)"
+  if command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; then
+    firewall-cmd --permanent --add-service=http --add-service=https >/dev/null && firewall-cmd --reload >/dev/null && tamam "firewalld: 80/443 açıldı"
+  elif command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then
+    ufw allow 80/tcp >/dev/null && ufw allow 443/tcp >/dev/null && tamam "ufw: 80/443 açıldı"
+  fi
 }
 
 ayarlar() {
@@ -224,6 +286,9 @@ durum() {
   if [ -n "$last" ]; then tamam "son yedek: ${last#backups/}"; else uyari "henüz yedek yok"; fi
   if [ -f "$UNIT" ]; then tamam "çıkış kilidi etkin"; else uyari "çıkış kilidi yok"; fi
 }
+
+# KURULUM_LIB=1: only define the functions (tests source the file).
+[ "${KURULUM_LIB:-}" = 1 ] && return 0
 
 case "${1:-kur}" in
   kur) kur ;;

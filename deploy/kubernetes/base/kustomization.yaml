@@ -19,4 +19,4 @@ resources:
 images:
   - name: openreporting
     newName: registry.example.com/openreporting/openreporting
-    newTag: "1.2.0"
+    newTag: "1.1.0"

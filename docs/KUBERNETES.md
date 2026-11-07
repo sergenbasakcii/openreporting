@@ -38,8 +38,8 @@ için saatleri dağıtın. Her istek yeni veritabanı bağlantısı açar; çok 
 ## 2. İmaj
 
 ```bash
-docker build -t registry.example.com/openreporting/openreporting:1.2.0 .
-docker push registry.example.com/openreporting/openreporting:1.2.0
+docker build -t registry.example.com/openreporting/openreporting:1.1.0 .
+docker push registry.example.com/openreporting/openreporting:1.1.0
 ```
 
 `deploy/kubernetes/base/kustomization.yaml` içindeki `images` bölümünü kendi deponuza göre düzenleyin
@@ -55,7 +55,7 @@ kubectl -n openreporting create secret generic openreporting-secrets \
   --from-literal=OPENREPORTING_DATABASE_URL='postgresql://openreporting:PAROLA@pg.example.com:5432/openreporting?sslmode=verify-full'
 
 # Şifreleme anahtarı: bir kez üretin, kasada saklayın, bütün pod'lar aynısını kullanır
-docker run --rm registry.example.com/openreporting/openreporting:1.2.0 \
+docker run --rm registry.example.com/openreporting/openreporting:1.1.0 \
   python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode(), end="")' > secret.key
 kubectl -n openreporting create secret generic openreporting-key --from-file=secret.key=secret.key
 # secret.key dosyasını kurum kasasına taşıyın ve sunucudan silin
@@ -73,13 +73,13 @@ kind: Kustomization
 namespace: openreporting
 resources: [../../base]
 images:
-  - {name: registry.example.com/openreporting/openreporting, newName: registry.sirket.local/openreporting, newTag: "1.2.0"}
+  - {name: registry.example.com/openreporting/openreporting, newName: registry.sirket.local/openreporting, newTag: "1.1.0"}
 patches:
   - target: {kind: ConfigMap, name: openreporting-config}
     patch: |
       - {op: replace, path: /data/OPENREPORTING_PUBLIC_URL, value: "https://openreporting.sirket.local"}
       - {op: replace, path: /data/OPENREPORTING_FORWARDED_ALLOW_IPS, value: "10.42.0.0/16"}   # ZORUNLU: kümenin pod CIDR'ı (varsayılan 10.244.0.0/16 yalnız kind içindir)
-  - target: {kind: Ingress, name: openreporting}
+  - target: {kind: Ingress, name: "openreporting(-login)?"}   # iki Ingress: genel + giriş (oran sınırlı)
     patch: |
       - {op: replace, path: /spec/rules/0/host, value: openreporting.sirket.local}
       - {op: replace, path: /spec/tls/0/hosts/0, value: openreporting.sirket.local}
@@ -125,9 +125,9 @@ Geri yüklemede üçü aynı ana ait olmalıdır.
 ## 6. Güncelleme
 
 ```bash
-docker build -t registry.example.com/openreporting/openreporting:1.2.1 . && docker push …
-kubectl -n openreporting set image deploy/openreporting-web web=registry.example.com/openreporting/openreporting:1.2.1
-kubectl -n openreporting set image deploy/openreporting-worker worker=registry.example.com/openreporting/openreporting:1.2.1
+docker build -t registry.example.com/openreporting/openreporting:1.1.1 . && docker push …
+kubectl -n openreporting set image deploy/openreporting-web web=registry.example.com/openreporting/openreporting:1.1.1
+kubectl -n openreporting set image deploy/openreporting-worker worker=registry.example.com/openreporting/openreporting:1.1.1
 ```
 
 Web pod'ları kesintisiz sırayla yenilenir (`maxUnavailable: 0`). Şema değişen sürümlerde önce
