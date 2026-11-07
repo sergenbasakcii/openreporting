@@ -8,7 +8,7 @@ const nothing = { resize() {}, destroy() {} };
 export function renderImage(container, frames, panel) {
   const o = panel.options || {};
   if (!o.logo_id) {
-    container.replaceChildren(h('div', { class: 'layout-empty' }, icon('upload'), h('span', { text: 'Görsel seçilmedi · sağ panelden yükleyin' })));
+    container.replaceChildren(h('div', { class: 'layout-empty' }, icon('upload'), h('span', { text: 'Görsel yok', title: 'Görseli sağ panelden yükleyin' })));
     return nothing;
   }
   container.replaceChildren(h('div', { class: `layout-image align-${o.align || 'center'}` },

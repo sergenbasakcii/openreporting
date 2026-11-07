@@ -35,13 +35,14 @@ function logoPicker(cfg, canEdit) {
     const preview = h('div', { class: 'logo-preview' }, cfg.logo_id
       ? h('img', { src: `/api/dash-reports/logos/${encodeURIComponent(cfg.logo_id)}`, alt: 'Müşteri logosu' })
       : h('span', { class: 'muted', text: 'Logo yok' }));
-    wrap.replaceChildren(preview, fileIn,
+    // Native replaceChildren() would print a null child as the text "null"; keep only real nodes.
+    wrap.replaceChildren(...[preview, fileIn,
       canEdit ? h('div', { class: 'toolbar' },
         button(cfg.logo_id ? 'Değiştir' : 'Logo yükle', { icon: 'upload', size: 'sm', onClick: () => fileIn.click() }),
         cfg.logo_id ? button('Kaldır', { icon: 'trash', size: 'sm', onClick: () => { cfg.logo_id = null; draw(); } }) : null) : null,
       cfg.logo_id ? h('div', { class: 'toolbar' },
         toggle('Kapakta göster', cfg.logo_on_cover, (v) => { cfg.logo_on_cover = v; }),
-        toggle('Her sayfanın başlığında göster', cfg.logo_on_pages, (v) => { cfg.logo_on_pages = v; })) : null);
+        toggle('Her sayfanın başlığında göster', cfg.logo_on_pages, (v) => { cfg.logo_on_pages = v; })) : null].filter(Boolean));
   };
   draw();
   return wrap;
@@ -281,7 +282,7 @@ export async function reportEditPage(root, { id, query, app }) {
         'PNG, JPG, WebP veya GIF; en fazla 1 MB. Saydam arka planlı PNG en iyi sonucu verir. Kapakta sağ üstte, sayfalarda başlığın sağında yer alır.'),
       field('Alt bilgi metni', input({ value: cfg.footer_text, placeholder: 'Ör. Ağ Operasyon Merkezi · Gizli', onChange: (e) => { cfg.footer_text = e.target.value; } }))),
     h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'E-posta' }),
-      settings.mailEnabled ? null : h('div', { class: 'alert warn', text: 'SMTP kapalı: raporlar arşivlenir, e-posta gönderilmez. Etkinleştirmek için /etc/openreporting/openreporting.env içinde OPENREPORTING_MAIL_ENABLED=true ve SMTP ayarlarını yapın.' }),
+      settings.mailEnabled ? null : h('div', { class: 'alert warn', text: 'E-posta kapalı: raporlar arşivlenir, e-posta gönderilmez. Bir yönetici Yönetim → Sistem ayarları → E-posta sekmesinden açabilir.' }),
       field('Konu şablonu', input({ value: cfg.email_subject, placeholder: '{report} | {from} – {to}', onChange: (e) => { cfg.email_subject = e.target.value; } })),
       field('Mesaj', textarea({ value: cfg.email_message, rows: 3, placeholder: 'Rapor ektedir.', onChange: (e) => { cfg.email_message = e.target.value; } })),
       toggle('Kısmi veri (hata / NO DATA) olsa da gönder', cfg.send_partial, (v) => { cfg.send_partial = v; }),

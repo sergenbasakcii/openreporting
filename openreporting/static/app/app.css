@@ -407,7 +407,15 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .smart-item .panel { box-shadow: none; border-color: #e3e6ec; }
 .smart-item.selected > .smart-view .panel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .smart-item.dragging { opacity: .85; z-index: 5; } .smart-item.blocked .panel { border-color: var(--error-text); }
-.smart-bar { display: flex; align-items: center; gap: 4px; min-height: 26px; margin-bottom: 2px; }
+.smart-bar { display: flex; align-items: center; gap: 4px; min-height: 26px; position: absolute; left: 3px; bottom: calc(100% - 3px); z-index: 7;
+  min-width: calc(100% - 6px); width: max-content; max-width: min(620px, 92vw);
+  padding: 3px 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated); box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity .12s var(--ease), transform .12s var(--ease); }
+/* Tools float above the item only when it is hovered, selected, focused or still needs a metric: the panel keeps its full area for data. */
+.smart-item:hover > .smart-bar, .smart-item.selected > .smart-bar, .smart-item:focus-within > .smart-bar, .smart-item.needs-keyword > .smart-bar { opacity: 1; pointer-events: auto; transform: none; }
+.smart-item:hover, .smart-item.selected, .smart-item:focus-within { z-index: 6; }
+.kw-chip .kw-label { white-space: nowrap; }
+.smart-item[data-edge="right"] > .smart-bar { left: auto; right: 3px; }
 .smart-bar-content { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .smart-grip { width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 6px; background: var(--accent-soft); color: var(--accent); cursor: move; flex: none; padding: 0; }
 .smart-grip svg { width: 14px; height: 14px; }
@@ -424,7 +432,7 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .kw-option:hover, .kw-option.on { background: var(--accent-soft); color: var(--text-strong); } .kw-option svg { width: 14px; height: 14px; color: var(--accent); } .kw-keyword { font-weight: 600; }
 @media (max-width: 1100px) { .smart-main { grid-template-columns: 1fr; } .smart-palette { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--border); } .smart-side { border-left: 0; border-top: 1px solid var(--border); } }
 .smart-view-inner { position: absolute; inset: 0; }
-.smart-hint { position: absolute; inset: 38px 8px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; color: var(--text-muted); font-size: 12px; background: var(--bg-panel); border-radius: 6px; pointer-events: none; padding: 6px; }
+.smart-hint { position: absolute; inset: 30px 8px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; color: var(--text-muted); font-size: 12px; background: var(--bg-panel); border-radius: 6px; pointer-events: none; padding: 6px; }
 .smart-hint svg { width: 20px; height: 20px; color: var(--accent); }
 
 /* ---- smart dashboard v2 ---- */
@@ -492,3 +500,5 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .paper-watermark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 0; font-weight: 800; font-size: clamp(40px, 9vw, 110px); color: rgba(148, 163, 184, .16); transform: rotate(-35deg); white-space: nowrap; overflow: hidden; }
 .paper-body { z-index: 1; }
 .smart-item.multi > .smart-view .panel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+
+.ds-type-grid { margin-bottom: 18px; } .ds-type-grid .tile { text-align: left; font: inherit; width: 100%; }

@@ -105,7 +105,7 @@ export async function serverPage(root) {
         h('div', { class: 'progress' }, h('i', { style: { width: `${Math.round((used / s.disk.total_bytes) * 100)}%` } })),
         h('p', { style: { marginTop: '10px' }, text: `Rapor arşivi: ${bytes(s.disk.archive_bytes)}` }),
         h('p', {}, 'Denetim zinciri: ', s.auditChainValid ? h('span', { class: 'badge ok', text: 'geçerli' }) : h('span', { class: 'badge err', text: `bozuk (#${s.auditBrokenId})` })),
-        h('p', {}, 'E-posta gönderimi: ', s.mailEnabled ? h('span', { class: 'badge ok', text: 'etkin' }) : h('span', { class: 'badge', text: 'kapalı (OPENREPORTING_MAIL_ENABLED)' })))),
+        h('p', {}, 'E-posta gönderimi: ', s.mailEnabled ? h('span', { class: 'badge ok', text: 'etkin' }) : h('span', { class: 'badge', text: 'kapalı (Sistem ayarları → E-posta)' })))),
       h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Kurumsal bağlantılar' }),
         h('p', { class: 'hint', text: 'Bağlantı testleri e-posta göndermez. Ayarlar sunucuda güvenli yapılandırma dosyasıyla yönetilir.' }),
         integrations ? null : h('p', { class: 'muted', text: 'Bağlantı durumu alınamadı.' }),

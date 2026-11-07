@@ -1,4 +1,4 @@
-# OpenReporting 1.0 — Kullanım Kılavuzu
+# OpenReporting 1.1 — Kullanım Kılavuzu
 
 ## 1. Roller
 
@@ -171,6 +171,10 @@ Zabbix, PostgreSQL/TimescaleDB, Prometheus/Mimir/VictoriaMetrics, Loki, HTTP JSO
 **veri gölü (Trino / Presto / Starburst)**, **Databricks SQL**, **ClickHouse**, **Elasticsearch / OpenSearch**,
 **InfluxDB**, **Graphite**. Tüm bağlantılar salt-okunurdur; HTTPS ve sertifika doğrulaması zorunludur.
 Her kaynak için yalnız okuma yetkili bir hesap kullanın.
+
+**Ekleme:** Yönetim → Veri kaynakları → **Veri kaynağı ekle**. Türler kategorilere ayrılmıştır (İzleme ve metrik, SQL,
+**Veri gölü / Lakehouse**, Log ve arama, HTTP / dosya, Test); üstteki kutuya "veri gölü", "s3", "iceberg", "postgres" gibi
+bir kelime yazarak arayabilirsiniz. Türü seçince bağlantı formu açılır; **Oluştur ve test et** bağlantıyı dener.
 
 ## 11. Arama ve kısayollar
 

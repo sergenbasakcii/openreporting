@@ -4,25 +4,32 @@ import { engineConnectionForm } from './datasource-forms.js';
 import { icon } from '../icons.js';
 import { get, post, put, del, invalidate } from '../api.js';
 import { navigate, setBreadcrumbs } from '../router.js';
+import { fold } from '../fuzzy.js';
 
-const TYPE_ICON = { zabbix: 'activity', postgres: 'database', testdata: 'layers', trino: 'layers', databricks: 'layers', elasticsearch: 'search', influxdb: 'chart-line', graphite: 'chart-line', prometheus: 'activity', loki: 'list', clickhouse: 'database' };
+const TYPE_ICON = { zabbix: 'activity', postgres: 'database', testdata: 'layers', trino: 'layers', databricks: 'layers', elasticsearch: 'search', influxdb: 'chart-line', graphite: 'chart-line', prometheus: 'activity', loki: 'list', clickhouse: 'database', httpjson: 'code', csv: 'table' };
+const DEFAULT_JSON = {
+  zabbix: { auth_mode: 'bearer', trends_from: '7d', trends_range: '4d', cache_ttl: 60, timeout: 30, max_items: 500 },
+  postgres: { port: 5432, sslmode: 'verify-full', timeout_ms: 30000, max_rows: 200000 },
+};
 
 export async function datasourcesPage(root) {
   setBreadcrumbs([{ label: 'Veri kaynakları' }]);
   const page = h('div', { class: 'page' });
   root.append(page);
   page.append(loading());
-  const list = await get('/api/datasources');
+  const [list, types] = await Promise.all([get('/api/datasources'), get('/api/datasources/types')]);
+  const typeName = Object.fromEntries(types.types.map((t) => [t.type, t.name]));
+  const groups = (types.categories || []).map((c) => c.name).join(', ');
   page.replaceChildren(h('div', { class: 'page-header' }, h('div', h('h1', icon('database'), 'Veri kaynakları'),
-    h('p', { class: 'sub', text: 'Zabbix, PostgreSQL, Prometheus, Loki, HTTP JSON/CSV ve test verisi. Kimlik bilgileri sunucuda şifreli saklanır ve tarayıcıya hiçbir zaman gönderilmez.' })),
+    h('p', { class: 'sub', text: `${types.types.length} tür: ${groups}. Kimlik bilgileri sunucuda şifreli saklanır ve tarayıcıya hiçbir zaman gönderilmez.` })),
   button('Veri kaynağı ekle', { icon: 'plus', variant: 'primary', onClick: () => navigate('/datasources/new') })));
   if (!list.length) page.append(h('div', { class: 'empty-state' }, h('h2', { class: 'section-heading', text: 'Veri kaynağı yok' })));
   for (const ds of list) {
     page.append(h('a', { class: 'list-row', href: ds.readOnly ? undefined : `/datasources/edit/${ds.uid}`, 'data-link': ds.readOnly ? undefined : '' },
       h('div', { class: 'tile-icon' }, icon(TYPE_ICON[ds.type] || 'database')),
-      h('div', { class: 'grow' }, h('b', { text: ds.name }), h('div', { class: 'faint', text: `${ds.type} · ${ds.url || '—'} · güncellendi ${timeAgo(ds.updated_at)}` })),
+      h('div', { class: 'grow' }, h('b', { text: ds.name }), h('div', { class: 'faint', text: `${typeName[ds.type] || ds.type} · ${ds.url || '—'} · güncellendi ${timeAgo(ds.updated_at)}` })),
       ds.isDefault ? h('span', { class: 'badge info', text: 'varsayılan' }) : null,
-      ds.readOnly ? h('span', { class: 'badge', title: 'Ortam dosyasından tanımlı; arayüzden değiştirilemez', text: 'provisioned' }) : null,
+      ds.readOnly ? h('span', { class: 'badge', title: 'Ortam dosyasından tanımlı; arayüzden değiştirilemez', text: 'otomatik' }) : null,
       button('Test et', { size: 'sm', onClick: async (e) => { e.preventDefault(); e.stopPropagation(); await testConnection(ds.uid); } })));
   }
 }
@@ -41,7 +48,13 @@ export async function datasourceEditPage(root, { uid }) {
   const all = await get('/api/datasources');
   setBreadcrumbs([{ label: 'Veri kaynakları', href: '/datasources' }, { label: existing ? existing.name : 'Yeni' }], root);
   const model = existing ? { name: existing.name, type: existing.type, url: existing.url, isDefault: existing.isDefault, jsonData: { ...existing.jsonData }, secureJsonData: {}, secureJsonReset: [] }
-    : { name: '', type: 'zabbix', url: '', isDefault: false, jsonData: { auth_mode: 'bearer', trends_from: '7d', trends_range: '4d', cache_ttl: 60, timeout: 30, max_items: 500 }, secureJsonData: {}, secureJsonReset: [] };
+    : { name: '', type: '', url: '', isDefault: false, jsonData: {}, secureJsonData: {}, secureJsonReset: [] };
+  const typeInfo = (v) => types.types.find((t) => t.type === v) || {};
+  const chooseType = (v) => {
+    model.type = v; model.url = ''; model.secureJsonData = {}; model.jsonData = { ...(DEFAULT_JSON[v] || {}) };
+    if (!model.name) model.name = (typeInfo(v).name || '').split(' · ').pop().split(' / ')[0];
+    draw();
+  };
   const configured = existing ? existing.secureJsonFields : {};
   const page = h('div', { class: 'page' });
   const form = h('div');
@@ -58,11 +71,13 @@ export async function datasourceEditPage(root, { uid }) {
   };
   const draw = () => {
     form.replaceChildren();
+    if (!model.type) { form.append(typePicker(types, chooseType)); return; }
     form.append(h('div', { class: 'card' }, h('div', { class: 'form-grid' },
       field('Ad', input({ value: model.name, onChange: (e) => { model.name = e.target.value; } })),
-      field('Tür', existing ? input({ value: model.type, readonly: true }) : select(types.types.map((t) => ({ value: t.type, label: t.name })), model.type, (v) => { model.type = v; model.url = ''; model.secureJsonData = {}; model.jsonData = v === 'postgres' ? { port: 5432, sslmode: 'verify-full', timeout_ms: 30000, max_rows: 200000 } : v === 'zabbix' ? { auth_mode: 'bearer', trends_from: '7d', trends_range: '4d', cache_ttl: 60, timeout: 30, max_items: 500 } : {}; draw(); })),
+      field('Tür', h('div', { class: 'toolbar' }, h('b', { text: typeInfo(model.type).name || model.type }),
+        existing ? null : button('Türü değiştir', { size: 'sm', onClick: () => { model.type = ''; draw(); } }))),
       field(null, toggle('Varsayılan veri kaynağı', model.isDefault, (v) => { model.isDefault = v; }))),
-    h('p', { class: 'hint', text: (types.types.find((t) => t.type === model.type) || {}).description || '' })));
+    h('p', { class: 'hint', text: typeInfo(model.type).description || '' })));
     const engineForm = engineConnectionForm(model.type, { model, jd, secret, redraw: () => draw() });
     if (model.type === 'zabbix') {
       form.append(h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Bağlantı' }),
@@ -125,4 +140,28 @@ export async function datasourceEditPage(root, { uid }) {
   draw();
   page.append(h('div', { class: 'page-header' }, h('div', h('h1', icon(TYPE_ICON[model.type] || 'database'), existing ? existing.name : 'Yeni veri kaynağı'))), form);
   root.append(page);
+}
+
+// "New datasource" step 1: every type grouped by category and searchable ("datalake", "s3", "veri golu" find Trino).
+function typePicker(types, onPick) {
+  const results = h('div');
+  const render = (q) => {
+    const words = fold(q.trim()).split(/\s+/).filter(Boolean);
+    const match = (t) => { const hay = fold(`${t.name} ${t.type} ${t.description} ${t.keywords || ''}`); return words.every((w) => hay.includes(w)); };
+    results.replaceChildren();
+    let shown = 0;
+    for (const cat of types.categories || [{ id: '', name: 'Tümü' }]) {
+      const items = types.types.filter((t) => (!cat.id || t.category === cat.id) && match(t));
+      if (!items.length) continue;
+      shown += items.length;
+      results.append(h('h2', { class: 'section-heading', text: cat.name }), h('div', { class: 'card-grid ds-type-grid' },
+        ...items.map((t) => h('button', { class: 'tile', type: 'button', 'data-type': t.type, onClick: () => onPick(t.type) },
+          h('div', { class: 'tile-icon' }, icon(TYPE_ICON[t.type] || 'database')), h('div', h('b', { text: t.name }), h('span', { text: t.description }))))));
+    }
+    if (!shown) results.append(h('p', { class: 'hint', text: 'Eşleşen tür yok. Eklenti olarak eklenen türler için Yönetim → Eklentiler.' }));
+  };
+  const search = input({ type: 'search', placeholder: 'Tür ara: veri gölü, trino, s3, postgres, log…', label: 'Veri kaynağı türü ara', onInput: (e) => render(e.target.value) });
+  render('');
+  queueMicrotask(() => search.focus());
+  return h('div', h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Ne bağlamak istiyorsunuz?' }), search), results);
 }

@@ -3,6 +3,8 @@
 const { chromium } = require(process.env.OPENREPORTING_PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { THEMES, applyTheme } = require('./themes.cjs');
+
 const base = process.env.OPENREPORTING_UI_URL || 'http://127.0.0.1:8811';
 const uid = process.env.OPENREPORTING_UI_DASHBOARD || 'preview';
 const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
@@ -21,12 +23,10 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
     let queries = 0;
     page.on('request', req => { if (new URL(req.url()).pathname === '/api/ds/query') queries += 1; });
     const dashboardUrl = `${base}/d/${encodeURIComponent(uid)}`;
+    // "dark"/"light" modes map to one curated theme each (ids and schemes mirror openreporting/themes.py).
     async function theme(value) {
       await page.locator('.app-shell').waitFor();
-      await page.evaluate(value => {
-        document.documentElement.dataset.theme = value;
-        window.dispatchEvent(new CustomEvent('openreporting:themechange', { detail: value }));
-      }, value);
+      await applyTheme(page, THEMES.find(t => t.scheme === value));
     }
     async function surface(selector, variable = '--bg-elevated') {
       const result = await page.locator(selector).first().evaluate((el, variable) => {
@@ -39,13 +39,16 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
       }, variable);
       assert.equal(result.actual, result.expected, `${selector} must use ${variable}`);
     }
+    async function openZabbixForm() {
+      await page.locator('.ds-type-grid .tile[data-type="zabbix"]').click();
+    }
     async function selects() {
       const failures = await page.locator('select').evaluateAll(items => {
         const probe = document.createElement('span');
         probe.style.backgroundColor = 'var(--bg-elevated)';
         document.body.append(probe);
         const expected = getComputedStyle(probe).backgroundColor;
-        const scheme = document.documentElement.dataset.theme;
+        const scheme = document.documentElement.dataset.scheme;
         const failed = [];
         for (const el of items) {
           if (getComputedStyle(el).colorScheme !== scheme) failed.push('native color scheme');
@@ -90,16 +93,18 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
 
       for (const route of ['/dashboards', '/datasources/new', `/reports/new?dashboard=${encodeURIComponent(uid)}`, '/profile', `/d/${uid}?editPanel=1`]) {
         await page.goto(base + route);
+        if (route === '/datasources/new') await openZabbixForm();
         await page.locator('select').first().waitFor();
         await theme(mode);
         await selects();
       }
       // Exercise a native popup without changing its selection.
       await page.goto(`${base}/datasources/new`);
+      await openZabbixForm();
       await page.locator('select').first().waitFor();
       await theme(mode);
       await page.locator('select').first().click();
-      assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), mode);
+      assert.equal(await page.evaluate(() => document.documentElement.dataset.scheme), mode);
       await page.screenshot({ path: `${output}/select-${mode}.png` });
       await page.keyboard.press('Escape');
 
@@ -114,10 +119,12 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
       await page.getByRole('button', { name: 'PDF önizle', exact: true }).click();
       const popup = await popupPromise;
       await popup.getByRole('status').waitFor();
-      assert.equal(await popup.evaluate(() => document.documentElement.dataset.theme), mode);
+      assert.equal(await popup.evaluate(() => document.documentElement.dataset.scheme), mode);
+      assert.equal(await popup.evaluate(() => document.documentElement.dataset.theme), await page.evaluate(() => document.documentElement.dataset.theme));
       assert.equal(await popup.evaluate(() => window.opener), null);
+      // The loading window must paint with the opener's theme background, not a white flash.
       const color = await popup.locator('body').evaluate(el => getComputedStyle(el).backgroundColor);
-      assert.equal(color, mode === 'dark' ? 'rgb(17, 18, 23)' : 'rgb(244, 245, 245)');
+      assert.equal(color, await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor));
       await popup.screenshot({ path: `${output}/preview-${mode}.png` });
       const navigation = popup.waitForURL(url => url.protocol === 'blob:', { timeout: 30000, waitUntil: 'commit' });
       const download = popup.waitForEvent('download', { timeout: 30000 }).then(async file => {
@@ -154,10 +161,11 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
           view.render();
         }
         const failures = [];
-        for (const mode of ['dark','light']) {
+        for (const [id, mode] of [['aurora','dark'],['porcelain','light']]) {
           const oldCharts = views.map(view=>view.viz?.chart);
-          document.documentElement.dataset.theme = mode;
-          window.dispatchEvent(new CustomEvent('openreporting:themechange'));
+          document.documentElement.dataset.theme = id;
+          document.documentElement.dataset.scheme = mode;
+          window.dispatchEvent(new CustomEvent('openreporting:themechange', { detail: id }));
           const expected = getComputedStyle(document.documentElement).getPropertyValue('--bg-elevated').trim();
           for (const view of views) {
             const chart = view.viz?.chart;
@@ -177,12 +185,12 @@ const output = process.env.OPENREPORTING_UI_OUTPUT || 'build/theme-audit';
     // Use the actual profile control for system-theme change propagation.
     await page.goto(`${base}/profile`);
     await page.emulateMedia({ colorScheme: 'light' });
-    await page.getByLabel('Tema', { exact: true }).selectOption('system');
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+    await page.getByRole('radiogroup', { name: 'Tema' }).getByRole('radio', { name: /Sistem/ }).click();
+    await page.waitForFunction(() => document.documentElement.dataset.scheme === 'light');
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    await page.waitForFunction(() => document.documentElement.dataset.scheme === 'dark');
     assert.deepEqual(errors, []);
-    console.log('Dark/light native selects, menus, panel view/inspector, PDF loading, all 20 chart tooltips, cached rerender and system theme passed');
+    console.log('Dark/light (Aurora/Porselen) native selects, menus, panel view/inspector, PDF loading, all 20 chart tooltips, cached rerender and system theme passed');
   } finally {
     await browser.close();
   }

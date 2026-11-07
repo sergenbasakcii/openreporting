@@ -38,7 +38,7 @@ TYPE_INFO = [
     {
         "type": "postgres",
         "name": "PostgreSQL / TimescaleDB",
-        "description": "Salt-okunur SQL sorguları, Grafana makroları; TimescaleDB’deki Zabbix geçmişi",
+        "description": "Salt-okunur SQL sorguları, zaman makroları; TimescaleDB’deki Zabbix geçmişi",
         "secure_fields": ["password"],
     },
     {"type": "testdata", "name": "TestData (sentetik)", "description": "Gerçek olmayan, deterministik örnek veri ve Zabbix simülasyonu", "secure_fields": []},
@@ -63,6 +63,48 @@ TYPE_INFO += [
         ("graphite", "Graphite", "Graphite render API hedefleri ve fonksiyonları", ["password", "token"], "metrics"),
     ]
 ]
+# Picker grouping and search words (the "new datasource" screen groups types; words help find "datalake", "s3" …).
+CATEGORIES = [
+    {"id": "monitoring", "name": "İzleme ve metrik"},
+    {"id": "sql", "name": "SQL veritabanı"},
+    {"id": "lake", "name": "Veri gölü / Lakehouse"},
+    {"id": "logs", "name": "Log ve arama"},
+    {"id": "http", "name": "HTTP / dosya"},
+    {"id": "test", "name": "Test"},
+]
+_CATEGORY = {
+    "zabbix": "monitoring",
+    "prometheus": "monitoring",
+    "influxdb": "monitoring",
+    "graphite": "monitoring",
+    "postgres": "sql",
+    "clickhouse": "sql",
+    "trino": "lake",
+    "databricks": "lake",
+    "loki": "logs",
+    "elasticsearch": "logs",
+    "httpjson": "http",
+    "csv": "http",
+    "testdata": "test",
+}
+_KEYWORDS = {
+    "trino": "datalake data lake veri gölü presto starburst hive iceberg delta s3 hdfs minio parquet",
+    "databricks": "datalake data lake veri gölü lakehouse delta unity catalog spark",
+    "clickhouse": "olap analitik column",
+    "postgres": "postgresql timescaledb sql zabbix history",
+    "zabbix": "monitoring host item trigger problem",
+    "prometheus": "promql mimir victoriametrics thanos cortex",
+    "influxdb": "influxql flux timeseries",
+    "elasticsearch": "opensearch kibana lucene log",
+    "loki": "logql grafana log",
+    "httpjson": "rest api json",
+    "csv": "csv dosya file",
+    "graphite": "carbon render",
+    "testdata": "demo örnek sentetik",
+}
+for _t in TYPE_INFO:
+    _t["category"] = _CATEGORY.get(_t["type"], "http")
+    _t["keywords"] = _KEYWORDS.get(_t["type"], "")
 SECURE_FIELDS = {t["type"]: t["secure_fields"] for t in TYPE_INFO}
 _UID = re.compile(r"^[A-Za-z0-9_-]{2,40}$")
 _TABLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")

@@ -45,6 +45,25 @@ def _regex(pattern):
         raise TransformationError(str(exc)) from exc
 
 
+def _number(value):
+    """A cell usable in arithmetic: numbers pass, text/booleans/None become None (shown empty, never a crash)."""
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _reducer(name, default):
+    name = name or default
+    if name not in REDUCERS:
+        raise TransformationError(f"Bilinmeyen hesaplama: {name}")
+    return name
+
+
+def _options(entry):
+    options = entry.get("options") or {}
+    if not isinstance(options, dict):
+        raise TransformationError(f"Dönüşüm seçenekleri geçersiz: {entry.get('id')}")
+    return options
+
+
 def _series(frames):
     return [f for f in frames if f["type"] == "timeseries"]
 
@@ -85,8 +104,7 @@ def reduce_series(frames, reducers, labels_to_fields=True):
 
 def reduce_by_label(frames, label="host", reducer="mean", column_by="name"):
     series = _series(frames)
-    if reducer not in REDUCERS:
-        raise TransformationError("Unknown reducer")
+    reducer = _reducer(reducer, "mean")
     matrix = OrderedDict()
     columns = OrderedDict()
     for f in series:
@@ -156,8 +174,8 @@ def _filter_by_name(frames, options):
 
 def _organize(frame, options):
     exclude = {k for k, v in (options.get("excludeByName") or {}).items() if v}
-    order = options.get("indexByName") or {}
-    rename = options.get("renameByName") or {}
+    order = {k: v for k, v in (options.get("indexByName") or {}).items() if isinstance(v, int) and not isinstance(v, bool)}
+    rename = {k: str(v) for k, v in (options.get("renameByName") or {}).items() if v}
     indexes = [i for i, c in enumerate(frame["columns"]) if c["name"] not in exclude]
     indexes.sort(key=lambda i: order.get(frame["columns"][i]["name"], 1000 + i))
     columns = [dict(frame["columns"][i], name=rename.get(frame["columns"][i]["name"]) or frame["columns"][i]["name"]) for i in indexes]
@@ -173,6 +191,8 @@ def _column_index(frame, name):
 
 def _sort(frame, options):
     spec = options.get("sort") or [{"field": options.get("field"), "desc": options.get("desc", False)}]
+    if not isinstance(spec, list) or not all(isinstance(entry, dict) for entry in spec):
+        raise TransformationError("Sıralama ayarı geçersiz")
     rows = list(frame["rows"])
     for entry in reversed(spec):
         index = _column_index(frame, entry.get("field"))
@@ -206,15 +226,18 @@ def _calculate(frame, options):
         if left is None or op not in ops:
             raise TransformationError("Invalid binary calculation")
         rows = []
+        if frame["columns"][left].get("type") not in ("number", None) or (right is not None and frame["columns"][right].get("type") not in ("number", None)):
+            raise TransformationError("Hesaplanan sütun yalnız sayı sütunlarıyla yapılabilir")
         for row in frame["rows"]:
-            a = row[left]
-            b = constant if constant is not None else row[right]
+            a = _number(row[left])
+            b = constant if constant is not None else _number(row[right])
             rows.append(row + [ops[op](a, b) if a is not None and b is not None else None])
     else:
-        reducer = (options.get("reduce") or {}).get("reducer", "sum")
-        include = (options.get("reduce") or {}).get("include")
+        reduce_options = options.get("reduce") or {}
+        reducer = _reducer(reduce_options.get("reducer"), "sum")
+        include = reduce_options.get("include")
         cols = [i for i in numeric if not include or frame["columns"][i]["name"] in include]
-        rows = [row + [reduce_values([row[i] for i in cols], reducer)] for row in frame["rows"]]
+        rows = [row + [reduce_values([_number(row[i]) for i in cols], reducer)] for row in frame["rows"]]
     unit = None
     if mode != "binary" or (options.get("binary") or {}).get("operator") in ("+", "-"):
         units = {frame["columns"][i].get("unit") for i in numeric}
@@ -251,10 +274,10 @@ def apply_transformations(frames, transformations):
         if not isinstance(entry, dict) or entry.get("disabled"):
             continue
         kind = entry.get("id")
-        options = entry.get("options") or {}
+        options = _options(entry)
         if kind == "reduce":
             if options.get("mode") == "reduceFields":
-                reducer = (options.get("reducers") or ["lastNotNull"])[0]
+                reducer = _reducer((options.get("reducers") or ["lastNotNull"])[0], "lastNotNull")
                 current = [
                     dict(f, points=[[f["points"][-1][0], reduce_values([p[1] for p in f["points"]], reducer)]] if f["points"] else [])
                     if f["type"] == "timeseries"
@@ -279,7 +302,10 @@ def apply_transformations(frames, transformations):
         elif kind == "sortBy":
             current = [_sort(f, options) if f["type"] == "table" else f for f in current]
         elif kind == "limit":
-            limit = max(0, int(options.get("limitField", options.get("limit", 10)) or 0))
+            try:
+                limit = max(0, int(options.get("limitField", options.get("limit", 10)) or 0))
+            except (TypeError, ValueError):
+                raise TransformationError("Satır sınırı bir sayı olmalı") from None
             current = [dict(f, rows=f["rows"][:limit]) if f["type"] == "table" else f for f in current]
         elif kind == "calculateField":
             current = [_calculate(f, options) if f["type"] == "table" else f for f in current]
@@ -304,5 +330,5 @@ def apply_transformations(frames, transformations):
                 rows = [row for t in merged for row in t["rows"]]
                 current = _series(current) + [dict(tables[0], rows=rows)] + rest
         else:
-            raise TransformationError(f"Unknown transformation: {kind}")
+            raise TransformationError(f"Bilinmeyen dönüşüm: {kind}")
     return current

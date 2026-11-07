@@ -1,7 +1,7 @@
 # Tehdit modeli ve güven sınırları
 
 İnceleme kapsamı: tek Ubuntu host, nginx HTTPS, ayrı web ve tek worker süreci, yerel SQLite,
-isteğe bağlı LDAP ve SMTP, yedi salt okunur kaynak ve tarayıcı/PDF/Excel/CSV çıktıları.
+isteğe bağlı LDAP ve SMTP, on üç salt okunur kaynak türü (ve eklenti kaynaklar) ve tarayıcı/PDF/Excel/CSV çıktıları.
 Deneysel PostgreSQL uygulama deposu için işletim/geri yükleme desteği tamamlanmadan üretim kabulü verilmez.
 
 ## Varlıklar ve yetkiler

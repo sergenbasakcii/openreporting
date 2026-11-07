@@ -85,7 +85,7 @@ def list_datasources(request: Request, user=Depends(authenticate)):
 
 @router.get("/api/datasources/types")
 def datasource_types(user=Depends(authenticate)):
-    return {"types": datasources.TYPE_INFO, "testdataScenarios": datasources.scenarios()}
+    return {"types": datasources.TYPE_INFO, "categories": datasources.CATEGORIES, "testdataScenarios": datasources.scenarios()}
 
 
 @router.get("/api/datasources/{uid}")

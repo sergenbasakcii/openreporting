@@ -150,7 +150,9 @@ export function createCanvas(opts) {
 
   function itemBox(panel) {
     const { el, bar } = opts.renderItem(panel);
-    const box = h('div', { class: ['smart-item', opts.selectedId?.() === panel.id ? 'selected' : '', opts.isMulti?.(panel.id) ? 'multi' : ''].join(' '), dataset: { id: panel.id },
+    // The chip/tool bar floats above the item (see .smart-bar); it stays visible while a draft still needs a metric.
+    const needsKeyword = panel.smartDraft && !(panel.targets || []).length;
+    const box = h('div', { class: ['smart-item', opts.selectedId?.() === panel.id ? 'selected' : '', opts.isMulti?.(panel.id) ? 'multi' : '', needsKeyword ? 'needs-keyword' : ''].join(' '), dataset: { id: panel.id },
       onPointerdown: (e) => { e.stopPropagation(); opts.onSelect(panel, e); } });
     if (opts.editable === false) {
       box.append(h('div', { class: 'smart-bar' }, bar), h('div', { class: 'smart-view' }, el));
@@ -162,6 +164,8 @@ export function createCanvas(opts) {
       box.append(h('div', { class: 'smart-bar' }, grip, bar), h('div', { class: 'smart-view' }, el), resize);
     }
     placeBox(box, panel.smartPos, rows());
+    // Items in the right half open their floating tool bar towards the left so it stays on the page.
+    if ((panel.smartPos?.x || 0) >= 12) box.dataset.edge = 'right';
     return box;
   }
 

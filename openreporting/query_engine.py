@@ -236,7 +236,7 @@ def run(settings, request, *, user="", transport=None, trusted=True):
     transform_error = None
     try:
         frames = apply_transformations(visible, request.get("transformations"))
-    except (DomainError, ValueError, TypeError, IndexError, KeyError) as exc:
+    except (DomainError, ValueError, TypeError, IndexError, KeyError, AttributeError) as exc:
         log.warning("Transformation failed: %s", exc)
         frames, transform_error = visible, str(exc) if isinstance(exc, DomainError) else "Dönüşüm uygulanamadı"
     return {

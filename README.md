@@ -1,6 +1,6 @@
-# OpenReporting 1.0 — Gözlem, Dashboard ve Grup Bazlı Raporlama Platformu
+# OpenReporting 1.1 — Gözlem, Dashboard ve Grup Bazlı Raporlama Platformu
 
-OpenReporting; Zabbix ve SQL (PostgreSQL/TimescaleDB) kaynaklarından **Grafana benzeri dashboard’lar** kurmanızı,
+OpenReporting; Zabbix, SQL veritabanları, veri gölleri (Trino/Presto, Databricks), zaman serisi ve log sistemlerinden **dashboard’lar ve sayfa düzenli akıllı raporlar** kurmanızı,
 host grupları üzerinde **sorgu bazlı metrik** çekmenizi ve bunları **PDF / Excel / CSV raporlara** dönüştürüp
 zamanlamanızı sağlar. Tek bir Linux sunucu için tasarlanmıştır; Redis, Node, CDN veya harici bulut servisi gerektirmez.
 Ubuntu 24.04 kurulum kabulü doğrulanmıştır. Oracle Linux 8.10/9.4+/10 için yerel kurulum yolu ve
