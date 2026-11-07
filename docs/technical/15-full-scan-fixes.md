@@ -24,6 +24,7 @@ Geçici, ayrı bir kopyada (kendi veri klasörü, MFA kapalı test yöneticisi) 
 | 6 | Küçük logo kutusunda yer tutucu metin kesiliyordu. | "Görsel yok" + ipucu. |
 | 7 | PostgreSQL açıklamasında "Grafana makroları". | "zaman makroları". |
 | 8 | README/kılavuz başlığı 1.0, README girişi "Grafana benzeri", tehdit modeli "yedi kaynak". | 1.1, güncel kaynak listesi, "on üç tür". |
+| 10 | **Yükseltmeden sonra 502.** Web konteyneri yeniden oluşturulunca (`--build`, `kurulum.sh guncelle`) yeni iç IP alıyor, nginx eski IP'ye bağlanmaya devam ediyordu. | Web'e sabit iç IP (`OPENREPORTING_WEB_IP`, 172.30.88.11). CI web'i yeniden oluşturup proxy üzerinden sağlığı doğruluyor. |
 | 9 | `tests/browser/theme-surfaces.cjs` tema sistemi öncesinden kalmıştı (`data-theme=dark/light`); açılır menüsüz bir dashboard'la çalıştığı için bunu hiç fark etmemişti. | Gerçek temalara (Aurora/Porselen, `data-scheme`), yeni tür seçicisine ve profil tema kartlarına uyarlandı; PDF önizleme penceresi açılış rengini sabit RGB yerine açan sayfanın arka planıyla karşılaştırıyor. |
 
 ## Sorun olmadığı doğrulananlar

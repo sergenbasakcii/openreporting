@@ -60,6 +60,12 @@ docker compose --profile backup run --rm --entrypoint openreporting backup \
 grep -q '"ok": *true' "$EVIDENCE/verify.json"
 docker image inspect "openreporting:local" --format '{{.Size}}' > "$EVIDENCE/image-size-bytes.txt"
 
+# Upgrade path: a recreated web container (new image) must stay reachable through the running proxy.
+docker compose up -d --force-recreate --no-deps --wait web
+for _ in $(seq 1 20); do [ "$(curl -s -o /dev/null -w '%{http_code}' --cacert deploy/docker/certs/cert.pem "$BASE/api/health")" = 200 ] && break; sleep 2; done
+[ "$(curl -s -o /dev/null -w '%{http_code}' --cacert deploy/docker/certs/cert.pem "$BASE/api/health")" = 200 ]
+echo 'Proxy reaches a recreated web container'
+
 # Offline operation after installation: the host firewall rejects every new connection the containers
 # open towards anything outside their own subnet (deploy/docker/egress-lock.sh). The product must still
 # sign in, query, render a PDF, run the worker and back up.

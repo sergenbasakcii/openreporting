@@ -129,6 +129,7 @@ sınırlar sonradan **Yönetim → Sistem ayarları** sayfasından yapılabilir;
 | `OPENREPORTING_BIND` | 0.0.0.0 | Yalnız tek arayüzden dinlemek için sunucu IP'si |
 | `OPENREPORTING_SUBNET` | 172.30.88.0/24 | İç Docker ağı; kurum ağıyla çakışırsa değiştirin |
 | `OPENREPORTING_PROXY_IP` | 172.30.88.10 | Proxy'nin sabit iç IP'si (alt ağ içinde olmalı) |
+| `OPENREPORTING_WEB_IP` | 172.30.88.11 | Web konteynerinin sabit iç IP'si; yeniden oluşturulunca proxy bağlantısı kopmaz |
 | `OPENREPORTING_TAG` | local | İmaj etiketi |
 
 Kullanıcılar sunucuya birden fazla adla (örn. IP ile) giriyorsa bu adları
