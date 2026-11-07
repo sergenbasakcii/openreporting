@@ -121,3 +121,8 @@ Linux sunucuda bu komutları servis kullanıcısıyla çalıştırmak için: `su
 ```bash
 .venv/bin/python -m pytest -q
 ```
+
+## Lisans
+
+[MIT](LICENSE) — ücretsiz kullanılabilir, değiştirilebilir ve dağıtılabilir; lisans metni korunmalıdır.
+Paketlenmiş Apache ECharts kendi Apache-2.0 lisansıyla gelir (`openreporting/static/ECHARTS_LICENSE.txt`).

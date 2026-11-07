@@ -24,9 +24,9 @@ Gerçek kaynak/rapor/TLS/LDAP/SMTP yüküyle kurum kabulü yapılmadan bu tablo 
 ## 2. Kurulum
 
 ```bash
-# 1a) GitHub’dan (özel depo: salt-okunur bir deploy key veya “Contents: read” yetkili ince taneli token gerekir)
+# 1a) GitHub’dan (herkese açık depo; hesap veya token gerekmez)
 sudo apt-get install -y git
-git clone --branch v1.1.0 https://github.com/sergenbasakcii/openreporting.git /tmp/openreporting && cd /tmp/openreporting
+git clone https://github.com/sergenbasakcii/openreporting.git /tmp/openreporting && cd /tmp/openreporting
 
 # 1b) veya internetsiz sunucuya paket olarak taşıyın
 scp openreporting-1.1.0.zip admin@sunucu:/tmp/ && ssh admin@sunucu
@@ -51,13 +51,6 @@ ile runtime, uygulama ve kurulum aracı wheel’lerini hazırlayıp kaynak ağac
 Kapsam ve güncelleme kabulü [paket kilidi yönergesindedir](DEPENDENCY_LOCK.md).
 
 Betik **idempotent**tir; tekrar çalıştırmak mevcut `/etc/openreporting/openreporting.env` ve anahtarı korur.
-
-**Özel depoya erişim.** Tercih sırası: (1) sunucuya özel, salt-okunur **deploy key** (SSH:
-`git clone git@github.com:sergenbasakcii/openreporting.git`), (2) yalnız bu depoya ve yalnız
-*Contents: Read-only* izinli, kısa süreli **ince taneli token**. `git clone` parola sorduğunda
-kullanıcı adı GitHub hesabı, “Password” alanı token'dır (GitHub hesap parolası kabul edilmez).
-Token'ı komut satırına ayrı komut olarak yapıştırmayın, ekran görüntüsünde göstermeyin ve
-kurulumdan sonra iptal edin. Token kabuk geçmişine düştüyse `history -d <satır>` ile silin.
 
 **Paket adımı.** Kurulum önce `apt-get update` (3 tekrar denemeli) yapar; bir depo dizini
 indirilemezse durur ve kaynakları **değiştirmeden** ne kontrol edileceğini yazar. Ardından
