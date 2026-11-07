@@ -502,3 +502,31 @@ select.input[multiple] { height: auto; min-height: 96px; padding: 4px; }
 .smart-item.multi > .smart-view .panel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
 
 .ds-type-grid { margin-bottom: 18px; } .ds-type-grid .tile { text-align: left; font: inherit; width: 100%; }
+
+/* ---- date-range calendar (calendar.js) ---- */
+.cal { display: flex; flex-direction: column; gap: 10px; padding: 12px; min-width: 560px; }
+.cal-months { display: flex; align-items: flex-start; gap: 14px; }
+.cal-month { flex: 1; min-width: 230px; }
+.cal-title { text-align: center; font-weight: 600; color: var(--text-strong); margin: 4px 0 8px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-head span { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); padding-bottom: 4px; }
+.menu .cal .cal-day, .cal .cal-day { display: grid; place-items: center; width: 100%; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 8px;
+  background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.menu .cal .cal-day:hover, .cal .cal-day:hover { background: var(--bg-hover); color: var(--text-strong); }
+.cal .cal-day.today { border-color: var(--accent); font-weight: 600; }
+.cal .cal-day.in, .menu .cal .cal-day.in { background: var(--accent-soft); border-radius: 0; color: var(--text-strong); }
+.cal .cal-day.start, .cal .cal-day.end, .menu .cal .cal-day.start, .menu .cal .cal-day.end { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+.cal .cal-day.off { color: var(--text-faint, var(--text-muted)); opacity: .45; cursor: not-allowed; }
+.cal .cal-day:focus-visible { outline: none; box-shadow: var(--focus); position: relative; z-index: 1; }
+.menu .cal .cal-months > .btn, .cal .cal-months > .btn { width: auto; flex: none; margin-top: 2px; padding: 4px 8px; }
+.cal-times { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 10px; }
+.cal-time { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-muted); } .cal-time .input { width: 110px; }
+.cal-foot { display: flex; align-items: center; gap: 10px; } .cal-foot > svg { width: 16px; height: 16px; color: var(--accent); flex: none; }
+.cal-summary { flex: 1; font-size: 13px; color: var(--text-strong); }
+.menu .cal .cal-foot .btn, .menu .cal .cal-times .switch { width: auto; }
+.range-field { display: flex; gap: 8px; align-items: center; } .range-field .input { flex: 1; }
+@media (max-width: 640px) { .cal { min-width: 0; } .cal-months { flex-direction: column; } }
+
+.period-picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.period-picker .timepicker { min-width: 0; max-width: 100%; } .period-picker .timepicker .btn { min-width: 0; }
+.period-picker .tp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

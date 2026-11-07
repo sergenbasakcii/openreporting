@@ -72,6 +72,8 @@ def main():
                 OPENREPORTING_UI_URL=f"http://127.0.0.1:{listener.getsockname()[1]}",
             )
             subprocess.run(["node", "tests/browser/folder-flow.cjs"], env=env, check=True, timeout=240)
+            # Same disposable instance: the date-range calendar on the report form and the dashboard time picker.
+            subprocess.run(["node", "tests/browser/calendar-flow.cjs"], env=dict(env, UI_TEST_USER="folderadmin"), check=True, timeout=240)
         finally:
             server.should_exit = True
             thread.join(timeout=15)

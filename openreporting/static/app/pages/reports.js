@@ -3,7 +3,7 @@ import { h, button, input, select, textarea, field, toggle, toast, confirmDialog
 import { icon } from '../icons.js';
 import { get, post, put, del, api } from '../api.js';
 import { navigate, setBreadcrumbs } from '../router.js';
-import { QUICK_RANGES, effectiveZone } from '../time.js';
+import { QUICK_RANGES, effectiveZone, openCalendar, parseUserTime, toInputText } from '../time.js';
 import { resolveVariables, ALL } from '../variables.js';
 import { preparePreviewWindow } from '../preview.js';
 
@@ -214,12 +214,22 @@ export async function reportEditPage(root, { id, query, app }) {
   };
 
   const rangeKey = `${cfg.time_range.from}|${cfg.time_range.to}`;
+  const shown = (v) => toInputText(v, cfg.timezone);
+  const setRange = (from, to) => { cfg.time_range = { from, to }; fromIn.value = shown(from); toIn.value = shown(to); };
   const rangeSel = select([...REPORT_RANGES.map(([f, t, l]) => ({ value: `${f}|${t}`, label: l })), { value: 'custom', label: 'Özel…' }],
     REPORT_RANGES.some(([f, t]) => `${f}|${t}` === rangeKey) ? rangeKey : 'custom', (v) => {
-      if (v !== 'custom') { const [f, t] = v.split('|'); cfg.time_range = { from: f, to: t }; fromIn.value = f; toIn.value = t; }
+      if (v !== 'custom') { const [f, t] = v.split('|'); setRange(f, t); }
     });
-  const fromIn = input({ value: cfg.time_range.from, onChange: (e) => { cfg.time_range.from = e.target.value; rangeSel.value = 'custom'; } });
-  const toIn = input({ value: cfg.time_range.to, onChange: (e) => { cfg.time_range.to = e.target.value; rangeSel.value = 'custom'; } });
+  // Typed values: relative expressions ("now-1d/d") or wall-clock dates in the report's time zone.
+  const readTime = (el, key) => {
+    const value = parseUserTime(el.value, cfg.timezone);
+    if (!value) { toast('Geçersiz zaman: "now-1d/d" veya "2026-11-01 00:00" yazın ya da takvimden seçin', 'error'); el.value = shown(cfg.time_range[key]); return; }
+    cfg.time_range[key] = value; el.value = shown(value); rangeSel.value = 'custom';
+  };
+  const fromIn = input({ value: shown(cfg.time_range.from), placeholder: 'now-1d/d veya 2026-11-01 00:00', onChange: (e) => readTime(e.target, 'from') });
+  const toIn = input({ value: shown(cfg.time_range.to), placeholder: 'now-1d/d veya 2026-11-30 23:59', onChange: (e) => readTime(e.target, 'to') });
+  const calendarBtn = button('Takvim', { icon: 'calendar', title: 'Tarih aralığını takvimden seçin', onClick: () => openCalendar(calendarBtn, {
+    range: cfg.time_range, timezone: cfg.timezone, onPick: ({ from, to }) => { setRange(from, to); rangeSel.value = 'custom'; } }) });
   const formatBoxes = h('div', { class: 'toolbar' }, ['pdf', 'xlsx', 'csv'].map((f) => toggle(f.toUpperCase(), cfg.formats.includes(f), (on) => {
     cfg.formats = on ? [...new Set([...cfg.formats, f])] : cfg.formats.filter((x) => x !== f);
   })));
@@ -265,9 +275,10 @@ export async function reportEditPage(root, { id, query, app }) {
       field('Rapor adı', input({ value: cfg.name, placeholder: 'Ör. WAN Router Haftalık Performans', onChange: (e) => { cfg.name = e.target.value; } })),
       field('Açıklama', textarea({ value: cfg.description, rows: 2, onChange: (e) => { cfg.description = e.target.value; } })),
       field('Dashboard', dashSel),
-      h('div', { class: 'form-grid' }, field('Zaman aralığı', rangeSel), field('Saat dilimi', select(['Europe/Istanbul', 'UTC', 'Europe/London', 'Europe/Berlin'].map((z) => ({ value: z, label: z })), cfg.timezone, (v) => { cfg.timezone = v; }))),
+      h('div', { class: 'form-grid' }, field('Zaman aralığı', h('div', { class: 'range-field' }, rangeSel, calendarBtn)),
+        field('Saat dilimi', select(['Europe/Istanbul', 'UTC', 'Europe/London', 'Europe/Berlin'].map((z) => ({ value: z, label: z })), cfg.timezone, (v) => { cfg.timezone = v; fromIn.value = shown(cfg.time_range.from); toIn.value = shown(cfg.time_range.to); }))),
       h('div', { class: 'form-grid' }, field('Başlangıç', fromIn), field('Bitiş', toIn)),
-      h('p', { class: 'hint', text: 'Zamanlanmış çalıştırmalarda varsayılan olarak "önceki tam dönem" (dün, geçen hafta, geçen ay) kullanılır.' })),
+      h('p', { class: 'hint', text: 'Takvimden seçilen sabit tarihler anlık çalıştırma ve önizleme içindir. Zamanlanmış çalıştırmalarda varsayılan olarak "önceki tam dönem" (dün, geçen hafta, geçen ay) kullanılır.' })),
     h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Dashboard içeriği' }), dashHost)),
     h('div', h('div', { class: 'card' }, h('h2', { class: 'section-heading', text: 'Çıktı ve düzen' }),
       field('Biçimler', formatBoxes),

@@ -1,6 +1,7 @@
 // Time range model, picker and refresh picker (Grafana semantics, server-side resolution).
 import { h, button, input, popover, closePopups, fmtDateTime, field, toast } from './dom.js';
 import { icon } from './icons.js';
+import { calendarRange, dayKey, formatDay, zonedParts } from './calendar.js';
 import { get } from './api.js';
 
 export const QUICK_RANGES = [
@@ -32,6 +33,18 @@ export function isAbsolute(value) { return /^\d{10,}$/.test(String(value)); }
 export function rangeLabel(range, tz) {
   const quick = QUICK_RANGES.find(([f, t]) => f === range.from && t === range.to);
   if (quick) return quick[2];
+  // Whole days (calendar picks): "2 Ekim 2026 – 20 Ekim 2026"; the end midnight belongs to the next day.
+  if (isAbsolute(range.from) && isAbsolute(range.to)) {
+    const zone = effectiveZone(tz);
+    const a = zonedParts(Number(range.from), zone);
+    const b = zonedParts(Number(range.to), zone);
+    if (!a.hh && !a.mm && !b.hh && !b.mm && Number(range.to) > Number(range.from)) {
+      const last = zonedParts(Number(range.to) - 3600000, zone);
+      const first = formatDay(dayKey(a.y, a.m, a.d));
+      const end = formatDay(dayKey(last.y, last.m, last.d));
+      return first === end ? first : `${first} – ${end}`;
+    }
+  }
   const fmt = (v) => (isAbsolute(v) ? fmtDateTime(Number(v), tz) : v);
   return `${fmt(range.from)} → ${fmt(range.to)}`;
 }
@@ -84,7 +97,7 @@ export function parseUserTime(text, tz) {
   return null;
 }
 
-function toInputText(value, tz) {
+export function toInputText(value, tz) {
   if (!isAbsolute(value)) return value;
   const d = new Date(Number(value));
   const parts = new Intl.DateTimeFormat('sv-SE', { timeZone: effectiveZone(tz), year: 'numeric', month: '2-digit', day: '2-digit',
@@ -121,8 +134,9 @@ export function timePicker({ range, timezone, onChange, getResolved, compact = f
     };
     const quick = h('div', { class: 'quick' }, QUICK_RANGES.map(([from, to, text]) => h('button', {
       type: 'button', class: from === range.from && to === range.to ? 'on' : '', text, onclick: () => { closePopups(); onChange({ from, to }); } })));
+    const calBtn = button('Takvimden seç', { icon: 'calendar', onClick: () => openCalendar(trigger, { range, timezone, onPick: ({ from, to }) => onChange({ from, to }) }) });
     const abs = h('div', { class: 'abs' }, h('h4', { text: 'Mutlak zaman aralığı' }), field('Başlangıç', fromIn), field('Bitiş', toIn),
-      button('Zaman aralığını uygula', { variant: 'primary', onClick: apply }),
+      h('div', { class: 'toolbar' }, button('Zaman aralığını uygula', { variant: 'primary', onClick: apply }), calBtn),
       h('p', { class: 'hint', style: { marginTop: '12px' } }, `Saat dilimi: ${effectiveZone(timezone)}. Örnekler: now-24h, now/d (bugün), now-1M/M (geçen ay).`));
     popover(trigger, [abs, quick], { className: 'timepicker-pop', align: 'right' });
     setTimeout(() => fromIn.focus(), 10);
@@ -140,6 +154,22 @@ export function timePicker({ range, timezone, onChange, getResolved, compact = f
   }
   wrap.setRange = (r) => { range = r; update(r); };
   return wrap;
+}
+
+/**
+ * Open the date-range calendar under `anchor`. Relative ranges ("now-1d/d") are resolved first so the
+ * calendar opens on the days they cover. onPick receives absolute epoch-ms strings.
+ */
+export async function openCalendar(anchor, { range, timezone, onPick }) {
+  let start = range.from;
+  let end = range.to;
+  const relative = !isAbsolute(start) || !isAbsolute(end);
+  if (relative) {
+    try { const r = await resolveRange(range, timezone); start = String(r.from); end = String(r.to); } catch { start = null; end = null; }
+  }
+  const cal = calendarRange({ from: start, to: end, timezone: effectiveZone(timezone), daysOnly: relative, onPick: (picked) => { closePopups(); onPick(picked); } });
+  popover(anchor, cal, { className: 'cal-pop' });
+  setTimeout(() => cal.focusDay(), 10);
 }
 
 export function refreshPicker({ value, onRefresh, onInterval }) {

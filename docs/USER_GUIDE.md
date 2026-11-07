@@ -93,7 +93,8 @@ Zaman serisi biçiminde `time` sütunu (+ isteğe bağlı `metric` sütunu) dön
 ## 6. Raporlar (grup bazlı)
 
 1. *Raporlar → Yeni rapor* (veya dashboard menüsü → *Bu dashboard’dan rapor oluştur*).
-2. **Zaman aralığı**: Dün / Geçen hafta / Geçen ay / Son N … veya özel (`now-1M/M` → `now-1M/M` = geçen takvim ayı).
+2. **Zaman aralığı**: Dün / Geçen hafta / Geçen ay / Son N … veya **Takvim** düğmesiyle başlangıç ve bitiş gününe tıklayarak
+   sabit bir aralık (ör. 1–15 Kasım). Göreli ifade de yazılabilir (`now-1M/M` → `now-1M/M` = geçen takvim ayı).
 3. **Değişken değerleri**: rapor için sabitleyin (ör. Host grubu = WAN Routers, Host = Tümü).
 4. **Grup bazlı bölümleme**: `$host` seçilirse gruptaki **her host için başlıklı bir bölüm** ve kapakta içindekiler üretilir.
    Bağımlı değişkenler her bölüm için yeniden çözülür.

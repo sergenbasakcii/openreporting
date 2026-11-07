@@ -4,7 +4,7 @@ import { icon } from '../icons.js';
 import { post } from '../api.js';
 import { PLUGINS } from '../panels/registry.js';
 import { THRESHOLDS } from './templates.js';
-import { timePicker, resolveRange, rangeLabel } from '../time.js';
+import { timePicker, resolveRange, rangeLabel, openCalendar } from '../time.js';
 
 export const CHART_TYPES = ['narrative', 'timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'donut', 'statusgrid', 'heatmap', 'statetimeline'];
 export const LAYOUT_TYPES = ['text', 'image', 'divider', 'reportinfo'];
@@ -50,14 +50,18 @@ const PERIODS = [['now-7d', 'now', 'Son 7 gün'], ['now-30d', 'now', 'Son 30 gü
 function periodEditor(panel, change, timezone) {
   const own = panel.timeRange;
   const set = (range) => change(() => { if (range) panel.timeRange = range; else delete panel.timeRange; }, { refresh: panel, canvas: true });
-  const picker = timePicker({ range: own || { from: 'now-1y', to: 'now' }, timezone, onChange: (r) => set({ from: String(r.from), to: String(r.to) }),
+  const picker = timePicker({ range: own || { from: 'now-1y', to: 'now' }, timezone, compact: true, onChange: (r) => set({ from: String(r.from), to: String(r.to) }),
     getResolved: () => resolveRange(own || { from: 'now-1y', to: 'now' }, timezone) });
   return h('div', { class: 'period-editor' },
     h('div', { class: 'segmented period-mode', role: 'radiogroup', 'aria-label': 'Tarih aralığı kaynağı' },
       h('button', { type: 'button', role: 'radio', 'aria-checked': String(!own), class: own ? '' : 'on', onClick: () => set(null) }, 'Rapor aralığı'),
       h('button', { type: 'button', role: 'radio', 'aria-checked': String(!!own), class: own ? 'on' : '', onClick: () => { if (!own) set({ from: 'now-1y', to: 'now' }); } }, 'Panele özel')),
     own ? h('div', h('div', { class: 'period-chips' }, PERIODS.map(([from, to, label]) => h('button', { type: 'button', class: ['kw-chip', own.from === from && own.to === to ? 'set' : ''].join(' '), onClick: () => set({ from, to }) }, label))),
-      h('div', { class: 'period-picker' }, h('span', { class: 'hint', text: 'veya takvimden seçin:' }), picker),
+      h('div', { class: 'period-picker' }, (() => {
+        const btn = button('Takvim', { icon: 'calendar', size: 'sm', title: 'Bu panelin tarih aralığını takvimden seçin',
+          onClick: () => openCalendar(btn, { range: own, timezone, onPick: ({ from, to }) => set({ from, to }) }) });
+        return btn;
+      })(), picker),
       h('p', { class: 'hint', text: `Seçili: ${rangeLabel(own, timezone)}. PDF’te panel başlığının yanında yazar; göreli aralıklar raporun bitiş anına göre hesaplanır.` }))
       : h('p', { class: 'hint', text: 'Panel, araç çubuğundaki rapor tarih aralığını izler.' }));
 }

@@ -32,3 +32,5 @@ responsive, data-dependent and institution-specific acceptance.
 
 The accessibility script also verifies real dialog Tab/Shift+Tab wrapping and Escape focus
 restoration, panel menu arrow navigation, and section Space/Enter toggling without saving data.
+
+- `calendar-flow.cjs` — tarih aralığı takvimi: rapor formunda ve dashboard zaman seçicisinde fare ve klavyeyle aralık seçimi, yazılan göreli/geçersiz değerler, 5 temada axe. CI'da `tools/folder_browser_acceptance.py` içinde çalışır.
