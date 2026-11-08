@@ -21,6 +21,7 @@ API'yi, güvenlik kurallarını ve testleri anlatır. Kurulum ve işletim rehber
 | 14 | [Tek komutla Docker kurulumu](14-one-command-installer.md) | `kurulum.sh`: kur, güncelle, durum, yedek; CI ile doğrulanır |
 | 15 | [Uçtan uca tarama ve düzeltmeler](15-full-scan-fixes.md) | Veri kaynağı tür seçicisi, akıllı dashboard araç çubuğu, dönüşüm sağlamlığı, metin düzeltmeleri |
 | 16 | [Tarih aralığı takvimi](16-date-range-calendar.md) | Raporlarda, dashboard zaman seçicisinde ve akıllı panelde tıklanabilir takvim |
+| 17 | [Herkese açık depo ve Linux kurulum dokümanı](17-public-install-guide.md) | MIT lisansı, dağıtıma göre Docker kurulumu, kurulum PDF'i |
 
 ## İlgili belgeler
 

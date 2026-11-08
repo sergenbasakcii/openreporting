@@ -35,6 +35,8 @@ Betik yalnız sunucu adresini ve ilk yöneticiyi sorar; Docker kontrolü, ayar d
 anahtar kopyası, gece yedeği ve isteğe bağlı internet çıkış kilidini kendisi yapar. Sonrası:
 `sudo ./kurulum.sh durum | yedek | guncelle`. Ayrıntılar: **[docs/DOCKER.md](docs/DOCKER.md)**.
 
+Kurulum öncesi kontrol listesi, dağıtıma göre hazırlık, kurumsal proxy/SSL denetimi ve Kubernetes adımları: **[Linux Kurulum Dokümanı](docs/KURULUM-LINUX.md)** ([PDF](docs/OpenReporting-Linux-Kurulum.pdf)).
+
 ## Doğrudan Linux kurulumu (Docker'sız alternatif)
 
 ```bash

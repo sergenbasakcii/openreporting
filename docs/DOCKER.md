@@ -14,6 +14,8 @@ Bütün konteynerler salt okunur kök dosya sistemiyle, tüm Linux yetenekleri k
 başlıklarına güvenir; 8810 portu sunucu dışına açılmaz. CI her değişiklikte bu yığını kurar ve
 HTTPS, güvenli çerez, HTTPS üzerinden MFA, worker, yeniden başlatma kalıcılığı ve yedek doğrulamasını test eder.
 
+> Adım adım kurulum (kontrol listesi, her dağıtım için hazırlık, proxy/SSL denetimi): **[KURULUM-LINUX.md](KURULUM-LINUX.md)**.
+
 ## 1. Gereksinimler
 
 - Linux sunucu (Ubuntu 24.04 önerilir), **Docker Engine 24+** ve **Docker Compose v2** (`docker compose version`).

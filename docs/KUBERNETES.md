@@ -28,6 +28,8 @@ Bilinen sınırlar: yazma işlemleri veritabanında tek kilitle sıralanır (oku
 yazmada sınır PostgreSQL'dir). Rapor üretimi tek aktif worker'dadır; çok sayıda ağır zamanlanmış rapor
 için saatleri dağıtın. Her istek yeni veritabanı bağlantısı açar; çok pod'da **PgBouncer** önerilir.
 
+> Küme yoksa tek sunuculu k3s, PostgreSQL hazırlığı ve adım adım kurulum: **[KURULUM-LINUX.md](KURULUM-LINUX.md)** (Bölüm 5).
+
 ## 1. Gereksinimler
 
 - Kubernetes 1.27+, bir Ingress controller (örnekler ingress-nginx için), metrics-server (HPA için).
